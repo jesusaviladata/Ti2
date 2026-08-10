@@ -10,7 +10,7 @@ CMD ["npm", "run", "dev"]
 
 FROM base AS builder
 COPY . .
-RUN npm run build
+RUN mkdir -p public && npm run build
 
 FROM node:20-alpine AS production
 WORKDIR /app
