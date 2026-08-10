@@ -1,0 +1,18 @@
+# Dependencias para el servidor de DESARROLLO (dev_server.py)
+# No requiere PostgreSQL, Redis ni Docker
+#
+# Instalar con:
+#   pip install -r requirements-dev.txt
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+PyJWT>=2.10.0
+bcrypt>=4.0.0
+python-multipart>=0.0.12
+pyodbc>=5.2.0
+apscheduler>=3.10.0
+paramiko>=3.5.0
+
+# Pruebas (backend/tests) — pruebas de humo con pytest + TestClient
+pytest>=8.0.0
+httpx>=0.27.0

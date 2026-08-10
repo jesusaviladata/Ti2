@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Paleta Data Express — azules corporativos. Los nombres de token se conservan
+     (musgo/arcilla/crema/carbon) para no tocar cada componente; solo cambian los
+     valores. Rol de cada uno: carbon = fondo, musgo = superficies/bordes (slate azul),
+     arcilla = acento (azul Data Express), crema = texto. */
+
+  /* Dark theme (default) — RGB tuples for Tailwind opacity modifier support */
+  :root {
+    --color-musgo:   30 52 79;    /* #1E344F — slate azul para tarjetas/bordes */
+    --color-arcilla: 41 170 224;  /* #29AAE0 — azul acento Data Express */
+    --color-crema:   233 240 247; /* #E9F0F7 — texto blanco frío */
+    --color-carbon:  11 20 34;    /* #0B1422 — fondo azul noche */
+  }
+
+  /* Light theme */
+  [data-theme="light"] {
+    --color-carbon:  237 242 248; /* #EDF2F8 — fondo claro frío */
+    --color-crema:   15 27 45;    /* #0F1B2D — texto azul oscuro */
+    --color-musgo:   30 52 79;
+    --color-arcilla: 41 170 224;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-carbon text-crema font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Magnetic button scale — from design system */
+  .btn-magnetic {
+    @apply transition-transform duration-200 ease-power3-out hover:scale-[1.03];
+  }
+}

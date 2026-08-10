@@ -1,0 +1,33 @@
+# Framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+
+# Settings & Validation
+pydantic-settings==2.6.1
+pydantic[email]==2.10.1
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+
+# Auth & Security
+PyJWT==2.10.1
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+
+# HTTP Client
+httpx==0.28.1
+
+# Backups
+pyodbc==5.2.0
+apscheduler==3.10.4
+cryptography==44.0.2
+paramiko==3.5.1
+aiofiles==24.1.0
+
+# Dev
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0

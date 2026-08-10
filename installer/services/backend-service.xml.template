@@ -1,0 +1,23 @@
+<service>
+  <id>DataExpressGestorBackend</id>
+  <name>Data Express Gestor PRIMEE - Backend</name>
+  <description>API interna de Gestor PRIMEE para Data Express.</description>
+  <executable>%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe</executable>
+  <arguments>-NoProfile -ExecutionPolicy Bypass -File "{{INSTALL_ROOT}}\installer\services\Start-Backend.ps1" -InstallRoot "{{INSTALL_ROOT}}" -Port {{BACKEND_PORT}}</arguments>
+  <workingdirectory>{{INSTALL_ROOT}}\app\current\backend</workingdirectory>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="none" />
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>30 sec</stoptimeout>
+  <logpath>{{INSTALL_ROOT}}\logs\backend</logpath>
+  <log mode="roll-by-size-time">
+    <sizeThreshold>10240</sizeThreshold>
+    <pattern>yyyyMMdd</pattern>
+    <autoRollAtTime>00:00:00</autoRollAtTime>
+    <zipOlderThanNumDays>7</zipOlderThanNumDays>
+    <zipDateFormat>yyyyMMdd</zipDateFormat>
+  </log>
+</service>

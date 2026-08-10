@@ -1,0 +1,29 @@
+@{
+    InstallRoot             = 'D:\DataExpress\GestorPrimee'
+    PostgresData            = 'D:\DataExpress\GestorPrimee\data\postgresql'
+    BackupRoot              = 'D:\DataExpress\GestorPrimee\backups\postgresql'
+    OffsiteRoot             = ''
+    FileManagerAllowedRoots = @('D:\DataExpress\GestorPrimee\data', 'D:\DataExpress\GestorPrimee\backups')
+    PostgresMajor           = 17
+    PostgresPort            = 5432
+    PostgresServiceName     = 'postgresql-x64-17-dataexpress'
+    DatabaseName            = 'gestor_primee'
+    DatabaseUser            = 'gestor_primee_app'
+    BackendPort             = 8000
+    FrontendPort            = 3000
+    FrontendHeapMb          = 512
+    FrontendMemoryWarnMb    = 600
+    FrontendMemoryRestartMb = 900
+    FrontendMemorySamples   = 3
+    IisSiteName             = 'DataExpress Gestor PRIMEE'
+    IisAppPoolName          = 'DataExpressGestorPrimee'
+    PublicHost              = 'gestor.dataexpress.local'
+    IisHttpsPort            = 443
+    CertificateThumbprint   = ''
+    PostgresInstallerPath   = ''
+    PostgresInstallerSha256 = ''
+    WinSWPath               = ''
+    WinSWSha256             = ''
+    PythonPath              = ''
+    NodePath                = ''
+}
