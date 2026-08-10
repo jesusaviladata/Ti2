@@ -161,6 +161,85 @@ class CleanupTrashItem(TenantRecord, Base):
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class RemoteAgent(TenantRecord, Base):
+    __tablename__ = "remote_agents"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "installation_id", name="uq_remote_agent_installation"),
+        Index("ix_remote_agents_status_seen", "tenant_id", "status", "last_seen_at"),
+    )
+
+    installation_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    hostname: Mapped[str] = mapped_column(String(255), nullable=False)
+    os_version: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    agent_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    public_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="SET NULL")
+    )
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class AgentPairingToken(TenantRecord, Base):
+    __tablename__ = "agent_pairing_tokens"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_agent_pairing_token_hash"),
+        Index("ix_agent_pairing_expiry", "expires_at", "used_at"),
+    )
+
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    replace_agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="SET NULL")
+    )
+
+
+class AgentRequestNonce(TenantRecord, Base):
+    __tablename__ = "agent_request_nonces"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "nonce_hash", name="uq_agent_request_nonce"),
+        Index("ix_agent_request_nonces_expiry", "expires_at"),
+    )
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="CASCADE"), nullable=False
+    )
+    nonce_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AgentCommand(TenantRecord, Base):
+    __tablename__ = "agent_commands"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "idempotency_key", name="uq_agent_command_idempotency"),
+        Index("ix_agent_commands_pending", "agent_id", "status", "expires_at", "created_at"),
+    )
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="CASCADE"), nullable=False
+    )
+    job_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("background_jobs.id", ondelete="SET NULL")
+    )
+    command_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    result_summary: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    error_code: Mapped[str | None] = mapped_column(String(100))
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+
 class RemoteServer(TenantRecord, Base):
     __tablename__ = "remote_servers"
     __table_args__ = (
@@ -168,12 +247,43 @@ class RemoteServer(TenantRecord, Base):
     )
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    protocol: Mapped[str] = mapped_column(String(10), nullable=False)
-    host: Mapped[str] = mapped_column(String(255), nullable=False)
-    port: Mapped[int] = mapped_column(Integer, nullable=False)
-    username: Mapped[str] = mapped_column(String(255), nullable=False)
-    base_path: Mapped[str] = mapped_column(String(2048), nullable=False)
+    transport: Mapped[str] = mapped_column(String(10), nullable=False, default="legacy")
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    protocol: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    host: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    base_path: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
     allowlist: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    target_folders: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    target_files: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    config_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    configuration_hash: Mapped[str | None] = mapped_column(String(64))
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RemoteStructureValidation(TenantRecord, Base):
+    __tablename__ = "remote_structure_validations"
+    __table_args__ = (
+        Index("ix_remote_structure_validation_server", "tenant_id", "server_id", "created_at"),
+    )
+
+    server_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("remote_servers.id", ondelete="CASCADE"), nullable=False
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="CASCADE"), nullable=False
+    )
+    job_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("background_jobs.id", ondelete="SET NULL")
+    )
+    configuration_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    summary: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class SshHostKey(TenantRecord, Base):

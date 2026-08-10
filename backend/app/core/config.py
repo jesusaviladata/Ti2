@@ -1,5 +1,5 @@
 from typing import List, Literal
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     # Rate-limiting de login (fuerza bruta)
     LOGIN_MAX_FAILS: int = 5
     LOGIN_FAIL_WINDOW_SEC: int = 300
+
+    # Windows Agent. Se activa solo despues de configurar la firma en Railway.
+    AGENT_MODULE_ENABLED: bool = False
+    AGENT_COMMAND_SIGNING_PRIVATE_KEY: str = ""
+    AGENT_COMMAND_SIGNING_KEY_ID: str = ""
+    AGENT_ENROLLMENT_TTL_SEC: int = Field(600, ge=60, le=3600)
+    AGENT_COMMAND_TTL_SEC: int = Field(120, ge=30, le=600)
+    AGENT_MAX_CLOCK_SKEW_SEC: int = Field(120, ge=30, le=300)
+    AGENT_MIN_VERSION: str = "0.1.0"
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://infra_user:infra_pass@db:5432/infra_platform"
@@ -75,6 +84,25 @@ class Settings(BaseSettings):
         if self.APP_ENV == "production":
             if not self.APP_ORIGIN.startswith("https://") or not self.COOKIE_SECURE:
                 raise ValueError("Produccion requiere APP_ORIGIN HTTPS y COOKIE_SECURE=true")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_agent_signing(self):
+        if not self.AGENT_MODULE_ENABLED:
+            return self
+        key_id = self.AGENT_COMMAND_SIGNING_KEY_ID
+        valid_key_id = (
+            1 <= len(key_id) <= 64
+            and all(character.isalnum() or character in "._-" for character in key_id)
+        )
+        if not valid_key_id:
+            raise ValueError("AGENT_COMMAND_SIGNING_KEY_ID invalido")
+        try:
+            from app.agent_protocol import load_private_key
+
+            load_private_key(self.AGENT_COMMAND_SIGNING_PRIVATE_KEY)
+        except Exception as exc:
+            raise ValueError("Clave privada de comandos del agente invalida") from exc
         return self
 
 
