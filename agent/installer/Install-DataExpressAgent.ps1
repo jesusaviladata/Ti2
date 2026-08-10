@@ -12,19 +12,20 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $packageRoot = Split-Path -Parent $scriptRoot
 $dataDirectory = "$env:ProgramData\DataExpress\Agent"
 $serviceWrapper = Join-Path $InstallDirectory "DataExpressAgent.Service.exe"
+$agentBundle = Join-Path $packageRoot "DataExpressAgent"
 
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw "Ejecute este instalador como administrador."
 }
-if (-not (Test-Path (Join-Path $packageRoot "DataExpressAgent.exe"))) {
-    throw "Falta DataExpressAgent.exe en el paquete."
+if (-not (Test-Path (Join-Path $agentBundle "DataExpressAgent.exe"))) {
+    throw "Falta la carpeta autocontenida DataExpressAgent en el paquete."
 }
 if (-not (Test-Path (Join-Path $packageRoot "DataExpressAgent.Service.exe"))) {
-    throw "Falta el ejecutable firmado de WinSW en el paquete."
+    throw "Falta el ejecutable oficial de WinSW en el paquete."
 }
 
 New-Item -ItemType Directory -Force -Path $InstallDirectory, $dataDirectory | Out-Null
-Copy-Item -Force (Join-Path $packageRoot "DataExpressAgent.exe") $InstallDirectory
+Copy-Item -Recurse -Force $agentBundle $InstallDirectory
 Copy-Item -Force (Join-Path $packageRoot "DataExpressAgent.Service.exe") $InstallDirectory
 Copy-Item -Force (Join-Path $scriptRoot "DataExpressAgent.Service.xml") $InstallDirectory
 

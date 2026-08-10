@@ -48,3 +48,4 @@ graphify-out/
 **/graphify-out/
 *.log
 *.zip
+agent/release/

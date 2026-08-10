@@ -1,10 +1,10 @@
 <service>
   <id>DataExpressAgent</id>
   <name>Data Express Agent</name>
-  <description>Conexión segura de salida para administrar servidores Core autorizados.</description>
-  <executable>%BASE%\DataExpressAgent.exe</executable>
+  <description>Conexion segura de salida para administrar servidores Core autorizados.</description>
+  <executable>%BASE%\DataExpressAgent\DataExpressAgent.exe</executable>
   <arguments>--config "%ProgramData%\DataExpress\Agent\agent.json" --pairing-code-file "%ProgramData%\DataExpress\Agent\pairing-code.tmp"</arguments>
-  <workingdirectory>%BASE%</workingdirectory>
+  <workingdirectory>%BASE%\DataExpressAgent</workingdirectory>
   <startmode>Automatic</startmode>
   <delayedAutoStart>true</delayedAutoStart>
   <serviceaccount>
@@ -21,4 +21,3 @@
   </log>
   <stoptimeout>30 sec</stoptimeout>
 </service>
-

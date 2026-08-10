@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 analysis = Analysis(
-    ["data_express_agent/__main__.py"],
+    ["agent_entry.py"],
     pathex=["."],
     binaries=[],
     datas=[],
@@ -16,14 +16,20 @@ pyz = PYZ(analysis.pure)
 exe = EXE(
     pyz,
     analysis.scripts,
-    analysis.binaries,
-    analysis.datas,
     [],
+    exclude_binaries=True,
     name="DataExpressAgent",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=True,
 )
-
+bundle = COLLECT(
+    exe,
+    analysis.binaries,
+    analysis.datas,
+    strip=False,
+    upx=True,
+    name="DataExpressAgent",
+)
