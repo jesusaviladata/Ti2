@@ -6,6 +6,10 @@ const PUBLIC_PATHS = ["/login", "/forgot-password"];
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
   if (
     PUBLIC_PATHS.some((path) => pathname.startsWith(path)) ||
     pathname.startsWith("/_next") ||
