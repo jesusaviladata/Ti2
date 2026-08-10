@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search, Bell, Sun, Moon, X,
   LogOut, User, Database, Monitor, ShieldAlert,
@@ -16,15 +17,18 @@ import { cn } from "@/lib/utils";
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface SearchItem {
   id: string;
-  label: string;
-  sub: string;
-  status: string;
+  type: "backup" | "access";
+  title: string;
+  subtitle: string;
+  href: string;
 }
 
 interface SearchResults {
-  backups: SearchItem[];
-  access: SearchItem[];
+  items: SearchItem[];
+  total: number;
 }
+
+type SearchStatus = "idle" | "loading" | "success" | "error";
 
 interface Notification {
   id: string;
@@ -57,25 +61,40 @@ function statusDot(status: string) {
 
 // ── Search panel ──────────────────────────────────────────────────────────────
 function SearchPanel({
-  query, results, onClose,
+  query, results, status, onClose, onSelect,
 }: {
   query: string;
   results: SearchResults | null;
+  status: SearchStatus;
   onClose: () => void;
+  onSelect: (href: string) => void;
 }) {
-  const hasBackups = (results?.backups.length ?? 0) > 0;
-  const hasAccess  = (results?.access.length  ?? 0) > 0;
-  const hasAny     = hasBackups || hasAccess;
+  const items = results?.items ?? [];
+  const backups = items.filter((item) => item.type === "backup");
+  const access = items.filter((item) => item.type === "access");
+  const hasBackups = backups.length > 0;
+  const hasAccess = access.length > 0;
+  const hasAny = hasBackups || hasAccess;
 
   return (
-    <div className="absolute left-0 top-full mt-2 w-full min-w-[420px] z-[60] rounded-[1rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden">
+    <div
+      id="global-search-results"
+      className="absolute left-0 top-full mt-2 w-full min-w-[420px] z-[60] rounded-[1rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden"
+    >
       {/* Loading / empty */}
-      {!results && (
+      {status === "loading" && (
         <div className="px-4 py-5 text-center">
-          <p className="font-mono text-xs text-crema/25">Buscando…</p>
+          <p role="status" className="font-mono text-xs text-crema/40">Buscando…</p>
         </div>
       )}
-      {results && !hasAny && (
+      {status === "error" && (
+        <div className="px-4 py-5 text-center">
+          <p role="alert" className="font-mono text-xs text-red-300/80">
+            No se pudo realizar la búsqueda. Inténtalo nuevamente.
+          </p>
+        </div>
+      )}
+      {status === "success" && !hasAny && (
         <div className="px-4 py-5 text-center">
           <p className="font-mono text-xs text-crema/25">Sin resultados para &ldquo;{query}&rdquo;</p>
         </div>
@@ -88,21 +107,18 @@ function SearchPanel({
             <Database size={10} className="text-crema/30" />
             <span className="font-mono text-[9px] text-crema/30 uppercase tracking-widest">Backups</span>
           </div>
-          {results!.backups.map((item) => (
-            <div
+          {backups.map((item) => (
+            <button
+              type="button"
               key={item.id}
-              className="flex items-center gap-3 px-4 py-2 hover:bg-musgo/10 cursor-pointer transition-colors"
+              onClick={() => onSelect(item.href)}
+              className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-musgo/10 transition-colors focus-visible:outline-none focus-visible:bg-musgo/15"
             >
-              <div className="flex-1 min-w-0">
-                <p className="font-sans text-sm text-crema/80 truncate">{item.label}</p>
-                {item.sub && (
-                  <p className="font-mono text-[10px] text-crema/35 truncate">{item.sub}</p>
-                )}
-              </div>
-              <span className={cn("font-mono text-[10px] shrink-0", statusDot(item.status))}>
-                {item.status}
+              <p className="flex-1 min-w-0 font-sans text-sm text-crema/80 truncate">{item.title}</p>
+              <span className={cn("font-mono text-[10px] shrink-0", statusDot(item.subtitle))}>
+                {item.subtitle}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -114,21 +130,20 @@ function SearchPanel({
             <Monitor size={10} className="text-crema/30" />
             <span className="font-mono text-[9px] text-crema/30 uppercase tracking-widest">Acceso Remoto</span>
           </div>
-          {results!.access.map((item) => (
-            <div
+          {access.map((item) => (
+            <button
+              type="button"
               key={item.id}
-              className="flex items-center gap-3 px-4 py-2 hover:bg-musgo/10 cursor-pointer transition-colors"
+              onClick={() => onSelect(item.href)}
+              className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-musgo/10 transition-colors focus-visible:outline-none focus-visible:bg-musgo/15"
             >
               <div className="flex-1 min-w-0">
-                <p className="font-sans text-sm text-crema/80 truncate">{item.label}</p>
-                {item.sub && (
-                  <p className="font-mono text-[10px] text-crema/35 truncate">{item.sub}</p>
+                <p className="font-sans text-sm text-crema/80 truncate">{item.title}</p>
+                {item.subtitle && (
+                  <p className="font-mono text-[10px] text-crema/35 truncate">{item.subtitle}</p>
                 )}
               </div>
-              <span className={cn("font-mono text-[10px] shrink-0", statusDot(item.status))}>
-                {item.status}
-              </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -245,14 +260,16 @@ function ProfileDropdown({
 
 // ── Main Topbar ───────────────────────────────────────────────────────────────
 export function Topbar() {
+  const router = useRouter();
   const { theme, toggle: toggleTheme } = useTheme();
   const user = useAuthStore((s) => s.user);
   const { logout } = useAuth();
 
   // Search
   const [query,       setQuery]       = useState("");
-  const [results,     setResults]     = useState<SearchResults | null>(null);
-  const [searchOpen,  setSearchOpen]  = useState(false);
+  const [results,      setResults]      = useState<SearchResults | null>(null);
+  const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
+  const [searchOpen,   setSearchOpen]   = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Notifications
@@ -296,15 +313,53 @@ export function Topbar() {
 
   // ── Debounced search ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (query.length < 2) { setResults(null); return; }
-    const t = setTimeout(async () => {
+    if (query.trim().length < 2) {
+      setResults(null);
+      setSearchStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    setResults(null);
+    setSearchStatus("loading");
+
+    const timeoutId = setTimeout(async () => {
       try {
-        const r = await api.get(`/api/v1/search?q=${encodeURIComponent(query)}`);
-        setResults(r.data);
-      } catch { setResults(null); }
+        const response = await api.get<SearchResults>(
+          `/api/v1/search?q=${encodeURIComponent(query.trim())}`,
+        );
+        if (cancelled) return;
+
+        const items = Array.isArray(response.data?.items) ? response.data.items : [];
+        setResults({
+          items,
+          total: typeof response.data?.total === "number" ? response.data.total : items.length,
+        });
+        setSearchStatus("success");
+      } catch {
+        if (cancelled) return;
+        setResults(null);
+        setSearchStatus("error");
+      }
     }, 300);
-    return () => clearTimeout(t);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [query]);
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setQuery("");
+    setResults(null);
+    setSearchStatus("idle");
+  }, []);
+
+  const selectSearchResult = useCallback((href: string) => {
+    closeSearch();
+    router.push(href);
+  }, [closeSearch, router]);
 
   // ── Poll notifications every 30 s ──────────────────────────────────────────
   const loadNotifs = useCallback(async () => {
@@ -335,6 +390,8 @@ export function Topbar() {
           type="text"
           placeholder="Buscar..."
           aria-label="Buscar backups y sesiones de acceso"
+          aria-controls="global-search-results"
+          aria-expanded={searchOpen && query.trim().length >= 2}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
           onFocus={() => setSearchOpen(true)}
@@ -342,7 +399,7 @@ export function Topbar() {
         />
         {query ? (
           <button
-            onClick={() => { setQuery(""); setResults(null); setSearchOpen(false); }}
+            onClick={closeSearch}
             aria-label="Limpiar búsqueda"
             className="absolute right-3 text-crema/30 hover:text-crema/60 transition-colors"
           >
@@ -354,11 +411,13 @@ export function Topbar() {
           </kbd>
         )}
 
-        {searchOpen && query.length >= 2 && (
+        {searchOpen && query.trim().length >= 2 && (
           <SearchPanel
             query={query}
             results={results}
-            onClose={() => { setSearchOpen(false); setQuery(""); setResults(null); }}
+            status={searchStatus}
+            onClose={closeSearch}
+            onSelect={selectSearchResult}
           />
         )}
       </div>
