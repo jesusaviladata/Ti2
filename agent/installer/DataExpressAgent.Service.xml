@@ -1,0 +1,24 @@
+<service>
+  <id>DataExpressAgent</id>
+  <name>Data Express Agent</name>
+  <description>Conexión segura de salida para administrar servidores Core autorizados.</description>
+  <executable>%BASE%\DataExpressAgent.exe</executable>
+  <arguments>--config "%ProgramData%\DataExpress\Agent\agent.json" --pairing-code-file "%ProgramData%\DataExpress\Agent\pairing-code.tmp"</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <serviceaccount>
+    <username>NT AUTHORITY\LocalService</username>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+  <onfailure action="restart" delay="15 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+  <stoptimeout>30 sec</stoptimeout>
+</service>
+

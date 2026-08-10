@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.capabilities import Capability, require_capabilities
@@ -9,11 +10,41 @@ from app.core.database import get_db
 from app.core.errors import DomainError
 from app.models.operations import RemoteAgent
 from app.models.user import User
+from app.services.agent_admin_service import (
+    DEFAULT_TARGET_FILES,
+    DEFAULT_TARGET_FOLDERS,
+    AgentAdminService,
+    server_payload,
+)
 from app.services.agent_enrollment_service import AgentEnrollmentService
 
 
 router = APIRouter()
 manage_config = require_capabilities(Capability.CONFIG_MANAGE)
+
+
+class BrowseRequest(BaseModel):
+    path: str | None = Field(None, max_length=2048)
+
+    model_config = {"extra": "forbid"}
+
+
+class ValidateRequest(BaseModel):
+    root: str = Field(min_length=3, max_length=2048)
+    target_folders: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_TARGET_FOLDERS), alias="targetFolders", max_length=20
+    )
+    target_files: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_TARGET_FILES), alias="targetFiles", max_length=20
+    )
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ConfigurationRequest(ValidateRequest):
+    name: str = Field(min_length=1, max_length=255)
+    validation_job_id: str = Field(alias="validationJobId")
+    server_id: str | None = Field(None, alias="serverId")
 
 
 def _require_enabled() -> None:
@@ -88,3 +119,82 @@ async def revoke_agent(
     await db.commit()
     return _serialize(agent)
 
+
+@router.post("/{agent_id}/browse", status_code=status.HTTP_202_ACCEPTED)
+async def browse_agent(
+    agent_id: str,
+    body: BrowseRequest,
+    current_user: User = Depends(manage_config),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    job = await AgentAdminService(db).start_browse(
+        str(current_user.tenant_id), agent_id, body.path
+    )
+    await db.commit()
+    return {"jobId": str(job.id)}
+
+
+@router.post("/{agent_id}/validate", status_code=status.HTTP_202_ACCEPTED)
+async def validate_agent_structure(
+    agent_id: str,
+    body: ValidateRequest,
+    current_user: User = Depends(manage_config),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    job = await AgentAdminService(db).start_validation(
+        str(current_user.tenant_id),
+        agent_id,
+        root=body.root,
+        target_folders=body.target_folders,
+        target_files=body.target_files,
+    )
+    await db.commit()
+    return {"jobId": str(job.id)}
+
+
+@router.put("/{agent_id}/configuration")
+async def save_agent_configuration(
+    agent_id: str,
+    body: ConfigurationRequest,
+    current_user: User = Depends(manage_config),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    server = await AgentAdminService(db).save_configuration(
+        str(current_user.tenant_id),
+        agent_id,
+        name=body.name,
+        root=body.root,
+        target_folders=body.target_folders,
+        target_files=body.target_files,
+        validation_job_id=body.validation_job_id,
+        server_id=body.server_id,
+    )
+    await db.commit()
+    return server_payload(server)
+
+
+@router.get("/jobs/{job_id}")
+async def get_agent_job(
+    job_id: str,
+    current_user: User = Depends(manage_config),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    return await AgentAdminService(db).get_job(str(current_user.tenant_id), job_id)
+
+
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_agent_job(
+    job_id: str,
+    current_user: User = Depends(manage_config),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    result = await AgentAdminService(db).cancel_job(
+        str(current_user.tenant_id), job_id
+    )
+    await db.commit()
+    return result
