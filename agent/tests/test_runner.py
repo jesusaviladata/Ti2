@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+import uuid
+
+from agent.data_express_agent.journal import ExecutionJournal
+from agent.data_express_agent.runner import AgentRunner, retry_delay
+
+
+class FakeClient:
+    def __init__(self, commands=None):
+        self.commands = list(commands or [])
+        self.completed = []
+        self.failed = []
+        self.progress_items = []
+
+    def next_command(self):
+        return self.commands.pop(0) if self.commands else None
+
+    def complete(self, command_id, result):
+        self.completed.append((command_id, result))
+
+    def fail(self, command_id, code, message):
+        self.failed.append((command_id, code, message))
+
+    def progress(self, command_id, value):
+        self.progress_items.append((command_id, value))
+
+
+class FakeExplorer:
+    def browse_drives(self):
+        return {"drives": [{"path": "D:\\"}]}
+
+
+def _command(command_type="browse_drives"):
+    return {
+        "id": str(uuid.uuid4()),
+        "type": command_type,
+        "payload": {},
+    }
+
+
+def test_completed_result_is_journaled_before_reporting_and_can_be_retried(tmp_path):
+    command = _command()
+    journal = ExecutionJournal(tmp_path / "journal.json")
+    first_client = FakeClient([command])
+    runner = AgentRunner(first_client, journal, explorer=FakeExplorer())
+
+    runner.run_once()
+
+    assert first_client.completed[0][0] == command["id"]
+    journal.entries[command["id"]]["reported"] = False
+    journal._save()
+    replacement_client = FakeClient()
+    AgentRunner(replacement_client, ExecutionJournal(journal.path), explorer=FakeExplorer()).flush_reports()
+    assert replacement_client.completed[0][0] == command["id"]
+
+
+def test_interrupted_destructive_command_never_restarts_automatically(tmp_path):
+    command = _command("execute_structural_quarantine")
+    journal = ExecutionJournal(tmp_path / "journal.json")
+    journal.record_started(command)
+    client = FakeClient()
+
+    runner = AgentRunner(client, journal, explorer=FakeExplorer())
+    runner.recover_interrupted()
+    runner.flush_reports()
+
+    assert client.failed[0][0] == command["id"]
+    assert client.failed[0][1] == "MANUAL_REVIEW_REQUIRED"
+    assert not client.completed
+
+
+def test_unknown_command_is_rejected_without_generic_shell_fallback(tmp_path):
+    command = _command("run_powershell")
+    client = FakeClient([command])
+    runner = AgentRunner(
+        client, ExecutionJournal(tmp_path / "journal.json"), explorer=FakeExplorer()
+    )
+
+    runner.run_once()
+
+    assert client.failed[0][1] == "COMMAND_TYPE_UNSUPPORTED"
+
+
+def test_retry_delay_is_exponential_bounded_and_jittered():
+    assert retry_delay(0, random_value=0.5) == 1.0
+    assert retry_delay(3, random_value=0.5) == 8.0
+    assert retry_delay(30, random_value=0.5) == 60.0
+
