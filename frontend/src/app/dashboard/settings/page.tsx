@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import {
@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 const ROLE_LABEL: Record<string, string> = {
   admin:      "Administrador",
-  technician: "TÃ©cnico",
+  technician: "Técnico",
   supervisor: "Supervisor",
   client:     "Cliente",
 };
@@ -23,7 +23,7 @@ function Row({ icon: Icon, label, value }: { icon: React.ElementType; label: str
     <div className="flex items-center gap-3 py-3 border-b border-musgo/10 last:border-0">
       <Icon size={15} className="text-crema/35 shrink-0" />
       <span className="font-mono text-[11px] text-crema/40 uppercase tracking-wider w-28 shrink-0">{label}</span>
-      <span className="font-sans text-sm text-crema/80 truncate">{value || "â€”"}</span>
+      <span className="font-sans text-sm text-crema/80 truncate">{value || "—"}</span>
     </div>
   );
 }
@@ -60,11 +60,11 @@ export default function SettingsPage() {
       <div>
         <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Cuenta</p>
         <h1 className="font-title text-4xl font-semibold text-crema">
-          ConfiguraciÃ³n<span className="text-arcilla">.</span>
+          Configuración<span className="text-arcilla">.</span>
         </h1>
       </div>
 
-      {/* PestaÃ±as */}
+      {/* Pestañas */}
       <div className="flex flex-wrap gap-1.5 border-b border-musgo/15 pb-3">
         {visibleTabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
@@ -80,7 +80,7 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {/* Contenido de cada pestaÃ±a */}
+      {/* Contenido de cada pestaña */}
       {tab === "perfil" && (
         <div className="space-y-6">
           <Card title="Perfil">
@@ -90,13 +90,13 @@ export default function SettingsPage() {
             <Row icon={Building2}  label="Usuario" value={user?.username ?? ""} />
           </Card>
 
-          <Card title="SesiÃ³n">
+          <Card title="Sesión">
             <button
               onClick={logout}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[0.65rem] text-red-400/80 hover:bg-red-900/15 hover:text-red-400 transition-colors text-sm font-sans"
             >
               <LogOut size={15} />
-              Cerrar sesiÃ³n
+              Cerrar sesión
             </button>
           </Card>
         </div>
@@ -107,7 +107,7 @@ export default function SettingsPage() {
           <p className="font-mono text-[11px] text-crema/40 leading-relaxed">
             Da de alta los servidores Core y sus <span className="text-arcilla/80">rutas autorizadas</span>.
             Estos servidores aparecen luego en <span className="text-crema/70">Limpieza</span> para operar.
-            La contraseÃ±a o llave .pem se introduce al conectar; nunca se guarda aquÃ­.
+            La contraseña o llave .pem se introduce al conectar; nunca se guarda aquí.
           </p>
           <CleanupServersAdmin />
         </div>
@@ -124,7 +124,7 @@ export default function SettingsPage() {
               <span className="font-sans text-sm text-crema/75">Tema {theme === "dark" ? "oscuro" : "claro"}</span>
             </div>
             <span className="font-mono text-[11px] text-arcilla/70 group-hover:text-arcilla transition-colors">
-              Cambiar â†’
+              Cambiar →
             </span>
           </button>
         </Card>
