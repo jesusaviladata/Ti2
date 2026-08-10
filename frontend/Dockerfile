@@ -9,6 +9,8 @@ EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
 FROM base AS builder
+ARG BACKEND_URL
+ENV BACKEND_URL=${BACKEND_URL}
 COPY . .
 RUN mkdir -p public && npm run build
 
