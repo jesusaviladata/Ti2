@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Search, Bell, Settings, Sun, Moon, X,
+  Search, Bell, Sun, Moon, X,
   LogOut, User, Database, Monitor, ShieldAlert,
   AlertTriangle, CheckCircle2,
 } from "lucide-react";
@@ -243,86 +243,6 @@ function ProfileDropdown({
   );
 }
 
-// ── Settings modal ────────────────────────────────────────────────────────────
-function SettingsModal({ onClose }: { onClose: () => void }) {
-  const { theme, toggle } = useTheme();
-
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center">
-      <div className="absolute inset-0 bg-carbon/70 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-modal-title"
-        className="relative z-10 w-full max-w-md mx-4 rounded-[1.5rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-musgo/20">
-          <h2 id="settings-modal-title" className="font-display text-2xl italic font-light text-crema">
-            Configuración<span className="text-arcilla">.</span>
-          </h2>
-          <button onClick={onClose} aria-label="Cerrar" className="text-crema/30 hover:text-crema/70 transition-colors">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Appearance */}
-          <section>
-            <p className="font-mono text-[10px] text-arcilla uppercase tracking-[0.15em] mb-3">
-              Apariencia
-            </p>
-            <div className="flex items-center justify-between rounded-[0.75rem] bg-musgo/10 border border-musgo/20 px-4 py-3">
-              <div>
-                <p className="font-sans text-sm text-crema/80">Tema</p>
-                <p className="font-mono text-[10px] text-crema/35 mt-0.5">
-                  {theme === "dark" ? "Modo oscuro activo" : "Modo claro activo"}
-                </p>
-              </div>
-              {/* Toggle switch */}
-              <button
-                onClick={toggle}
-                className={cn(
-                  "relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0",
-                  theme === "light" ? "bg-arcilla" : "bg-musgo/60"
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-1 w-4 h-4 rounded-full bg-crema shadow transition-all duration-200",
-                    theme === "light" ? "left-6" : "left-1"
-                  )}
-                />
-              </button>
-            </div>
-          </section>
-
-          {/* System info */}
-          <section>
-            <p className="font-mono text-[10px] text-arcilla uppercase tracking-[0.15em] mb-3">
-              Sistema
-            </p>
-            <div className="rounded-[0.75rem] bg-musgo/10 border border-musgo/20 px-4 py-3 space-y-2">
-              <div className="flex justify-between">
-                <span className="font-mono text-[11px] text-crema/40">Versión</span>
-                <span className="font-mono text-[11px] text-crema/60">0.5.0</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-mono text-[11px] text-crema/40">Entorno</span>
-                <span className="font-mono text-[11px] text-crema/60">desarrollo</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-mono text-[11px] text-crema/40">API</span>
-                <span className="font-mono text-[11px] text-crema/60">mismo origen</span>
-              </div>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main Topbar ───────────────────────────────────────────────────────────────
 export function Topbar() {
   const { theme, toggle: toggleTheme } = useTheme();
@@ -343,7 +263,6 @@ export function Topbar() {
 
   // Profile / settings
   const [profileOpen,  setProfileOpen]  = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
   // ── Keyboard shortcut Ctrl+K / ⌘K ──────────────────────────────────────────
@@ -358,7 +277,6 @@ export function Topbar() {
         setSearchOpen(false);
         setNotifOpen(false);
         setProfileOpen(false);
-        setSettingsOpen(false);
       }
     }
     window.addEventListener("keydown", handler);
@@ -487,15 +405,6 @@ export function Topbar() {
           )}
         </div>
 
-        {/* Settings */}
-        <button
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Configuración"
-          className="w-9 h-9 rounded-[0.75rem] flex items-center justify-center text-crema/40 hover:bg-musgo/20 hover:text-crema/80 transition-all"
-        >
-          <Settings size={16} />
-        </button>
-
         {/* Profile avatar */}
         <div ref={profileRef} className="relative ml-0.5">
           <button
@@ -516,9 +425,6 @@ export function Topbar() {
           )}
         </div>
       </div>
-
-      {/* Settings modal */}
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </header>
   );
 }

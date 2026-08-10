@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Infra Platform", template: "%s — Infra Platform" },
+  title: { default: "Data Express Latinoamérica", template: "%s — Data Express Latinoamérica" },
   description: "Plataforma de administración de infraestructura empresarial",
 };
 

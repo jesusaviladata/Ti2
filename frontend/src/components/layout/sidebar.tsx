@@ -1,18 +1,18 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  Database,
-  FolderSync,
-  Monitor,
   Bell,
-  Settings,
   ChevronLeft,
   ChevronRight,
+  Database,
+  FolderSync,
+  LayoutDashboard,
+  Monitor,
+  Settings,
   ShieldCheck,
-  User,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -20,39 +20,37 @@ import { useAuthStore } from "@/store/auth.store";
 import { useAuth } from "@/hooks/useAuth";
 
 function UserBadge({ collapsed }: { collapsed: boolean }) {
-  const user = useAuthStore((s) => s.user);
+  const user = useAuthStore((state) => state.user);
   const { logout } = useAuth();
   const initials = user?.fullName
-    ? user.fullName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+    ? user.fullName.split(" ").map((name) => name[0]).slice(0, 2).join("").toUpperCase()
     : "?";
 
   return (
     <button
+      type="button"
       onClick={logout}
       title="Cerrar sesión"
       className={cn(
-        "w-full flex items-center gap-3 px-3 h-10 rounded-[0.75rem] cursor-pointer text-left",
-        "text-crema/45 hover:bg-red-900/20 hover:text-crema/80 transition-all duration-150",
-        collapsed && "justify-center px-0"
+        "flex h-10 w-full cursor-pointer items-center gap-3 rounded-[0.75rem] px-3 text-left text-crema/45 transition-all duration-150 hover:bg-red-900/20 hover:text-crema/80",
+        collapsed && "justify-center px-0",
       )}
     >
-      <div className="w-[18px] h-[18px] rounded-full bg-musgo/60 border border-musgo/40 flex items-center justify-center shrink-0">
-        <span className="font-mono text-[8px] text-crema/70">{initials}</span>
+      <div className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full border border-arcilla/35 bg-arcilla/15">
+        <span className="font-mono text-[8px] text-crema/75">{initials}</span>
       </div>
-      {!collapsed && (
-        <span className="text-sm font-sans truncate">{user?.fullName ?? "Mi cuenta"}</span>
-      )}
+      {!collapsed ? <span className="truncate text-sm">{user?.fullName ?? "Mi cuenta"}</span> : null}
     </button>
   );
 }
 
 const NAV_ITEMS = [
-  { href: "/dashboard",        label: "Dashboard",       icon: LayoutDashboard },
-  { href: "/dashboard/backups",   label: "Backups",         icon: Database        },
-  { href: "/dashboard/cleanup",   label: "Archivos",        icon: FolderSync      },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/backups", label: "Backups", icon: Database },
+  { href: "/dashboard/cleanup", label: "Archivos", icon: FolderSync },
   { href: "/dashboard/limpieza-remota", label: "Limpieza", icon: ShieldCheck },
-  { href: "/dashboard/access",    label: "Acceso Remoto",   icon: Monitor         },
-  { href: "/dashboard/alerts",    label: "Notificaciones",  icon: Bell            },
+  { href: "/dashboard/access", label: "Acceso Remoto", icon: Monitor },
+  { href: "/dashboard/alerts", label: "Notificaciones", icon: Bell },
 ];
 
 const BOTTOM_ITEMS = [
@@ -66,28 +64,29 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative flex flex-col h-screen bg-carbon border-r border-musgo/20",
-        "transition-all duration-300 ease-power3-out shrink-0",
-        collapsed ? "w-[68px]" : "w-[220px]"
+        "relative flex h-screen shrink-0 flex-col border-r border-musgo/30 bg-carbon transition-all duration-300 ease-power3-out",
+        collapsed ? "w-[72px]" : "w-[240px]",
       )}
     >
-      {/* Logo */}
-      <div className={cn(
-        "flex items-center h-16 px-4 border-b border-musgo/20",
-        collapsed ? "justify-center" : "gap-3"
-      )}>
-        <span className="w-7 h-7 rounded-full bg-arcilla flex items-center justify-center shrink-0">
-          <span className="w-3 h-3 rounded-full bg-crema/90" />
-        </span>
-        {!collapsed && (
-          <span className="font-mono text-xs text-crema/50 tracking-wide truncate">
-            infra platform
+      <div className={cn("flex h-[72px] items-center border-b border-musgo/25 px-3", collapsed ? "justify-center" : "gap-3")}>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[0.7rem] bg-white p-0.5">
+          <Image
+            src="/brand/data-express-logo.png"
+            alt=""
+            width={44}
+            height={44}
+            className="h-full w-full object-contain"
+          />
+        </div>
+        {!collapsed ? (
+          <span className="min-w-0 leading-tight text-crema">
+            <span className="block truncate text-sm font-semibold">Data Express</span>
+            <span className="block truncate text-[10px] uppercase tracking-[0.14em] text-arcilla">Latinoamérica</span>
           </span>
-        )}
+        ) : null}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4" aria-label="Navegación principal">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
@@ -95,55 +94,49 @@ export function Sidebar() {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 px-3 h-10 rounded-[0.75rem]",
-                "text-sm font-sans transition-all duration-150",
+                "flex h-10 items-center gap-3 rounded-[0.75rem] px-3 text-sm transition-all duration-150",
                 active
-                  ? "bg-musgo/40 text-crema"
-                  : "text-crema/45 hover:bg-musgo/20 hover:text-crema/80",
-                collapsed && "justify-center px-0"
+                  ? "bg-arcilla/15 text-crema"
+                  : "text-crema/45 hover:bg-musgo/25 hover:text-crema/80",
+                collapsed && "justify-center px-0",
               )}
               title={collapsed ? label : undefined}
             >
-              <Icon size={18} className="shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
+              <Icon size={18} className={cn("shrink-0", active && "text-arcilla")} />
+              {!collapsed ? <span className="truncate">{label}</span> : null}
             </Link>
           );
         })}
       </nav>
 
-      {/* Bottom */}
-      <div className="py-4 px-2 space-y-1 border-t border-musgo/20">
-        {BOTTOM_ITEMS.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "flex items-center gap-3 px-3 h-10 rounded-[0.75rem]",
-              "text-sm font-sans text-crema/45 hover:bg-musgo/20 hover:text-crema/80 transition-all duration-150",
-              collapsed && "justify-center px-0"
-            )}
-            title={collapsed ? label : undefined}
-          >
-            <Icon size={18} className="shrink-0" />
-            {!collapsed && <span className="truncate">{label}</span>}
-          </Link>
-        ))}
-
-        {/* Profile */}
+      <div className="space-y-1 border-t border-musgo/25 px-2 py-4">
+        {BOTTOM_ITEMS.map(({ href, label, icon: Icon }) => {
+          const active = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex h-10 items-center gap-3 rounded-[0.75rem] px-3 text-sm transition-all duration-150",
+                active ? "bg-arcilla/15 text-crema" : "text-crema/45 hover:bg-musgo/25 hover:text-crema/80",
+                collapsed && "justify-center px-0",
+              )}
+              title={collapsed ? label : undefined}
+            >
+              <Icon size={18} className={cn("shrink-0", active && "text-arcilla")} />
+              {!collapsed ? <span className="truncate">{label}</span> : null}
+            </Link>
+          );
+        })}
         <UserBadge collapsed={collapsed} />
       </div>
 
-      {/* Collapse toggle */}
       <button
-        onClick={() => setCollapsed((v) => !v)}
+        type="button"
+        onClick={() => setCollapsed((value) => !value)}
         aria-label={collapsed ? "Expandir menú lateral" : "Colapsar menú lateral"}
         aria-expanded={!collapsed}
-        className={cn(
-          "absolute -right-3 top-[4.5rem] z-20",
-          "w-6 h-6 rounded-full bg-carbon border border-musgo/40",
-          "flex items-center justify-center text-crema/40 hover:text-crema hover:border-musgo/80",
-          "transition-all duration-150"
-        )}
+        className="absolute -right-3 top-[5.25rem] z-20 flex h-6 w-6 items-center justify-center rounded-full border border-musgo/50 bg-carbon text-crema/40 transition-all duration-150 hover:border-arcilla/60 hover:text-crema"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
       </button>

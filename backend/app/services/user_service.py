@@ -1,6 +1,6 @@
 import uuid
 from fastapi import HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
@@ -29,16 +29,23 @@ class UserService:
         return list(users), total
 
     async def create(self, tenant_id: str, data: UserCreate) -> User:
-        # Check email uniqueness
-        existing = await self.db.execute(select(User).where(User.email == data.email))
-        if existing.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ya registrado")
+        email = str(data.email).strip().lower()
+        username = data.username.strip()
+        full_name = data.full_name.strip()
+
+        existing = await self.db.execute(
+            select(User).where(or_(User.email == email, User.username == username))
+        )
+        duplicate = existing.scalars().first()
+        if duplicate:
+            detail = "El correo ya está registrado" if duplicate.email == email else "El usuario ya está registrado"
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
         user = User(
             tenant_id=uuid.UUID(tenant_id),
-            email=data.email,
-            username=data.username,
-            full_name=data.full_name,
+            email=email,
+            username=username,
+            full_name=full_name,
             hashed_password=hash_password(data.password),
             role=data.role,
         )

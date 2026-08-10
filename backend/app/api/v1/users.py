@@ -1,30 +1,29 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_roles
+from app.core.security import require_roles
 from app.models.user import User, UserRole
-from app.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.schemas.user import UserCreate, UserUpdate
 from app.services.user_service import UserService
 
 router = APIRouter()
 
 require_admin = require_roles(UserRole.admin)
-require_admin_or_supervisor = require_roles(UserRole.admin, UserRole.supervisor)
 
 
-from pydantic import BaseModel
 
 
 class PasswordChangeBody(BaseModel):
-    new_password: str
+    new_password: str = Field(min_length=14, max_length=128)
 
 
 @router.get("", response_model=dict)
 async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    current_user: User = Depends(require_admin_or_supervisor),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = UserService(db)
@@ -52,7 +51,7 @@ async def create_user(
 @router.get("/{user_id}", response_model=dict)
 async def get_user(
     user_id: str,
-    current_user: User = Depends(require_admin_or_supervisor),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = UserService(db)
@@ -67,6 +66,13 @@ async def update_user(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    if user_id == str(current_user.id) and (
+        data.role is not None or data.is_active is False
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="No puedes cambiar tu propio rol ni desactivar tu cuenta",
+        )
     svc = UserService(db)
     user = await svc.update(user_id, str(current_user.tenant_id), data)
     await db.commit()
@@ -79,6 +85,11 @@ async def deactivate_user(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    if user_id == str(current_user.id):
+        raise HTTPException(
+            status_code=400,
+            detail="No puedes desactivar tu propia cuenta",
+        )
     svc = UserService(db)
     await svc.deactivate(user_id, str(current_user.tenant_id))
     await db.commit()

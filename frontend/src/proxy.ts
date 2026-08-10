@@ -12,6 +12,7 @@ export function proxy(request: NextRequest) {
 
   if (
     PUBLIC_PATHS.some((path) => pathname.startsWith(path)) ||
+    pathname.startsWith("/brand/") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {

@@ -10,18 +10,18 @@
 
   /* Dark theme (default) — RGB tuples for Tailwind opacity modifier support */
   :root {
-    --color-musgo:   30 52 79;    /* #1E344F — slate azul para tarjetas/bordes */
-    --color-arcilla: 41 170 224;  /* #29AAE0 — azul acento Data Express */
+    --color-musgo:   12 51 80;    /* #0C3350 — azul marino institucional */
+    --color-arcilla: 54 169 224;  /* #36A9E0 — azul claro institucional */
     --color-crema:   233 240 247; /* #E9F0F7 — texto blanco frío */
-    --color-carbon:  11 20 34;    /* #0B1422 — fondo azul noche */
+    --color-carbon:  7 24 39;     /* #071827 — fondo azul noche */
   }
 
   /* Light theme */
   [data-theme="light"] {
     --color-carbon:  237 242 248; /* #EDF2F8 — fondo claro frío */
     --color-crema:   15 27 45;    /* #0F1B2D — texto azul oscuro */
-    --color-musgo:   30 52 79;
-    --color-arcilla: 41 170 224;
+    --color-musgo:   12 51 80;
+    --color-arcilla: 54 169 224;
   }
 
   html {
