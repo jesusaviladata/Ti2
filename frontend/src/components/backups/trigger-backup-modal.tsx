@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { X, Database, Loader2, Search, ChevronDown, Check, Eye, EyeOff, CheckCircle2, XCircle, Clock, FolderOpen } from "lucide-react";
+import { X, Database, Loader2, Search, ChevronDown, Check, Eye, EyeOff, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAgentDatabases, useBackupAgents, useDatabases, useTriggerAgentBackup, useTriggerBackup, useBackupStatus } from "@/hooks/useBackups";
+import { useAgentDatabases, useBackupAgentJob, useBackupAgents, useBackupStatuses, useDatabases, useTriggerAgentBackup, useTriggerBackup } from "@/hooks/useBackups";
 import { useConnectionsStore } from "@/store/connections.store";
-import { formatBytes } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 type BackupType  = "full" | "differential" | "log";
@@ -313,92 +312,102 @@ function DestinationCredentials({
   );
 }
 
-// ── Multi-backup progress list ────────────────────────────────────────────────
-function BackupProgressRow({ backupId }: { backupId: string }) {
-  const { data: backup } = useBackupStatus(backupId);
-
-  const status = backup?.status ?? "pending";
-
-  const barColor = {
-    pending:   "bg-musgo/40",
-    running:   "bg-arcilla",
-    completed: "bg-green-500",
-    failed:    "bg-red-500",
-  }[status];
-
-  const isRunning   = status === "running";
-  const isCompleted = status === "completed";
-  const isFailed    = status === "failed";
-
-  return (
-    <div className="rounded-[0.875rem] border border-musgo/20 bg-musgo/5 p-3.5 space-y-2.5">
-      {/* Name + status icon */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-xs text-crema/80 truncate">{backup?.databaseName ?? "…"}</span>
-        <span className="shrink-0">
-          {isCompleted && <CheckCircle2 size={14} className="text-green-400" />}
-          {isFailed    && <XCircle      size={14} className="text-red-400"   />}
-          {!isCompleted && !isFailed && <Clock size={14} className="text-crema/25" />}
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <div className="h-1.5 rounded-full bg-musgo/20 overflow-hidden">
-        <div
-          className={cn(
-            "h-full rounded-full transition-all duration-500",
-            barColor,
-            isRunning && "animate-pulse w-3/4",
-            isCompleted && "w-full",
-            isFailed && "w-full",
-            status === "pending" && "w-0",
-          )}
-        />
-      </div>
-
-      {/* Meta row */}
-      <div className="flex items-center justify-between">
-        <span className={cn("font-mono text-[10px]", {
-          "text-crema/30":  status === "pending",
-          "text-arcilla/70": status === "running",
-          "text-green-400/70": isCompleted,
-          "text-red-400/70": isFailed,
-        })}>
-          {status === "pending"   && "En cola…"}
-          {status === "running"   && "Ejecutando…"}
-          {isCompleted            && "Completado"}
-          {isFailed               && "Fallido"}
-        </span>
-        {isCompleted && backup?.fileSizeBytes ? (
-          <span className="font-mono text-[10px] text-crema/40">
-            {formatBytes(backup.fileSizeBytes)}
-          </span>
-        ) : isFailed && backup?.errorMessage ? (
-          <span className="font-mono text-[10px] text-red-400/60 truncate max-w-[60%] text-right">
-            {backup.errorMessage.split("]").pop()?.trim().slice(0, 60)}
-          </span>
-        ) : null}
-      </div>
-
-      {/* File path when done */}
-      {isCompleted && backup?.filePath && (
-        <p className="font-mono text-[10px] text-green-400/50 break-all leading-relaxed border-t border-musgo/15 pt-2">
-          {backup.filePath}
-        </p>
-      )}
-    </div>
-  );
+// ── Unified multi-backup progress ────────────────────────────────────────────
+function jobProgress(job?: {
+  status: string;
+  phase: string;
+  processedUnits: number;
+  totalUnits: number;
+}) {
+  if (!job) return { percent: 4, label: "Enviando orden al agente…" };
+  const total = Math.max(1, job.totalUnits);
+  if (job.status === "completed") return { percent: 100, label: "Backup y ZIP completados" };
+  if (job.status === "failed" || job.status === "cancelled") return { percent: 100, label: "El proceso terminó con error" };
+  if (job.phase === "compressing") return { percent: 88, label: "Comprimiendo y validando el ZIP…" };
+  if (job.phase === "transferring") return { percent: 95, label: "Transfiriendo el ZIP al destino…" };
+  if (job.phase === "backing_up") {
+    const completed = Math.min(job.processedUnits, total);
+    const current = Math.min(completed + 1, total);
+    return {
+      percent: Math.max(10, Math.round(10 + (completed / total) * 70)),
+      label: `Procesando base ${current} de ${total}`,
+    };
+  }
+  return { percent: 6, label: "Esperando respuesta del agente…" };
 }
 
-function MultiBackupProgress({ backupIds }: { backupIds: string[] }) {
+function MultiBackupProgress({
+  backupIds,
+  jobId,
+  databaseNames,
+  starting,
+}: {
+  backupIds: string[];
+  jobId?: string;
+  databaseNames: string[];
+  starting: boolean;
+}) {
+  const { data: job } = useBackupAgentJob(jobId);
+  const backupQueries = useBackupStatuses(backupIds);
+  const backups = backupQueries.flatMap((query) => query.data ? [query.data] : []);
+  const directFinished = backups.filter((backup) => backup.status === "completed" || backup.status === "failed").length;
+  const directFailed = backups.filter((backup) => backup.status === "failed").length;
+  const directTotal = Math.max(1, backupIds.length || databaseNames.length);
+  const directCompleted = backupIds.length > 0 && directFinished === backupIds.length && directFailed === 0;
+  const directDone = backupIds.length > 0 && directFinished === backupIds.length;
+  const directPercent = directDone ? 100 : Math.max(6, Math.round((directFinished / directTotal) * 100));
+  const directLabel = directDone
+    ? directFailed ? `${directFinished - directFailed} completados · ${directFailed} fallidos` : "Backups completados"
+    : `Procesando ${Math.min(directFinished + 1, directTotal)} de ${directTotal}`;
+  const progress = jobId ? jobProgress(job) : { percent: directPercent, label: directLabel };
+  const failed = jobId
+    ? job?.status === "failed" || job?.status === "cancelled"
+    : directDone && directFailed > 0;
+  const completed = jobId ? job?.status === "completed" : directCompleted;
+
   return (
-    <div className="space-y-2">
-      <p className="font-mono text-[10px] text-crema/30 uppercase tracking-wider mb-3">
-        {backupIds.length} tarea{backupIds.length !== 1 ? "s" : ""} en progreso
-      </p>
-      {backupIds.map((id) => (
-        <BackupProgressRow key={id} backupId={id} />
-      ))}
+    <div className="space-y-4">
+      <div className="rounded-[1rem] border border-musgo/25 bg-musgo/5 p-5 space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-mono text-[10px] text-crema/30 uppercase tracking-wider">Progreso general</p>
+            <p className={cn("font-sans text-sm mt-1", failed ? "text-red-400" : completed ? "text-green-400" : "text-crema/80")}>
+              {starting && !job ? "Preparando el proceso…" : progress.label}
+            </p>
+          </div>
+          <span className={cn("font-mono text-xl tabular-nums", failed ? "text-red-400" : completed ? "text-green-400" : "text-arcilla")}>
+            {progress.percent}%
+          </span>
+        </div>
+
+        <div className="h-3 rounded-full bg-musgo/20 overflow-hidden">
+          <div
+            className={cn(
+              "h-full rounded-full transition-[width] duration-700 ease-out",
+              failed ? "bg-red-500" : completed ? "bg-green-500" : "bg-arcilla",
+            )}
+            style={{ width: `${progress.percent}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 font-mono text-[10px] text-crema/30">
+          <span>{databaseNames.length} base{databaseNames.length !== 1 ? "s" : ""} seleccionada{databaseNames.length !== 1 ? "s" : ""}</span>
+          {!failed && !completed && <span>No cierres el agente</span>}
+        </div>
+
+        {job?.error && <p className="font-mono text-[10px] text-red-400/80 break-words">{job.error}</p>}
+      </div>
+
+      <div className="rounded-[0.875rem] border border-musgo/20 bg-musgo/5 p-4">
+        <p className="font-mono text-[10px] text-crema/30 uppercase tracking-wider mb-2">Bases incluidas</p>
+        <div className="flex flex-wrap gap-1.5">
+          {databaseNames.map((name) => (
+            <span key={name} className="px-2 py-1 rounded-md bg-musgo/15 border border-musgo/20 font-mono text-[10px] text-crema/55">
+              {name}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -460,6 +469,9 @@ export function TriggerBackupModal({ open, onClose }: Props) {
     host: "", username: "", password: "", path: "", domain: "",
   });
   const [activeBackupIds, setActiveBackupIds] = useState<string[]>([]);
+  const [activeJobId, setActiveJobId] = useState("");
+  const [submittedDatabases, setSubmittedDatabases] = useState<string[]>([]);
+  const [showProgress, setShowProgress] = useState(false);
 
   if (!open) return null;
 
@@ -470,26 +482,38 @@ export function TriggerBackupModal({ open, onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedDbs.length) return;
-    const result = executionMode === "agent"
-      ? await triggerAgent.mutateAsync({
+    setSubmittedDatabases([...selectedDbs]);
+    setShowProgress(true);
+    try {
+      const result = executionMode === "agent"
+        ? await triggerAgent.mutateAsync({
           agent_id: agentId,
           sql_profile_id: sqlProfileId,
           database_names: selectedDbs,
           backup_type: backupType,
           destination_profile_id: destinationProfileId || undefined,
         })
-      : await trigger.mutateAsync({
+        : await trigger.mutateAsync({
           database_names: selectedDbs,
           backup_type:    backupType,
           destination,
           local_path:     destination === "local" ? localPath.trim() || undefined : undefined,
           connection:     connPayload ?? undefined,
         });
-    setActiveBackupIds(result.backups.map((b) => b.id));
+      setActiveBackupIds(result.backups.map((b) => b.id));
+      if ("jobId" in result && typeof result.jobId === "string") {
+        setActiveJobId(result.jobId);
+      }
+    } catch {
+      setShowProgress(false);
+    }
   }
 
   function handleClose() {
     setActiveBackupIds([]);
+    setActiveJobId("");
+    setSubmittedDatabases([]);
+    setShowProgress(false);
     setLocalPath(todayLocalPath());
     trigger.reset();
     triggerAgent.reset();
@@ -519,7 +543,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
 
         {/* Scrollable body */}
         <div className="p-6 overflow-y-auto">
-          {!activeBackupIds.length ? (
+          {!showProgress ? (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="font-mono text-xs text-crema/40 uppercase tracking-wider block mb-2">
@@ -755,7 +779,12 @@ export function TriggerBackupModal({ open, onClose }: Props) {
             </form>
           ) : (
             <div className="space-y-4">
-              <MultiBackupProgress backupIds={activeBackupIds} />
+              <MultiBackupProgress
+                backupIds={activeBackupIds}
+                jobId={activeJobId || undefined}
+                databaseNames={submittedDatabases}
+                starting={trigger.isPending || triggerAgent.isPending}
+              />
               <Button onClick={handleClose} variant="outline" className="w-full">
                 Cerrar — los backups continúan en segundo plano
               </Button>
