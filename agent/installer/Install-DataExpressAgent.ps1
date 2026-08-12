@@ -56,14 +56,20 @@ $configuration = [ordered]@{
     commandSigningPublicKey = $CommandSigningPublicKey
     commandSigningKeyId = $CommandSigningKeyId
     dataDir = $dataDirectory
-    agentVersion = "0.2.0"
+    agentVersion = "0.2.1"
     pollWaitSeconds = 25
     requestTimeoutSeconds = 40
     verifyTls = $true
     sqlInstances = $sqlInstances
     backupDestinations = $backupDestinations
 }
-$configuration | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 (Join-Path $dataDirectory "agent.json")
+$configurationJson = $configuration | ConvertTo-Json -Depth 6
+$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText(
+    (Join-Path $dataDirectory "agent.json"),
+    $configurationJson,
+    $utf8WithoutBom
+)
 $PairingCode | Set-Content -Encoding ASCII -NoNewline (Join-Path $dataDirectory "pairing-code.tmp")
 
 & icacls $dataDirectory /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" "LOCAL SERVICE:(OI)(CI)M" | Out-Null

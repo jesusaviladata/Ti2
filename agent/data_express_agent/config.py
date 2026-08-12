@@ -24,7 +24,7 @@ class AgentConfig:
     command_signing_public_key: str
     command_signing_key_id: str
     data_dir: Path
-    agent_version: str = "0.2.0"
+    agent_version: str = "0.2.1"
     poll_wait_seconds: int = 25
     request_timeout_seconds: int = 40
     verify_tls: bool = True
@@ -34,7 +34,9 @@ class AgentConfig:
     @classmethod
     def from_file(cls, path: Path) -> "AgentConfig":
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            # Windows PowerShell 5.1 writes UTF-8 files with a BOM. utf-8-sig
+            # accepts those files while remaining compatible with BOM-less UTF-8.
+            raw = json.loads(path.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError) as exc:
             raise AgentConfigError("No se pudo leer la configuración del agente") from exc
         try:
@@ -43,7 +45,7 @@ class AgentConfig:
                 command_signing_public_key=str(raw["commandSigningPublicKey"]),
                 command_signing_key_id=str(raw["commandSigningKeyId"]),
                 data_dir=Path(raw.get("dataDir") or default_data_dir()),
-                agent_version=str(raw.get("agentVersion", "0.2.0")),
+                agent_version=str(raw.get("agentVersion", "0.2.1")),
                 poll_wait_seconds=int(raw.get("pollWaitSeconds", 25)),
                 request_timeout_seconds=int(raw.get("requestTimeoutSeconds", 40)),
                 verify_tls=bool(raw.get("verifyTls", True)),
