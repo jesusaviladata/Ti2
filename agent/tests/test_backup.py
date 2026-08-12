@@ -3,7 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from agent.data_express_agent.backup import BackupError, BackupExecutor, _sql_unicode_literal
+from agent.data_express_agent.backup import (
+    BackupError,
+    BackupExecutor,
+    _consume_sql_results,
+    _sql_unicode_literal,
+    _wait_for_backup_file,
+)
 
 
 class FakeRows:
@@ -58,6 +64,33 @@ def test_lists_databases_from_configured_profile(tmp_path):
 
 def test_sql_unicode_literal_escapes_apostrophes():
     assert _sql_unicode_literal("D:\\O'Brien\\file.bak") == "N'D:\\O''Brien\\file.bak'"
+
+
+def test_wait_for_backup_file_retries_until_sql_server_materializes_it(tmp_path, monkeypatch):
+    path = tmp_path / "backup.bak"
+    calls = []
+
+    def sleep(_seconds):
+        calls.append(1)
+        if len(calls) == 2:
+            path.write_bytes(b"backup")
+
+    assert _wait_for_backup_file(path, timeout_seconds=5, sleep=sleep) is True
+    assert len(calls) == 2
+
+
+def test_consume_sql_results_drains_all_sets():
+    class Cursor:
+        def __init__(self):
+            self.calls = 0
+
+        def nextset(self):
+            self.calls += 1
+            return self.calls < 3
+
+    cursor = Cursor()
+    _consume_sql_results(cursor)
+    assert cursor.calls == 3
 
 
 def test_backup_error_includes_redacted_database_diagnostic(tmp_path):

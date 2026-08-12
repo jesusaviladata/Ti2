@@ -6,6 +6,7 @@ import os
 import posixpath
 import re
 import shutil
+import time
 import zipfile
 from collections.abc import Callable
 from datetime import datetime
@@ -60,6 +61,31 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _wait_for_backup_file(
+    path: Path, *, timeout_seconds: float = 90, sleep: Callable[[float], None] = time.sleep
+) -> bool:
+    """Wait for SQL Server to finish materializing a backup file on disk."""
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            if path.is_file() and path.stat().st_size > 0:
+                return True
+        except OSError:
+            pass
+        if time.monotonic() >= deadline:
+            return False
+        sleep(0.5)
+
+
+def _consume_sql_results(cursor: Any) -> None:
+    """Drain informational result sets so SQL Server has completed BACKUP."""
+    nextset = getattr(cursor, "nextset", None)
+    if nextset is None:
+        return
+    while nextset():
+        pass
 
 
 def _verification_requires_database_create_permission(error: Exception) -> bool:
@@ -184,7 +210,7 @@ class BackupExecutor:
                     verification_method = self._backup_database(
                         connection, database, backup_type, file_path
                     )
-                    if not file_path.is_file() or file_path.stat().st_size <= 0:
+                    if not _wait_for_backup_file(file_path):
                         raise BackupError(
                             "BACKUP_FILE_MISSING",
                             f"SQL Server no dejo un archivo valido para {database}",
@@ -287,9 +313,11 @@ class BackupExecutor:
         # SQL Server Express does not support backup compression.  Using the
         # portable statement directly also avoids a failed first attempt on
         # editions where compression is disabled by policy.
-        connection.execute(sql)
+        cursor = connection.execute(sql)
+        _consume_sql_results(cursor)
         try:
-            connection.execute(f"RESTORE VERIFYONLY FROM DISK = {disk_path} WITH CHECKSUM")
+            cursor = connection.execute(f"RESTORE VERIFYONLY FROM DISK = {disk_path} WITH CHECKSUM")
+            _consume_sql_results(cursor)
         except Exception as exc:
             if _verification_requires_database_create_permission(exc):
                 # Keep least privilege on SQL Server Express. The .bak is still
