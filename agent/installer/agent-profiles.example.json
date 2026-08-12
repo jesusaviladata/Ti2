@@ -1,0 +1,25 @@
+{
+  "sqlInstances": [
+    {
+      "id": "sql-local",
+      "label": "SQL Server local",
+      "server": ".",
+      "driver": "ODBC Driver 18 for SQL Server",
+      "authentication": "windows",
+      "backupRoot": "D:\\"
+    }
+  ],
+  "backupDestinations": [
+    {
+      "id": "central-sftp",
+      "label": "Servidor central SFTP",
+      "type": "sftp",
+      "host": "backup.example.internal",
+      "port": 22,
+      "username": "dataexpress-backup",
+      "path": "/backups",
+      "privateKeyPath": "C:\\ProgramData\\DataExpress\\Agent\\keys\\backup_ed25519",
+      "hostKeySha256": "REEMPLAZAR_CON_SHA256_BASE64"
+    }
+  ]
+}

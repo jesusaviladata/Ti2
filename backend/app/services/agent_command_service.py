@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+import ntpath
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
@@ -21,6 +22,8 @@ ALLOWED_COMMAND_TYPES = frozenset(
         "restore_quarantine_item",
         "purge_quarantine_items",
         "cancel_job",
+        "list_sql_databases",
+        "run_backup_batch",
     }
 )
 
@@ -101,7 +104,13 @@ class AgentCommandService:
         return command
 
     async def claim_next(self, agent: RemoteAgent) -> AgentCommand | None:
-        return await self.repo.claim_next_command(agent.id, self.now())
+        command = await self.repo.claim_next_command(agent.id, self.now())
+        if command is not None and command.job_id:
+            job = await self.repo.get_background_job(command.job_id)
+            if job is not None:
+                job.status = "running"
+                job.phase = "claimed"
+        return command
 
     async def progress(
         self,
@@ -120,10 +129,13 @@ class AgentCommandService:
         if command.job_id:
             job = await self.repo.get_background_job(command.job_id)
             if job is not None:
+                job.status = "running"
                 job.phase = phase[:100]
                 job.processed_units = max(0, processed_units)
                 job.total_units = max(0, total_units)
                 job.found_count = max(0, found_count)
+        if command.command_type == "run_backup_batch":
+            await self._mark_backups_running(command)
         await self.db.flush()
         return command
 
@@ -152,6 +164,8 @@ class AgentCommandService:
                 job.phase = "completed"
                 job.result = result
                 job.finished_at = now
+        if command.command_type == "run_backup_batch":
+            await self._complete_backups(command, result, now)
         await self.db.flush()
         return command
 
@@ -182,8 +196,68 @@ class AgentCommandService:
                 job.phase = "failed"
                 job.error = command.error_message
                 job.finished_at = now
+        if command.command_type == "run_backup_batch":
+            await self._fail_backups(command, error_message, now)
         await self.db.flush()
         return command
+
+    async def _backup_records(self, command: AgentCommand):
+        from sqlalchemy import select
+        from app.models.backup import Backup
+
+        parsed: list[uuid.UUID] = []
+        for value in command.payload.get("backupRecordIds", []):
+            try:
+                parsed.append(uuid.UUID(str(value)))
+            except ValueError:
+                continue
+        if not parsed:
+            return []
+        result = await self.db.execute(
+            select(Backup).where(
+                Backup.id.in_(parsed), Backup.tenant_id == command.tenant_id
+            )
+        )
+        return list(result.scalars().all())
+
+    async def _mark_backups_running(self, command: AgentCommand) -> None:
+        from app.models.backup import BackupStatus
+
+        for record in await self._backup_records(command):
+            if record.status == BackupStatus.pending:
+                record.status = BackupStatus.running
+
+    async def _complete_backups(
+        self, command: AgentCommand, result: dict[str, Any], now: datetime
+    ) -> None:
+        from app.models.backup import BackupStatus
+
+        by_database = {
+            str(item.get("databaseName")): item
+            for item in result.get("databases", [])
+        }
+        folder = str(result.get("folder") or "")
+        for record in await self._backup_records(command):
+            item = by_database.get(record.database_name)
+            if item is None:
+                record.status = BackupStatus.failed
+                record.error_message = "El agente no reporto el archivo de esta base de datos"
+            else:
+                record.status = BackupStatus.completed
+                record.file_path = ntpath.join(folder, str(item.get("fileName") or ""))
+                record.file_size_bytes = int(item.get("fileSizeBytes") or 0)
+                record.error_message = None
+            record.finished_at = now
+
+    async def _fail_backups(
+        self, command: AgentCommand, error_message: str, now: datetime
+    ) -> None:
+        from app.models.backup import BackupStatus
+
+        for record in await self._backup_records(command):
+            record.status = BackupStatus.failed
+            record.error_message = error_message[:2048]
+            record.finished_at = now
 
     async def _get(self, agent: RemoteAgent, command_id: str) -> AgentCommand:
         try:

@@ -9,6 +9,8 @@ export const BACKUP_KEYS = {
   list:      (skip = 0, limit = 50) => ["backups", "list", skip, limit] as const,
   status:    (id: string) => ["backups", "status", id] as const,
   databases: (connId?: string) => ["backups", "databases", connId ?? "env"] as const,
+  agents:    ["backups", "agents"] as const,
+  agentDatabases: (agentId?: string, profileId?: string) => ["backups", "agent-databases", agentId, profileId] as const,
 };
 
 export function useBackupList(skip = 0, limit = 50) {
@@ -16,6 +18,24 @@ export function useBackupList(skip = 0, limit = 50) {
     queryKey: BACKUP_KEYS.list(skip, limit),
     queryFn:  () => backupsService.listBackups(skip, limit),
     refetchInterval: 5000,
+  });
+}
+
+export function useBackupAgents(enabled = true) {
+  return useQuery({
+    queryKey: BACKUP_KEYS.agents,
+    queryFn: () => backupsService.listAgents(),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAgentDatabases(agentId?: string, sqlProfileId?: string, enabled = true) {
+  return useQuery({
+    queryKey: BACKUP_KEYS.agentDatabases(agentId, sqlProfileId),
+    queryFn: () => backupsService.listAgentDatabases(agentId!, sqlProfileId!),
+    enabled: enabled && !!agentId && !!sqlProfileId,
+    staleTime: 60_000,
   });
 }
 
@@ -47,5 +67,13 @@ export function useTriggerBackup() {
   return useMutation({
     mutationFn: backupsService.triggerBackup,
     onSuccess:  () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.all }),
+  });
+}
+
+export function useTriggerAgentBackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: backupsService.triggerAgentBackup,
+    onSuccess: () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.all }),
   });
 }

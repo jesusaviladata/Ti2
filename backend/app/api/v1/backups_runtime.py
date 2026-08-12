@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
@@ -12,6 +12,10 @@ from app.core.database import get_db
 from app.models.user import User
 from app.services.backup_runtime_service import BackupRuntimeService
 from app.services.backup_service import BackupService
+from app.services.agent_admin_service import AgentAdminService
+from app.services.agent_backup_service import AgentBackupService
+from app.core.config import settings
+from app.core.errors import DomainError
 
 
 router = APIRouter()
@@ -19,6 +23,9 @@ read_operation = require_capabilities(Capability.OPERATION_READ)
 run_backup = require_capabilities(Capability.BACKUP_RUN)
 manage_backup = require_capabilities(Capability.CONFIG_MANAGE)
 purge_backup = require_capabilities(Capability.PURGE)
+DatabaseName = Annotated[
+    str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
+]
 
 
 class ConnectionBody(BaseModel):
@@ -36,6 +43,26 @@ class ManualBackupBody(BaseModel):
     destination: Literal["local", "nas", "secondary_server"] = "local"
     local_path: str | None = None
     connection: ConnectionBody | None = None
+
+
+class AgentDatabaseBody(BaseModel):
+    agent_id: str
+    sql_profile_id: str = Field(min_length=1, max_length=64)
+
+
+class AgentManualBackupBody(BaseModel):
+    agent_id: str
+    sql_profile_id: str = Field(min_length=1, max_length=64)
+    database_names: list[DatabaseName] = Field(min_length=1, max_length=100)
+    backup_type: Literal["full", "differential", "log"] = "full"
+    destination_profile_id: str | None = Field(None, max_length=64)
+
+
+def _require_agent_module() -> None:
+    if not settings.AGENT_MODULE_ENABLED:
+        raise DomainError(
+            "AGENT_MODULE_DISABLED", "El modulo de agentes no esta habilitado", 503
+        )
 
 
 class RetentionBody(BaseModel):
@@ -92,6 +119,30 @@ async def list_databases(
     }
 
 
+@router.get("/agents")
+async def list_backup_agents(
+    current_user: User = Depends(read_operation),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_agent_module()
+    items = await AgentBackupService(db).list_agents(str(current_user.tenant_id))
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/agent-databases", status_code=status.HTTP_202_ACCEPTED)
+async def list_agent_databases(
+    body: AgentDatabaseBody,
+    current_user: User = Depends(read_operation),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_agent_module()
+    job = await AgentBackupService(db).start_database_list(
+        str(current_user.tenant_id), body.agent_id, body.sql_profile_id
+    )
+    await db.commit()
+    return {"jobId": str(job.id)}
+
+
 @router.post("/manual", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_manual_backup(
     body: ManualBackupBody,
@@ -107,6 +158,38 @@ async def trigger_manual_backup(
         body.connection.model_dump() if body.connection else None,
     )
     return {"backups": [_serialize(item) for item in records]}
+
+
+@router.post("/manual-agent", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_agent_backup(
+    body: AgentManualBackupBody,
+    current_user: User = Depends(run_backup),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_agent_module()
+    job, records = await AgentBackupService(db).start_backup(
+        str(current_user.tenant_id),
+        body.agent_id,
+        sql_profile_id=body.sql_profile_id,
+        database_names=body.database_names,
+        backup_type=body.backup_type,
+        destination_profile_id=body.destination_profile_id,
+    )
+    await db.commit()
+    return {
+        "jobId": str(job.id),
+        "backups": [_serialize(item) for item in records],
+    }
+
+
+@router.get("/agent-jobs/{job_id}")
+async def get_backup_agent_job(
+    job_id: str,
+    current_user: User = Depends(read_operation),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_agent_module()
+    return await AgentAdminService(db).get_job(str(current_user.tenant_id), job_id)
 
 
 @router.get("/{backup_id}/status")

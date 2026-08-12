@@ -26,6 +26,33 @@ export interface BackupListResponse {
   limit: number;
 }
 
+export interface BackupAgentProfile {
+  id: string;
+  label: string;
+  type?: string;
+}
+
+export interface BackupAgent {
+  id: string;
+  hostname: string;
+  status: string;
+  lastSeenAt: string | null;
+  sqlInstances: BackupAgentProfile[];
+  backupDestinations: BackupAgentProfile[];
+}
+
+export interface AgentJob {
+  id: string;
+  kind: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  phase: string;
+  totalUnits: number;
+  processedUnits: number;
+  foundCount: number;
+  result?: Record<string, any> | null;
+  error?: string | null;
+}
+
 export interface DatabasesResponse {
   databases: string[];
   connected: boolean;

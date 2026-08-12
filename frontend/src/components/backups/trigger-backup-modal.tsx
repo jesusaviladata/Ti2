@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { X, Database, Loader2, Search, ChevronDown, Check, Eye, EyeOff, CheckCircle2, XCircle, Clock, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useDatabases, useTriggerBackup, useBackupStatus } from "@/hooks/useBackups";
+import { useAgentDatabases, useBackupAgents, useDatabases, useTriggerAgentBackup, useTriggerBackup, useBackupStatus } from "@/hooks/useBackups";
 import { useConnectionsStore } from "@/store/connections.store";
 import { formatBytes } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 type BackupType  = "full" | "differential" | "log";
 type Destination = "local" | "nas" | "secondary_server";
+type ExecutionMode = "agent" | "direct";
 
 interface DestinationCreds {
   host:     string;
@@ -416,8 +417,40 @@ export function TriggerBackupModal({ open, onClose }: Props) {
   const activeConn  = getActive();
   const connPayload = activeConn ? toPayload(activeConn) : null;
 
-  const { data: dbData, isLoading: loadingDbs } = useDatabases(connPayload, activeConn?.id, open);
+  const [executionMode, setExecutionMode] = useState<ExecutionMode>("agent");
+  const [agentId, setAgentId] = useState("");
+  const [sqlProfileId, setSqlProfileId] = useState("");
+  const [destinationProfileId, setDestinationProfileId] = useState("");
+  const { data: agentData, isLoading: loadingAgents, isError: agentsUnavailable } = useBackupAgents(open);
+  const selectedAgent = agentData?.items.find((item) => item.id === agentId);
+
+  useEffect(() => {
+    if (!agentId && agentData?.items.length) setAgentId(agentData.items[0].id);
+  }, [agentData, agentId]);
+
+  useEffect(() => {
+    const profiles = selectedAgent?.sqlInstances ?? [];
+    if (!profiles.some((item) => item.id === sqlProfileId)) {
+      setSqlProfileId(profiles[0]?.id ?? "");
+    }
+    setDestinationProfileId("");
+    setSelectedDbs([]);
+  }, [selectedAgent, sqlProfileId]);
+
+  const directDatabases = useDatabases(
+    connPayload,
+    activeConn?.id,
+    open && executionMode === "direct",
+  );
+  const agentDatabases = useAgentDatabases(
+    agentId,
+    sqlProfileId,
+    open && executionMode === "agent",
+  );
+  const dbData = executionMode === "agent" ? agentDatabases.data : directDatabases.data;
+  const loadingDbs = executionMode === "agent" ? agentDatabases.isLoading : directDatabases.isLoading;
   const trigger = useTriggerBackup();
+  const triggerAgent = useTriggerAgentBackup();
 
   const [selectedDbs,     setSelectedDbs]     = useState<string[]>([]);
   const [backupType,      setBackupType]      = useState<BackupType>("full");
@@ -437,13 +470,21 @@ export function TriggerBackupModal({ open, onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedDbs.length) return;
-    const result = await trigger.mutateAsync({
-      database_names: selectedDbs,
-      backup_type:    backupType,
-      destination,
-      local_path:     destination === "local" ? localPath.trim() || undefined : undefined,
-      connection:     connPayload ?? undefined,
-    });
+    const result = executionMode === "agent"
+      ? await triggerAgent.mutateAsync({
+          agent_id: agentId,
+          sql_profile_id: sqlProfileId,
+          database_names: selectedDbs,
+          backup_type: backupType,
+          destination_profile_id: destinationProfileId || undefined,
+        })
+      : await trigger.mutateAsync({
+          database_names: selectedDbs,
+          backup_type:    backupType,
+          destination,
+          local_path:     destination === "local" ? localPath.trim() || undefined : undefined,
+          connection:     connPayload ?? undefined,
+        });
     setActiveBackupIds(result.backups.map((b) => b.id));
   }
 
@@ -451,6 +492,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
     setActiveBackupIds([]);
     setLocalPath(todayLocalPath());
     trigger.reset();
+    triggerAgent.reset();
     onClose();
   }
 
@@ -479,7 +521,70 @@ export function TriggerBackupModal({ open, onClose }: Props) {
         <div className="p-6 overflow-y-auto">
           {!activeBackupIds.length ? (
             <form onSubmit={handleSubmit} className="space-y-5">
-              {!activeConn && (
+              <div>
+                <label className="font-mono text-xs text-crema/40 uppercase tracking-wider block mb-2">
+                  Ejecucion
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setExecutionMode("agent"); setSelectedDbs([]); }}
+                    className={cn(
+                      "h-10 rounded-[0.75rem] border text-xs font-sans transition-colors",
+                      executionMode === "agent" ? "bg-arcilla/10 border-arcilla/40 text-crema" : "bg-musgo/10 border-musgo/20 text-crema/40",
+                    )}
+                  >
+                    Agente del servidor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setExecutionMode("direct"); setSelectedDbs([]); }}
+                    className={cn(
+                      "h-10 rounded-[0.75rem] border text-xs font-sans transition-colors",
+                      executionMode === "direct" ? "bg-arcilla/10 border-arcilla/40 text-crema" : "bg-musgo/10 border-musgo/20 text-crema/40",
+                    )}
+                  >
+                    Conexion directa
+                  </button>
+                </div>
+              </div>
+
+              {executionMode === "agent" && (
+                <div className="rounded-[1rem] border border-musgo/25 bg-musgo/5 p-4 space-y-3">
+                  <div>
+                    <label className="font-mono text-[10px] text-crema/35 uppercase tracking-wider block mb-1.5">
+                      Servidor / Agente
+                    </label>
+                    <select value={agentId} onChange={(event) => setAgentId(event.target.value)} className={INPUT}>
+                      <option value="">Seleccione un servidor</option>
+                      {agentData?.items.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.hostname} — {agent.status}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-mono text-[10px] text-crema/35 uppercase tracking-wider block mb-1.5">
+                      Instancia SQL
+                    </label>
+                    <select value={sqlProfileId} onChange={(event) => setSqlProfileId(event.target.value)} className={INPUT}>
+                      <option value="">Seleccione una instancia</option>
+                      {selectedAgent?.sqlInstances.map((profile) => (
+                        <option key={profile.id} value={profile.id}>{profile.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {loadingAgents && <p className="font-mono text-[10px] text-crema/30">Consultando agentes…</p>}
+                  {agentsUnavailable && (
+                    <p className="font-mono text-[10px] text-red-400/70">
+                      El modulo de agentes no esta disponible en Railway. Active el modulo o use conexion directa.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {executionMode === "direct" && !activeConn && (
                 <div className="flex items-center gap-2 rounded-[0.75rem] bg-musgo/10 border border-musgo/20 px-4 py-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-crema/20 shrink-0" />
                   <span className="font-mono text-xs text-crema/35">
@@ -556,7 +661,20 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 <label className="font-mono text-xs text-crema/40 uppercase tracking-wider block mb-2">
                   Destino
                 </label>
-                <div className="flex gap-2">
+                {executionMode === "agent" && (
+                  <div className="rounded-[1rem] border border-musgo/25 bg-musgo/5 p-4 space-y-2">
+                    <select value={destinationProfileId} onChange={(event) => setDestinationProfileId(event.target.value)} className={INPUT}>
+                      <option value="">Solo carpeta local + ZIP</option>
+                      {selectedAgent?.backupDestinations.map((profile) => (
+                        <option key={profile.id} value={profile.id}>{profile.label}</option>
+                      ))}
+                    </select>
+                    <p className="font-mono text-[10px] text-crema/25 leading-relaxed">
+                      El agente crea la carpeta fechada, verifica los .bak y genera el ZIP antes de transferirlo.
+                    </p>
+                  </div>
+                )}
+                {executionMode === "direct" && <div className="flex gap-2">
                   {DESTINATIONS.map(({ value, label }) => (
                     <button
                       key={value}
@@ -572,10 +690,10 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                       {label}
                     </button>
                   ))}
-                </div>
+                </div>}
 
                 {/* Local path config */}
-                {destination === "local" && (
+                {executionMode === "direct" && destination === "local" && (
                   <div className="mt-3 rounded-[1rem] border border-musgo/25 overflow-hidden">
                     <div className="flex items-center gap-2 px-4 py-2.5 bg-musgo/15 border-b border-musgo/20">
                       <FolderOpen size={12} className="text-arcilla/60 shrink-0" />
@@ -599,7 +717,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 )}
 
                 {/* Credential fields for NAS / secondary server */}
-                {destination !== "local" && (
+                {executionMode === "direct" && destination !== "local" && (
                   <div className="mt-3">
                     <DestinationCredentials
                       destination={destination}
@@ -610,9 +728,9 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 )}
               </div>
 
-              {trigger.isError && (
+              {(trigger.isError || triggerAgent.isError) && (
                 <p className="font-mono text-xs text-red-400 bg-red-900/10 border border-red-800/20 rounded-[0.75rem] px-4 py-3">
-                  {(trigger.error as any)?.response?.data?.detail ?? "Error al iniciar backup"}
+                  {((triggerAgent.error ?? trigger.error) as any)?.response?.data?.detail ?? "Error al iniciar backup"}
                 </p>
               )}
 
@@ -623,9 +741,9 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 <Button
                   type="submit"
                   className="flex-1"
-                  disabled={!selectedDbs.length || trigger.isPending || !dbData?.connected}
+                  disabled={!selectedDbs.length || trigger.isPending || triggerAgent.isPending || !dbData?.connected || (executionMode === "agent" && (!agentId || !sqlProfileId))}
                 >
-                  {trigger.isPending ? (
+                  {(trigger.isPending || triggerAgent.isPending) ? (
                     <><Loader2 size={14} className="animate-spin mr-2" />Iniciando…</>
                   ) : (
                     <><Database size={14} className="mr-2" />

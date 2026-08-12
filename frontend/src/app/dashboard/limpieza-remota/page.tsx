@@ -46,8 +46,9 @@ export default function LimpiezaRemotaPage() {
   const [subtab, setSubtab]         = useState<"operar" | "cuarentena" | "historial">("operar");
 
   const server = servers.find((s) => s.id === serverId) ?? null;
+  const isAgent = server?.transport === "agent";
   // La llave .pem solo aplica a SFTP; para FTP/FTPS se fuerza contraseña.
-  const pemAvailable = (server?.protocol ?? "sftp") === "sftp";
+  const pemAvailable = !isAgent && (server?.protocol ?? "sftp") === "sftp";
   const effectiveMethod = pemAvailable ? authMethod : "password";
   const creds: RemoteCreds = effectiveMethod === "pem"
     ? { privateKey: pemKey, passphrase }
@@ -77,6 +78,9 @@ export default function LimpiezaRemotaPage() {
   }, []);
 
   useEffect(() => { loadServers(); loadAudit(); }, [loadServers, loadAudit]);
+  useEffect(() => {
+    if (isAgent) setCleanMode("estructural");
+  }, [isAgent]);
 
   async function doRestore(item: QuarantineItem) {
     try {
@@ -159,11 +163,13 @@ export default function LimpiezaRemotaPage() {
                 <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1.5">Servidor</label>
                 <select value={serverId} onChange={(e) => { setServerId(e.target.value); setEntries([]); setCurrent(""); }} className={INPUT}>
                   {servers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} · {s.protocol}://{s.host}</option>
+                    <option key={s.id} value={s.id}>
+                      {s.name} · {s.transport === "agent" ? "agente local" : `${s.protocol}://${s.host}`}
+                    </option>
                   ))}
                 </select>
               </div>
-              <div>
+              {!isAgent && <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider flex items-center gap-1">
                     <Lock size={9} /> Autenticación (no se guarda)
@@ -198,15 +204,20 @@ export default function LimpiezaRemotaPage() {
                       className={INPUT} placeholder="Passphrase" title="Solo si la llave está cifrada" />
                   </div>
                 )}
-              </div>
-              <button onClick={() => doList()} disabled={loading}
+              </div>}
+              {!isAgent && <button onClick={() => doList()} disabled={loading}
                 className="h-9 px-4 rounded-[0.5rem] bg-arcilla/15 border border-arcilla/30 font-mono text-xs text-arcilla/90 hover:bg-arcilla/25 disabled:opacity-40 transition-colors flex items-center gap-2">
                 {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Conectar / listar
-              </button>
+              </button>}
+              {isAgent && (
+                <div className="md:col-span-2 h-9 flex items-center rounded-[0.5rem] border border-green-800/30 bg-green-900/10 px-3 font-mono text-xs text-green-300/70">
+                  Conexion segura mediante el agente instalado; no requiere credenciales remotas.
+                </div>
+              )}
             </div>
 
             {/* Rutas autorizadas (puntos de entrada) */}
-            {server && (
+            {server && !isAgent && (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 <span className="font-mono text-[10px] text-crema/30 mr-1 self-center">Rutas autorizadas:</span>
                 {server.allowlist.length === 0 ? (
@@ -237,9 +248,9 @@ export default function LimpiezaRemotaPage() {
                   cleanMode === "estructural" ? "bg-arcilla/15 text-arcilla/80" : "text-crema/35 hover:text-crema/55")}>
                 <Boxes size={11} /> Estructural (por propiedad)
               </button>
-              <button onClick={() => setCleanMode("reglas")}
+              <button onClick={() => !isAgent && setCleanMode("reglas")} disabled={isAgent}
                 className={cn("px-3 h-8 font-mono text-[10px] transition-colors flex items-center gap-1",
-                  cleanMode === "reglas" ? "bg-arcilla/15 text-arcilla/80" : "text-crema/35 hover:text-crema/55")}>
+                  cleanMode === "reglas" ? "bg-arcilla/15 text-arcilla/80" : "text-crema/35 hover:text-crema/55", isAgent && "opacity-30")}>
                 <FlaskConical size={11} /> Por extensión/edad
               </button>
             </div>
@@ -250,7 +261,7 @@ export default function LimpiezaRemotaPage() {
           )}
 
           {/* Listado + Simulación (modo por extensión/edad) */}
-          {cleanMode === "reglas" && (
+          {cleanMode === "reglas" && !isAgent && (
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
             {/* Tabla de archivos */}
             <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 overflow-hidden">

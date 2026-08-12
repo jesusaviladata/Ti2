@@ -1,7 +1,7 @@
 <service>
   <id>DataExpressAgent</id>
   <name>Data Express Agent</name>
-  <description>Conexion segura de salida para administrar servidores Core autorizados.</description>
+  <description>Agente seguro para exploracion, limpieza y backups SQL autorizados.</description>
   <executable>%BASE%\DataExpressAgent\DataExpressAgent.exe</executable>
   <arguments>--config "%ProgramData%\DataExpress\Agent\agent.json" --pairing-code-file "%ProgramData%\DataExpress\Agent\pairing-code.tmp"</arguments>
   <workingdirectory>%BASE%\DataExpressAgent</workingdirectory>

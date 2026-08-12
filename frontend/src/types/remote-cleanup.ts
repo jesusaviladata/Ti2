@@ -11,12 +11,16 @@ export interface RemoteCreds {
 export interface CleanupServer {
   id:        string;
   name:      string;
-  protocol:  RemoteProtocol;
-  host:      string;
-  port:      number;
-  username:  string;
+  transport?: "agent" | "remote";
+  agentId?:  string | null;
+  protocol:  RemoteProtocol | null;
+  host:      string | null;
+  port:      number | null;
+  username:  string | null;
   rutaBase:  string;
   allowlist: string[];
+  targetFolders?: string[];
+  targetFiles?: string[];
   createdAt?: string;
 }
 
@@ -102,6 +106,8 @@ export interface StructuralRule {
 }
 
 export interface StructuralReport {
+  simulationId?:          string;
+  manifestHash?:          string;
   simulacion?:           boolean;
   encontrados:           number;
   elegibles:             (RemoteEntry & { propiedad?: string })[];
@@ -131,6 +137,18 @@ export interface CleanupJob {
   encontrados:           number;
   result:                StructuralReport | (Record<string, any>) | null;
   error:                 string | null;
+}
+
+export interface AgentCleanupJob {
+  id: string;
+  kind: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  phase: string;
+  totalUnits: number;
+  processedUnits: number;
+  foundCount: number;
+  result: Record<string, any> | null;
+  error: string | null;
 }
 
 /** Regla mínima para la simulación (Fase 3). */
