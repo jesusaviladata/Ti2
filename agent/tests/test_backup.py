@@ -12,6 +12,9 @@ class FakeRows:
 
 
 class FakeConnection:
+    def __init__(self):
+        self.statements = []
+
     def __enter__(self):
         return self
 
@@ -19,6 +22,7 @@ class FakeConnection:
         return None
 
     def execute(self, sql, *parameters):
+        self.statements.append(sql)
         if sql.startswith("SELECT name"):
             return FakeRows()
         if sql.startswith("BACKUP"):
@@ -57,11 +61,12 @@ def test_sql_unicode_literal_escapes_apostrophes():
 
 
 def test_backup_batch_creates_dated_folder_verified_baks_and_zip(tmp_path):
+    connection = FakeConnection()
     executor = BackupExecutor(
         sql_profiles=(
             {"id": "local", "label": "SQL local", "server": ".", "backupRoot": str(tmp_path)},
         ),
-        connect=lambda _profile: FakeConnection(),
+        connect=lambda _profile: connection,
         now=lambda: datetime(2026, 8, 12, 10, 30, 0),
     )
     progress = []
@@ -83,6 +88,7 @@ def test_backup_batch_creates_dated_folder_verified_baks_and_zip(tmp_path):
     assert [item["databaseName"] for item in result["databases"]] == ["DX", "IPSOFACTU"]
     assert all(item["verified"] for item in result["databases"])
     assert all(item["verificationMethod"] == "restore_verifyonly" for item in result["databases"])
+    assert all("COMPRESSION" not in sql for sql in connection.statements)
     assert progress[-1]["phase"] == "completed"
 
 

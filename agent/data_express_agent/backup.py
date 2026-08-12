@@ -271,18 +271,12 @@ class BackupExecutor:
         disk_path = _sql_unicode_literal(str(file_path))
         sql = (
             f"{verb} [{quoted_database}] TO DISK = {disk_path} WITH "
-            f"COMPRESSION, {differential}FORMAT, INIT, CHECKSUM, STATS = 10"
+            f"{differential}FORMAT, INIT, CHECKSUM, STATS = 10"
         )
-        try:
-            connection.execute(sql)
-        except Exception as exc:
-            if "compress" not in str(exc).lower():
-                raise
-            fallback = (
-                f"{verb} [{quoted_database}] TO DISK = {disk_path} WITH "
-                f"{differential}FORMAT, INIT, CHECKSUM, STATS = 10"
-            )
-            connection.execute(fallback)
+        # SQL Server Express does not support backup compression.  Using the
+        # portable statement directly also avoids a failed first attempt on
+        # editions where compression is disabled by policy.
+        connection.execute(sql)
         try:
             connection.execute(f"RESTORE VERIFYONLY FROM DISK = {disk_path} WITH CHECKSUM")
         except Exception as exc:
