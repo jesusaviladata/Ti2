@@ -49,7 +49,7 @@ sale a la red como la cuenta del servidor) debe tener acceso al recurso comparti
 Para SFTP se recomienda una llave privada local con permisos exclusivos para la cuenta
 del servicio. Nunca agregue password o connectionString al archivo de perfiles.
 
-FUNCIONES DE LA VERSION 0.2.2
+FUNCIONES DE LA VERSION 0.2.3
 - Exploracion de discos y carpetas.
 - Simulacion de limpieza estructural.
 - Movimiento reversible a cuarentena, restauracion y purga.

@@ -127,8 +127,16 @@ class AgentClient:
             ) from exc
 
     def progress(self, command_id: str, progress: dict[str, Any]) -> None:
+        # The server progress contract is deliberately compact and rejects extra
+        # fields. Executors may keep local context (for example, database name),
+        # but it must not be sent as an API field.
+        payload = {
+            key: progress[key]
+            for key in ("phase", "processedUnits", "totalUnits", "foundCount")
+            if key in progress
+        }
         self._request(
-            "POST", f"/agent/v1/commands/{command_id}/progress", progress
+            "POST", f"/agent/v1/commands/{command_id}/progress", payload
         )
 
     def complete(self, command_id: str, result: dict[str, Any]) -> None:

@@ -135,3 +135,34 @@ def test_enrollment_sends_public_identity_and_accepts_only_expected_key_id():
     assert identity.tenant_id == tenant_id
     client.close()
 
+
+def test_progress_sends_only_the_declared_progress_contract_fields():
+    server_private_key = Ed25519PrivateKey.generate()
+    identity = AgentIdentity.generate()
+    identity.agent_id = str(uuid.uuid4())
+    identity.tenant_id = str(uuid.uuid4())
+
+    def handler(request):
+        assert json.loads(request.content) == {
+            "phase": "backing_up",
+            "processedUnits": 0,
+            "totalUnits": 1,
+            "foundCount": 0,
+        }
+        return httpx.Response(200, json={"status": "running"})
+
+    client = AgentClient(
+        _config(server_private_key), identity, transport=httpx.MockTransport(handler)
+    )
+    client.progress(
+        str(uuid.uuid4()),
+        {
+            "phase": "backing_up",
+            "processedUnits": 0,
+            "totalUnits": 1,
+            "foundCount": 0,
+            "database": "IpsofactuMxRecepcion_ZENSHO",
+        },
+    )
+    client.close()
+
