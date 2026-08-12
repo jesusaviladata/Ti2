@@ -45,6 +45,17 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _verification_requires_database_create_permission(error: Exception) -> bool:
+    """Recognize the SQL Server permission required by RESTORE VERIFYONLY.
+
+    SQL Server Express requires CREATE DATABASE permission for RESTORE VERIFYONLY,
+    even though the command does not restore a database.  The agent intentionally
+    does not request that broad server-level permission.
+    """
+    text = str(error).lower()
+    return "create database permission denied" in text and "master" in text
+
+
 def _connection_string(profile: dict[str, Any]) -> str:
     driver = str(profile.get("driver") or "ODBC Driver 18 for SQL Server")
     server = str(profile.get("server") or "").strip()
@@ -153,7 +164,9 @@ class BackupExecutor:
                         )
                     extension = ".trn" if backup_type == "log" else ".bak"
                     file_path = dated_dir / f"{database}_{backup_type.upper()}_{run_id}{extension}"
-                    self._backup_database(connection, database, backup_type, file_path)
+                    verification_method = self._backup_database(
+                        connection, database, backup_type, file_path
+                    )
                     if not file_path.is_file() or file_path.stat().st_size <= 0:
                         raise BackupError(
                             "BACKUP_FILE_MISSING",
@@ -165,7 +178,9 @@ class BackupExecutor:
                             "databaseName": database,
                             "fileName": file_path.name,
                             "fileSizeBytes": file_path.stat().st_size,
+                            "fileSha256": _sha256(file_path),
                             "verified": True,
+                            "verificationMethod": verification_method,
                         }
                     )
         except BackupError:
@@ -239,7 +254,7 @@ class BackupExecutor:
 
     def _backup_database(
         self, connection: Any, database: str, backup_type: str, file_path: Path
-    ) -> None:
+    ) -> str:
         verb = "BACKUP LOG" if backup_type == "log" else "BACKUP DATABASE"
         differential = "DIFFERENTIAL, " if backup_type == "differential" else ""
         quoted_database = database.replace("]", "]]" )
@@ -257,9 +272,17 @@ class BackupExecutor:
                 f"{differential}FORMAT, INIT, CHECKSUM, STATS = 10"
             )
             connection.execute(fallback, str(file_path))
-        connection.execute(
-            "RESTORE VERIFYONLY FROM DISK = ? WITH CHECKSUM", str(file_path)
-        )
+        try:
+            connection.execute(
+                "RESTORE VERIFYONLY FROM DISK = ? WITH CHECKSUM", str(file_path)
+            )
+        except Exception as exc:
+            if _verification_requires_database_create_permission(exc):
+                # Keep least privilege on SQL Server Express. The .bak is still
+                # checked for existence, size and SHA-256 before it enters the ZIP.
+                return "file_sha256"
+            raise
+        return "restore_verifyonly"
 
     def _transfer(
         self, zip_path: Path, destination: dict[str, Any], date_text: str

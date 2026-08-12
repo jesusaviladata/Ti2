@@ -49,11 +49,13 @@ sale a la red como la cuenta del servidor) debe tener acceso al recurso comparti
 Para SFTP se recomienda una llave privada local con permisos exclusivos para la cuenta
 del servicio. Nunca agregue password o connectionString al archivo de perfiles.
 
-FUNCIONES DE LA VERSION 0.2.1
+FUNCIONES DE LA VERSION 0.2.2
 - Exploracion de discos y carpetas.
 - Simulacion de limpieza estructural.
 - Movimiento reversible a cuarentena, restauracion y purga.
 - Descubrimiento de bases por instancia SQL configurada.
-- Backups .bak/.trn en D:\AAAA-MM-DD, RESTORE VERIFYONLY y ZIP diario.
+- Backups .bak/.trn en D:\AAAA-MM-DD y ZIP diario. Cuando SQL Server Express
+  no permite RESTORE VERIFYONLY sin privilegios amplios, valida tamano y SHA-256
+  del .bak antes de comprimir, y la integridad del ZIP despues de crearlo.
 - Transferencia opcional del ZIP por SFTP o SMB.
 

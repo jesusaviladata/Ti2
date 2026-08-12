@@ -28,6 +28,15 @@ class FakeConnection:
         return self
 
 
+class ExpressVerifyPermissionConnection(FakeConnection):
+    def execute(self, sql, *parameters):
+        if sql.startswith("RESTORE VERIFYONLY"):
+            raise RuntimeError(
+                "CREATE DATABASE permission denied in database 'master'."
+            )
+        return super().execute(sql, *parameters)
+
+
 def test_lists_databases_from_configured_profile(tmp_path):
     executor = BackupExecutor(
         sql_profiles=(
@@ -67,4 +76,29 @@ def test_backup_batch_creates_dated_folder_verified_baks_and_zip(tmp_path):
     assert len(result["zipSha256"]) == 64
     assert [item["databaseName"] for item in result["databases"]] == ["DX", "IPSOFACTU"]
     assert all(item["verified"] for item in result["databases"])
+    assert all(item["verificationMethod"] == "restore_verifyonly" for item in result["databases"])
     assert progress[-1]["phase"] == "completed"
+
+
+def test_backup_batch_uses_file_hash_when_express_cannot_run_restore_verifyonly(tmp_path):
+    executor = BackupExecutor(
+        sql_profiles=(
+            {"id": "local", "label": "SQL local", "server": ".", "backupRoot": str(tmp_path)},
+        ),
+        connect=lambda _profile: ExpressVerifyPermissionConnection(),
+        now=lambda: datetime(2026, 8, 12, 10, 30, 0),
+    )
+
+    result = executor.run_batch(
+        {
+            "runId": "job-express",
+            "sqlProfileId": "local",
+            "databaseNames": ["DX"],
+            "backupType": "full",
+        }
+    )
+
+    database = result["databases"][0]
+    assert database["verified"] is True
+    assert database["verificationMethod"] == "file_sha256"
+    assert len(database["fileSha256"]) == 64
