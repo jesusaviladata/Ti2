@@ -8,6 +8,7 @@ export interface BackgroundBackupBatch {
   backupIds: string[];
   databaseNames: string[];
   startedAt: string;
+  submissionError?: string;
 }
 
 interface BackupProgressState {

@@ -45,9 +45,13 @@ export function BackupBackgroundIndicator({ collapsed }: { collapsed: boolean })
   const failedCount = backups.filter((backup) => backup.status === "failed").length;
   const total = Math.max(1, batch.backupIds.length || batch.databaseNames.length);
   const directDone = batch.backupIds.length > 0 && finished === batch.backupIds.length;
-  const progress = batch.jobId
-    ? getAgentProgress(job)
-    : {
+  const progress = batch.submissionError
+    ? { percent: 100, label: "No se pudo iniciar", done: true, failed: true }
+    : batch.jobId
+      ? getAgentProgress(job)
+      : batch.backupIds.length === 0
+        ? { percent: 6, label: "Preparando…", done: false, failed: false }
+        : {
         percent: directDone ? 100 : Math.max(6, Math.round((finished / total) * 100)),
         label: directDone
           ? failedCount ? "Backup fallido" : "Backup completado"
@@ -99,7 +103,7 @@ export function BackupBackgroundIndicator({ collapsed }: { collapsed: boolean })
         />
       </div>
       <p className="mt-1.5 truncate font-mono text-[9px] text-crema/25">
-        {batch.databaseNames.length} base{batch.databaseNames.length !== 1 ? "s" : ""}
+        {batch.submissionError ?? `${batch.databaseNames.length} base${batch.databaseNames.length !== 1 ? "s" : ""}`}
       </p>
     </div>
   );

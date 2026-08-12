@@ -474,6 +474,8 @@ export function TriggerBackupModal({ open, onClose }: Props) {
   const [activeJobId, setActiveJobId] = useState("");
   const [submittedDatabases, setSubmittedDatabases] = useState<string[]>([]);
   const [showProgress, setShowProgress] = useState(false);
+  const backgroundRequestedRef = useRef(false);
+  const submittedDatabasesRef = useRef<string[]>([]);
 
   if (!open) return null;
 
@@ -484,7 +486,9 @@ export function TriggerBackupModal({ open, onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedDbs.length) return;
-    setSubmittedDatabases([...selectedDbs]);
+    const databases = [...selectedDbs];
+    submittedDatabasesRef.current = databases;
+    setSubmittedDatabases(databases);
     setShowProgress(true);
     try {
       const result = executionMode === "agent"
@@ -502,19 +506,59 @@ export function TriggerBackupModal({ open, onClose }: Props) {
           local_path:     destination === "local" ? localPath.trim() || undefined : undefined,
           connection:     connPayload ?? undefined,
         });
-      setActiveBackupIds(result.backups.map((b) => b.id));
-      if ("jobId" in result && typeof result.jobId === "string") {
-        setActiveJobId(result.jobId);
+      const backupIds = result.backups.map((backup) => backup.id);
+      const jobId = "jobId" in result && typeof result.jobId === "string"
+        ? result.jobId
+        : undefined;
+      if (backgroundRequestedRef.current) {
+        showInBackground({
+          jobId,
+          backupIds,
+          databaseNames: databases,
+          startedAt: new Date().toISOString(),
+        });
+        backgroundRequestedRef.current = false;
+        submittedDatabasesRef.current = [];
+        trigger.reset();
+        triggerAgent.reset();
+        return;
       }
+      setActiveBackupIds(backupIds);
+      setActiveJobId(jobId ?? "");
     } catch {
-      setShowProgress(false);
+      if (backgroundRequestedRef.current) {
+        showInBackground({
+          backupIds: [],
+          databaseNames: databases,
+          startedAt: new Date().toISOString(),
+          submissionError: "Railway rechazó o no pudo iniciar el lote",
+        });
+        backgroundRequestedRef.current = false;
+        submittedDatabasesRef.current = [];
+        trigger.reset();
+        triggerAgent.reset();
+      } else {
+        setShowProgress(false);
+      }
     }
   }
 
   function handleClose() {
-    // Espera a que Railway entregue los identificadores antes de mandar el lote
-    // al indicador lateral; así el seguimiento nunca queda desconectado.
-    if (showProgress && (trigger.isPending || triggerAgent.isPending)) return;
+    if (showProgress && (trigger.isPending || triggerAgent.isPending)) {
+      backgroundRequestedRef.current = true;
+      showInBackground({
+        backupIds: [],
+        databaseNames: submittedDatabasesRef.current,
+        startedAt: new Date().toISOString(),
+      });
+      setActiveBackupIds([]);
+      setActiveJobId("");
+      setSubmittedDatabases([]);
+      setShowProgress(false);
+      setLocalPath(todayLocalPath());
+      onClose();
+      return;
+    }
     if (showProgress && (activeJobId || activeBackupIds.length)) {
       showInBackground({
         jobId: activeJobId || undefined,
@@ -527,6 +571,8 @@ export function TriggerBackupModal({ open, onClose }: Props) {
     setActiveJobId("");
     setSubmittedDatabases([]);
     setShowProgress(false);
+    backgroundRequestedRef.current = false;
+    submittedDatabasesRef.current = [];
     setLocalPath(todayLocalPath());
     trigger.reset();
     triggerAgent.reset();
@@ -802,7 +848,6 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 onClick={handleClose}
                 variant="outline"
                 className="w-full"
-                disabled={trigger.isPending || triggerAgent.isPending}
               >
                 Ver en segundo plano
               </Button>
