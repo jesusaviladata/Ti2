@@ -111,6 +111,7 @@ class AgentRunner:
             self.journal.record_completed(command_id, result)
         except (ExplorerError, BackupError, CleanupError, ValueError, KeyError) as exc:
             code = getattr(exc, "code", "COMMAND_FAILED")
+            logger.exception("Command %s failed: %s", command_id, code)
             self.journal.record_failed(command_id, code, str(exc))
         self.flush_reports()
         return True

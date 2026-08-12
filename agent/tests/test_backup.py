@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from agent.data_express_agent.backup import BackupExecutor, _sql_unicode_literal
+from agent.data_express_agent.backup import BackupError, BackupExecutor, _sql_unicode_literal
 
 
 class FakeRows:
@@ -58,6 +58,27 @@ def test_lists_databases_from_configured_profile(tmp_path):
 
 def test_sql_unicode_literal_escapes_apostrophes():
     assert _sql_unicode_literal("D:\\O'Brien\\file.bak") == "N'D:\\O''Brien\\file.bak'"
+
+
+def test_backup_error_includes_redacted_database_diagnostic(tmp_path):
+    class BrokenConnection(FakeConnection):
+        def execute(self, sql, *parameters):
+            if sql.startswith("BACKUP"):
+                raise RuntimeError("[HY000] backup denied; PWD=topsecret")
+            return super().execute(sql, *parameters)
+
+    executor = BackupExecutor(
+        sql_profiles=({"id": "local", "server": ".", "backupRoot": str(tmp_path)},),
+        connect=lambda _profile: BrokenConnection(),
+    )
+
+    try:
+        executor.run_batch({"sqlProfileId": "local", "databaseNames": ["DX"]})
+    except BackupError as exc:
+        assert "backup denied" in str(exc)
+        assert "topsecret" not in str(exc)
+    else:
+        raise AssertionError("Expected BackupError")
 
 
 def test_backup_batch_creates_dated_folder_verified_baks_and_zip(tmp_path):

@@ -23,6 +23,13 @@ class BackupError(RuntimeError):
         self.code = code
 
 
+def _diagnostic_error_message(exc: Exception) -> str:
+    """Expose a bounded, credential-free database error to the operator."""
+    detail = " ".join(str(exc).replace("\r", " ").replace("\n", " ").split())
+    detail = re.sub(r"(?i)(password|pwd)\s*=\s*[^;\s]+", r"\1=***", detail)
+    return detail[:700]
+
+
 def _profile(profiles: tuple[dict[str, Any], ...], profile_id: str, kind: str) -> dict[str, Any]:
     for item in profiles:
         if item.get("id") == profile_id:
@@ -196,7 +203,11 @@ class BackupExecutor:
         except BackupError:
             raise
         except Exception as exc:
-            raise BackupError("BACKUP_DATABASE_FAILED", "SQL Server no pudo completar el backup") from exc
+            detail = _diagnostic_error_message(exc)
+            message = "SQL Server no pudo completar el backup"
+            if detail:
+                message = f"{message}: {detail}"
+            raise BackupError("BACKUP_DATABASE_FAILED", message) from exc
 
         if progress:
             progress(
