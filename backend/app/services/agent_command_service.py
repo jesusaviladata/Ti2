@@ -166,6 +166,7 @@ class AgentCommandService:
                 job.finished_at = now
         if command.command_type == "run_backup_batch":
             await self._complete_backups(command, result, now)
+            self._create_backup_success_notification(command, result)
         await self.db.flush()
         return command
 
@@ -258,6 +259,33 @@ class AgentCommandService:
             record.status = BackupStatus.failed
             record.error_message = error_message[:2048]
             record.finished_at = now
+
+    def _create_backup_success_notification(
+        self, command: AgentCommand, result: dict[str, Any]
+    ) -> None:
+        from app.models.operations import Notification
+
+        databases = result.get("databases", [])
+        total = len(databases)
+        zip_name = str(result.get("zipFileName") or "archivo ZIP")
+        self.db.add(
+            Notification(
+                tenant_id=command.tenant_id,
+                user_id=None,
+                kind="backup_success",
+                title="Lote de respaldos completado",
+                message=(
+                    f"{total} base{'s' if total != 1 else ''} respaldada"
+                    f"{'s' if total != 1 else ''} correctamente · {zip_name}"
+                ),
+                severity="success",
+                metadata_json={
+                    "jobId": str(command.job_id) if command.job_id else None,
+                    "databaseCount": total,
+                    "zipPath": result.get("zipPath"),
+                },
+            )
+        )
 
     async def _get(self, agent: RemoteAgent, command_id: str) -> AgentCommand:
         try:

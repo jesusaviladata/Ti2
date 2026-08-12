@@ -145,12 +145,34 @@ class InsightsService:
         events.sort(key=lambda item: item["ts"], reverse=True)
         return events[:limit]
 
-    async def notifications(self, tenant_id: str) -> list[dict[str, Any]]:
+    async def notifications(
+        self, tenant_id: str, user_id: str | None = None
+    ) -> list[dict[str, Any]]:
         tenant = tenant_uuid(tenant_id)
+        cleared_at = None
+        if user_id:
+            cleared_at = (
+                await self.db.execute(
+                    select(Notification.created_at)
+                    .where(
+                        Notification.tenant_id == tenant,
+                        Notification.user_id == uuid.UUID(user_id),
+                        Notification.kind == "clear_marker",
+                    )
+                    .order_by(Notification.created_at.desc())
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+        persisted_filters = [
+            Notification.tenant_id == tenant,
+            Notification.kind != "clear_marker",
+        ]
+        if cleared_at is not None:
+            persisted_filters.append(Notification.created_at > cleared_at)
         persisted = (
             await self.db.execute(
                 select(Notification)
-                .where(Notification.tenant_id == tenant)
+                .where(*persisted_filters)
                 .order_by(Notification.created_at.desc())
                 .limit(100)
             )
@@ -167,13 +189,16 @@ class InsightsService:
             }
             for item in persisted
         ]
+        failed_filters = [
+            Backup.tenant_id == tenant,
+            Backup.status == BackupStatus.failed,
+        ]
+        if cleared_at is not None:
+            failed_filters.append(Backup.created_at > cleared_at)
         failed_backups = (
             await self.db.execute(
                 select(Backup)
-                .where(
-                    Backup.tenant_id == tenant,
-                    Backup.status == BackupStatus.failed,
-                )
+                .where(*failed_filters)
                 .order_by(Backup.created_at.desc())
                 .limit(50)
             )
@@ -188,13 +213,16 @@ class InsightsService:
             }
             for item in failed_backups
         )
+        suspicious_filters = [
+            AccessLog.tenant_id == tenant,
+            AccessLog.is_suspicious.is_(True),
+        ]
+        if cleared_at is not None:
+            suspicious_filters.append(AccessLog.started_at > cleared_at)
         suspicious = (
             await self.db.execute(
                 select(AccessLog)
-                .where(
-                    AccessLog.tenant_id == tenant,
-                    AccessLog.is_suspicious.is_(True),
-                )
+                .where(*suspicious_filters)
                 .order_by(AccessLog.started_at.desc())
                 .limit(50)
             )
@@ -211,6 +239,25 @@ class InsightsService:
         )
         result.sort(key=lambda item: item["ts"], reverse=True)
         return result[:100]
+
+    async def clear_notifications(
+        self, tenant_id: str, user_id: str
+    ) -> dict[str, Any]:
+        item = Notification(
+            tenant_id=tenant_uuid(tenant_id),
+            user_id=uuid.UUID(user_id),
+            kind="clear_marker",
+            title="Notificaciones limpiadas",
+            message="Las notificaciones anteriores fueron ocultadas por el usuario.",
+            severity="info",
+            metadata_json={},
+        )
+        self.db.add(item)
+        await self.db.flush()
+        return {
+            "cleared": True,
+            "clearedAt": item.created_at.isoformat(),
+        }
 
     async def create_test_notification(
         self, tenant_id: str, user_id: str

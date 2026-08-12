@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Bell, AlertTriangle, ShieldAlert, CheckCircle2, RefreshCw } from "lucide-react";
+import { Bell, AlertTriangle, ShieldAlert, CheckCircle2, RefreshCw, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 
 interface Notification {
   id:    string;
-  kind:  "backup_fail" | "suspicious";
+  kind:  "backup_fail" | "backup_success" | "suspicious" | "test";
   title: string;
   body:  string;
   ts:    string;
@@ -26,6 +26,7 @@ function timeAgo(iso: string) {
 export default function AlertsPage() {
   const [items,   setItems]   = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -35,11 +36,28 @@ export default function AlertsPage() {
     finally { setLoading(false); }
   }, []);
 
+  const clear = useCallback(async () => {
+    setClearing(true);
+    try {
+      await api.delete("/api/v1/notifications");
+      setItems([]);
+      window.dispatchEvent(new Event("data-express:notifications-cleared"));
+    } finally {
+      setClearing(false);
+    }
+  }, []);
+
   useEffect(() => {
     load();
     const id = setInterval(load, 30000);
     return () => clearInterval(id);
   }, [load]);
+
+  useEffect(() => {
+    const cleared = () => setItems([]);
+    window.addEventListener("data-express:notifications-cleared", cleared);
+    return () => window.removeEventListener("data-express:notifications-cleared", cleared);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -51,13 +69,25 @@ export default function AlertsPage() {
             Notificaciones<span className="text-arcilla">.</span>
           </h1>
         </div>
-        <button
-          onClick={load}
-          className="w-7 h-7 flex items-center justify-center rounded-[0.5rem] border border-musgo/25 text-crema/30 hover:text-crema/70 transition-colors"
-          aria-label="Actualizar"
-        >
-          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-        </button>
+        <div className="flex items-center gap-2">
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={clear}
+              disabled={clearing}
+              className="flex h-8 items-center gap-1.5 rounded-[0.5rem] border border-musgo/25 px-3 font-mono text-[10px] text-crema/35 transition-colors hover:border-red-400/30 hover:text-red-300 disabled:opacity-40"
+            >
+              <Trash2 size={12} /> {clearing ? "Limpiando…" : "Limpiar"}
+            </button>
+          )}
+          <button
+            onClick={load}
+            className="w-7 h-7 flex items-center justify-center rounded-[0.5rem] border border-musgo/25 text-crema/30 hover:text-crema/70 transition-colors"
+            aria-label="Actualizar"
+          >
+            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+          </button>
+        </div>
       </div>
 
       {/* List */}
@@ -84,9 +114,9 @@ export default function AlertsPage() {
                 className="flex items-start gap-3 px-5 py-4 border-b border-musgo/10 last:border-0 hover:bg-musgo/10 transition-colors"
               >
                 <div className="mt-0.5 shrink-0">
-                  {n.kind === "backup_fail"
-                    ? <AlertTriangle size={15} className="text-red-400/80" />
-                    : <ShieldAlert   size={15} className="text-orange-400/80" />}
+                  {n.kind === "backup_fail" && <AlertTriangle size={15} className="text-red-400/80" />}
+                  {n.kind === "backup_success" && <CheckCircle2 size={15} className="text-green-400/80" />}
+                  {n.kind !== "backup_fail" && n.kind !== "backup_success" && <ShieldAlert size={15} className="text-orange-400/80" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-sans text-sm font-medium text-crema/85">{n.title}</p>

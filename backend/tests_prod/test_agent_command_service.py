@@ -4,9 +4,11 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from unittest.mock import AsyncMock
 
 from app.core.errors import ConflictError
 from app.models.operations import AgentCommand, BackgroundJob, RemoteAgent
+from app.models.operations import Notification
 from app.services.agent_command_service import AgentCommandService
 
 
@@ -154,4 +156,39 @@ async def test_destructive_claim_is_not_automatically_requeued_after_uncertain_d
 
     assert await service.claim_next(agent) is None
     assert command.status == "claimed"
+
+
+@pytest.mark.asyncio
+async def test_completed_backup_batch_creates_one_success_notification():
+    agent, db, repo, service = _fixture()
+    command = AgentCommand(
+        id=uuid.uuid4(),
+        tenant_id=agent.tenant_id,
+        agent_id=agent.id,
+        command_type="run_backup_batch",
+        payload={"backupRecordIds": []},
+        payload_hash="2" * 64,
+        status="claimed",
+        idempotency_key="backup-1",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
+    repo.commands.append(command)
+    service._complete_backups = AsyncMock()
+
+    await service.complete(
+        agent,
+        str(command.id),
+        {
+            "databases": [
+                {"databaseName": "Core"},
+                {"databaseName": "Emision"},
+            ],
+            "zipFileName": "Backup_2026-08-12.zip",
+        },
+    )
+
+    notifications = [item for item in db.added if isinstance(item, Notification)]
+    assert len(notifications) == 1
+    assert notifications[0].kind == "backup_success"
+    assert "2 bases" in notifications[0].message
 

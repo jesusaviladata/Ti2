@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAgentDatabases, useBackupAgentJob, useBackupAgents, useBackupStatuses, useDatabases, useTriggerAgentBackup, useTriggerBackup } from "@/hooks/useBackups";
 import { useConnectionsStore } from "@/store/connections.store";
 import { cn } from "@/lib/utils";
+import { useBackupProgressStore } from "@/store/backup-progress.store";
 
 type BackupType  = "full" | "differential" | "log";
 type Destination = "local" | "nas" | "secondary_server";
@@ -460,6 +461,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
   const loadingDbs = executionMode === "agent" ? agentDatabases.isLoading : directDatabases.isLoading;
   const trigger = useTriggerBackup();
   const triggerAgent = useTriggerAgentBackup();
+  const showInBackground = useBackupProgressStore((state) => state.showInBackground);
 
   const [selectedDbs,     setSelectedDbs]     = useState<string[]>([]);
   const [backupType,      setBackupType]      = useState<BackupType>("full");
@@ -510,6 +512,17 @@ export function TriggerBackupModal({ open, onClose }: Props) {
   }
 
   function handleClose() {
+    // Espera a que Railway entregue los identificadores antes de mandar el lote
+    // al indicador lateral; así el seguimiento nunca queda desconectado.
+    if (showProgress && (trigger.isPending || triggerAgent.isPending)) return;
+    if (showProgress && (activeJobId || activeBackupIds.length)) {
+      showInBackground({
+        jobId: activeJobId || undefined,
+        backupIds: activeBackupIds,
+        databaseNames: submittedDatabases,
+        startedAt: new Date().toISOString(),
+      });
+    }
     setActiveBackupIds([]);
     setActiveJobId("");
     setSubmittedDatabases([]);
@@ -785,8 +798,13 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 databaseNames={submittedDatabases}
                 starting={trigger.isPending || triggerAgent.isPending}
               />
-              <Button onClick={handleClose} variant="outline" className="w-full">
-                Cerrar — los backups continúan en segundo plano
+              <Button
+                onClick={handleClose}
+                variant="outline"
+                className="w-full"
+                disabled={trigger.isPending || triggerAgent.isPending}
+              >
+                Ver en segundo plano
               </Button>
             </div>
           )}
