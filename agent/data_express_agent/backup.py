@@ -37,6 +37,16 @@ def _safe_database_name(value: str) -> str:
     return name
 
 
+def _sql_unicode_literal(value: str) -> str:
+    """Return a safely escaped SQL Server Unicode string literal.
+
+    BACKUP/RESTORE statements on SQL Server Express do not reliably accept ODBC
+    parameter markers for their DISK path.  Paths here are agent-generated from
+    a validated root and database names are separately allow-listed.
+    """
+    return "N'" + value.replace("'", "''") + "'"
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -258,24 +268,23 @@ class BackupExecutor:
         verb = "BACKUP LOG" if backup_type == "log" else "BACKUP DATABASE"
         differential = "DIFFERENTIAL, " if backup_type == "differential" else ""
         quoted_database = database.replace("]", "]]" )
+        disk_path = _sql_unicode_literal(str(file_path))
         sql = (
-            f"{verb} [{quoted_database}] TO DISK = ? WITH "
+            f"{verb} [{quoted_database}] TO DISK = {disk_path} WITH "
             f"COMPRESSION, {differential}FORMAT, INIT, CHECKSUM, STATS = 10"
         )
         try:
-            connection.execute(sql, str(file_path))
+            connection.execute(sql)
         except Exception as exc:
             if "compress" not in str(exc).lower():
                 raise
             fallback = (
-                f"{verb} [{quoted_database}] TO DISK = ? WITH "
+                f"{verb} [{quoted_database}] TO DISK = {disk_path} WITH "
                 f"{differential}FORMAT, INIT, CHECKSUM, STATS = 10"
             )
-            connection.execute(fallback, str(file_path))
+            connection.execute(fallback)
         try:
-            connection.execute(
-                "RESTORE VERIFYONLY FROM DISK = ? WITH CHECKSUM", str(file_path)
-            )
+            connection.execute(f"RESTORE VERIFYONLY FROM DISK = {disk_path} WITH CHECKSUM")
         except Exception as exc:
             if _verification_requires_database_create_permission(exc):
                 # Keep least privilege on SQL Server Express. The .bak is still

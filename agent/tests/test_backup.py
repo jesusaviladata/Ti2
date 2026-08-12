@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from agent.data_express_agent.backup import BackupExecutor
+from agent.data_express_agent.backup import BackupExecutor, _sql_unicode_literal
 
 
 class FakeRows:
@@ -22,7 +22,9 @@ class FakeConnection:
         if sql.startswith("SELECT name"):
             return FakeRows()
         if sql.startswith("BACKUP"):
-            path = Path(parameters[0])
+            assert parameters == ()
+            path_text = sql.split("TO DISK = N'", 1)[1].split("' WITH", 1)[0]
+            path = Path(path_text.replace("''", "'"))
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes((path.stem * 100).encode("utf-8"))
         return self
@@ -48,6 +50,10 @@ def test_lists_databases_from_configured_profile(tmp_path):
     result = executor.list_databases("local")
 
     assert result["databases"] == ["DX", "IPSOFACTU"]
+
+
+def test_sql_unicode_literal_escapes_apostrophes():
+    assert _sql_unicode_literal("D:\\O'Brien\\file.bak") == "N'D:\\O''Brien\\file.bak'"
 
 
 def test_backup_batch_creates_dated_folder_verified_baks_and_zip(tmp_path):
