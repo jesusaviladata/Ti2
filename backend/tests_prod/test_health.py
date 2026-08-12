@@ -4,6 +4,10 @@ from fastapi.testclient import TestClient
 from app.api import health
 
 
+def test_readiness_tracks_latest_database_migration():
+    assert health.EXPECTED_ALEMBIC_REVISION == "0004"
+
+
 def _client(readiness):
     app = FastAPI()
     app.include_router(health.router)
