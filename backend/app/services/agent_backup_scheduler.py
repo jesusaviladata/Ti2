@@ -33,6 +33,10 @@ def backup_type_for_weekday(weekday: int) -> str | None:
     return None
 
 
+def backup_type_for_plan_run(weekday: int, *, has_prior_run: bool) -> str | None:
+    return backup_type_for_weekday(weekday) if has_prior_run else "full"
+
+
 def _time_parts(value: str) -> tuple[int, int]:
     if not _LOCAL_TIME.fullmatch(value):
         raise DomainError("INVALID_BACKUP_TIME", "La hora debe usar el formato HH:MM", 422)
@@ -237,7 +241,11 @@ async def run_agent_backup_plan(plan_id: str) -> None:
         if item.last_run_at and now - item.last_run_at < timedelta(minutes=2):
             return
         local_now = now.astimezone(_timezone(item.timezone_name))
-        backup_type = backup_type_for_weekday(local_now.weekday())
+        # A differential backup requires a regular full backup as its base.
+        # Bootstrap every new plan with a full even when its first fire is Tue/Thu.
+        backup_type = backup_type_for_plan_run(
+            local_now.weekday(), has_prior_run=item.last_run_at is not None
+        )
         if backup_type is None:
             return
 

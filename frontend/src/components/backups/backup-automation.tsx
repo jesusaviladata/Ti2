@@ -180,6 +180,9 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
               <p className="mt-1 font-mono text-xs text-crema/45">Martes · Jueves</p>
             </div>
           </div>
+          <p className="font-mono text-[10px] leading-relaxed text-crema/35">
+            La primera ejecución será Full para establecer una base válida, aunque corresponda a martes o jueves.
+          </p>
 
           {error && <p className="rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2 text-xs text-red-400">{error}</p>}
         </div>

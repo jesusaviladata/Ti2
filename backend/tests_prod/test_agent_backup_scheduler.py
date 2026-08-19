@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from app.services.agent_backup_scheduler import (
+    backup_type_for_plan_run,
     backup_type_for_weekday,
     next_run_for_plan,
 )
@@ -26,3 +27,8 @@ def test_plan_next_run_uses_mexico_city_local_time():
     assert next_run.astimezone(timezone.utc) == datetime(
         2026, 8, 18, 8, 0, tzinfo=timezone.utc
     )
+
+
+def test_new_plan_bootstraps_with_full_before_tuesday_differentials():
+    assert backup_type_for_plan_run(1, has_prior_run=False) == "full"
+    assert backup_type_for_plan_run(1, has_prior_run=True) == "differential"
