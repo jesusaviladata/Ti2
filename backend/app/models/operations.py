@@ -182,6 +182,32 @@ class RemoteAgent(TenantRecord, Base):
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
+class AgentBackupPlan(TenantRecord, Base):
+    __tablename__ = "agent_backup_plans"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_agent_backup_plan_name"),
+        Index("ix_agent_backup_plans_active", "tenant_id", "is_active", "next_run_at"),
+    )
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("remote_agents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sql_profile_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    destination_profile_id: Mapped[str | None] = mapped_column(String(64))
+    database_names: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    local_time: Mapped[str] = mapped_column(String(5), nullable=False, default="02:00")
+    timezone_name: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="America/Mexico_City"
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class AgentPairingToken(TenantRecord, Base):
     __tablename__ = "agent_pairing_tokens"
     __table_args__ = (

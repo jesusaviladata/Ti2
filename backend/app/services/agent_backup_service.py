@@ -72,6 +72,7 @@ class AgentBackupService:
         database_names: list[str],
         backup_type: str,
         destination_profile_id: str | None,
+        command_ttl_seconds: int | None = None,
     ) -> tuple[BackgroundJob, list[Backup]]:
         agent = await self._active_agent(tenant_id, agent_id)
         self._require_profile(agent.metadata_json, "sqlInstances", sql_profile_id)
@@ -129,6 +130,7 @@ class AgentBackupService:
             },
             idempotency_key=f"backup:{job.id}",
             job_id=str(job.id),
+            ttl_seconds=command_ttl_seconds,
         )
         return job, records
 

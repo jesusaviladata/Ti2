@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { AgentJob, BackupAgent, BackupRecord, BackupListResponse, DatabasesResponse } from "@/types/backup";
+import type { AgentBackupPlan, AgentJob, BackupAgent, BackupRecord, BackupListResponse, DatabasesResponse } from "@/types/backup";
 import type { ConnectionPayload } from "@/types/connection";
 
 export const backupsService = {
@@ -86,6 +86,37 @@ export const backupsService = {
   }): Promise<{ jobId: string; backups: BackupRecord[] }> {
     const { data } = await api.post("/api/v1/backups/manual-agent", payload);
     return data;
+  },
+
+  async listAgentPlans(): Promise<{ items: AgentBackupPlan[]; total: number }> {
+    const { data } = await api.get("/api/v1/backups/agent-plans");
+    return data;
+  },
+
+  async createAgentPlan(payload: {
+    name: string;
+    agentId: string;
+    sqlProfileId: string;
+    destinationProfileId?: string;
+    databaseNames: string[];
+    localTime: string;
+    timezone: string;
+    enabled: boolean;
+  }): Promise<AgentBackupPlan> {
+    const { data } = await api.post("/api/v1/backups/agent-plans", payload);
+    return data;
+  },
+
+  async updateAgentPlan(
+    planId: string,
+    payload: Partial<Pick<AgentBackupPlan, "name" | "databaseNames" | "localTime" | "timezone" | "enabled" | "destinationProfileId">>,
+  ): Promise<AgentBackupPlan> {
+    const { data } = await api.put(`/api/v1/backups/agent-plans/${planId}`, payload);
+    return data;
+  },
+
+  async deleteAgentPlan(planId: string): Promise<void> {
+    await api.delete(`/api/v1/backups/agent-plans/${planId}`);
   },
 
   async getStatus(backupId: string): Promise<BackupRecord> {

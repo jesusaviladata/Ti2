@@ -53,6 +53,23 @@ export interface AgentJob {
   error?: string | null;
 }
 
+export interface AgentBackupPlan {
+  id: string;
+  name: string;
+  agentId: string;
+  sqlProfileId: string;
+  destinationProfileId?: string | null;
+  databaseNames: string[];
+  localTime: string;
+  timezone: string;
+  enabled: boolean;
+  fullDays: string[];
+  differentialDays: string[];
+  lastRunAt?: string | null;
+  nextRunAt?: string | null;
+  createdAt: string;
+}
+
 export interface DatabasesResponse {
   databases: string[];
   connected: boolean;

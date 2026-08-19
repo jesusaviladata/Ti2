@@ -113,6 +113,24 @@ async def test_create_command_is_idempotent_and_claim_is_single_delivery():
 
 
 @pytest.mark.asyncio
+async def test_create_command_can_extend_ttl_for_queued_scheduled_batches():
+    agent, _db, _repo, service = _fixture()
+    fixed_now = datetime(2026, 8, 19, 8, 0, tzinfo=timezone.utc)
+    service.now = lambda: fixed_now
+
+    command = await service.create_command(
+        tenant_id=str(agent.tenant_id),
+        agent_id=str(agent.id),
+        command_type="run_backup_batch",
+        payload={},
+        idempotency_key="scheduled-batch-1",
+        ttl_seconds=24 * 60 * 60,
+    )
+
+    assert command.expires_at == fixed_now + timedelta(hours=24)
+
+
+@pytest.mark.asyncio
 async def test_duplicate_completion_is_idempotent_but_conflicting_transition_is_rejected():
     agent, db, repo, service = _fixture()
     command = AgentCommand(

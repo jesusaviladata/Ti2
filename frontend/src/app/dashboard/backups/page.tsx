@@ -8,6 +8,7 @@ import { TriggerBackupModal } from "@/components/backups/trigger-backup-modal";
 import { SqlConnectionModal } from "@/components/backups/sql-connection-modal";
 import { ConnectionDropdown } from "@/components/backups/connection-dropdown";
 import { useBackupList } from "@/hooks/useBackups";
+import { BackupAutomationList, BackupAutomationModal } from "@/components/backups/backup-automation";
 
 function BackupStats() {
   const { data } = useBackupList(0, 100);
@@ -47,6 +48,7 @@ function BackupStats() {
 export default function BackupsPage() {
   const [backupModalOpen,     setBackupModalOpen]     = useState(false);
   const [connectionModalOpen, setConnectionModalOpen] = useState(false);
+  const [automationModalOpen, setAutomationModalOpen] = useState(false);
 
   return (
     <div className="space-y-7">
@@ -74,6 +76,8 @@ export default function BackupsPage() {
       {/* Stats */}
       <BackupStats />
 
+      <BackupAutomationList onNew={() => setAutomationModalOpen(true)} />
+
       {/* Historial */}
       <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 overflow-hidden">
         <BackupList />
@@ -82,6 +86,7 @@ export default function BackupsPage() {
       {/* Modals */}
       <TriggerBackupModal open={backupModalOpen}     onClose={() => setBackupModalOpen(false)} />
       <SqlConnectionModal open={connectionModalOpen} onClose={() => setConnectionModalOpen(false)} />
+      <BackupAutomationModal open={automationModalOpen} onClose={() => setAutomationModalOpen(false)} />
     </div>
   );
 }

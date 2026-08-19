@@ -14,6 +14,7 @@ from app.services.backup_runtime_service import BackupRuntimeService
 from app.services.backup_service import BackupService
 from app.services.agent_admin_service import AgentAdminService
 from app.services.agent_backup_service import AgentBackupService
+from app.services.agent_backup_scheduler import AgentBackupPlanService
 from app.core.config import settings
 from app.core.errors import DomainError
 
@@ -56,6 +57,26 @@ class AgentManualBackupBody(BaseModel):
     database_names: list[DatabaseName] = Field(min_length=1, max_length=100)
     backup_type: Literal["full", "differential", "log"] = "full"
     destination_profile_id: str | None = Field(None, max_length=64)
+
+
+class AgentBackupPlanBody(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    agentId: str
+    sqlProfileId: str = Field(min_length=1, max_length=64)
+    destinationProfileId: str | None = Field(None, max_length=64)
+    databaseNames: list[DatabaseName] = Field(min_length=1, max_length=5000)
+    localTime: str = Field("02:00", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+    timezone: str = Field("America/Mexico_City", min_length=1, max_length=64)
+    enabled: bool = True
+
+
+class AgentBackupPlanUpdateBody(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=255)
+    destinationProfileId: str | None = Field(None, max_length=64)
+    databaseNames: list[DatabaseName] | None = Field(None, min_length=1, max_length=5000)
+    localTime: str | None = Field(None, pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+    timezone: str | None = Field(None, min_length=1, max_length=64)
+    enabled: bool | None = None
 
 
 def _require_agent_module() -> None:
@@ -190,6 +211,53 @@ async def get_backup_agent_job(
 ):
     _require_agent_module()
     return await AgentAdminService(db).get_job(str(current_user.tenant_id), job_id)
+
+
+@router.get("/agent-plans")
+async def list_agent_backup_plans(
+    current_user: User = Depends(read_operation),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_agent_module()
+    items = await AgentBackupPlanService(db).list(str(current_user.tenant_id))
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/agent-plans", status_code=status.HTTP_201_CREATED)
+async def create_agent_backup_plan(
+    body: AgentBackupPlanBody,
+    current_user: User = Depends(manage_backup),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_agent_module()
+    return await AgentBackupPlanService(db).create(
+        str(current_user.tenant_id), body.model_dump()
+    )
+
+
+@router.put("/agent-plans/{plan_id}")
+async def update_agent_backup_plan(
+    plan_id: str,
+    body: AgentBackupPlanUpdateBody,
+    current_user: User = Depends(manage_backup),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_agent_module()
+    return await AgentBackupPlanService(db).update(
+        str(current_user.tenant_id),
+        plan_id,
+        body.model_dump(exclude_unset=True),
+    )
+
+
+@router.delete("/agent-plans/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_agent_backup_plan(
+    plan_id: str,
+    current_user: User = Depends(manage_backup),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_agent_module()
+    await AgentBackupPlanService(db).delete(str(current_user.tenant_id), plan_id)
 
 
 @router.get("/{backup_id}/status")

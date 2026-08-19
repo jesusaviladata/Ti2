@@ -15,6 +15,7 @@ from app.api.v1 import cleanup_runtime, remote_cleanup, file_manager
 from app.api.v1 import access_runtime, backups_runtime, connections, insights
 from app.services.backup_runtime_service import load_backup_schedules
 from app.services.cleanup_scheduler import load_cleanup_schedules
+from app.services.agent_backup_scheduler import load_agent_backup_plans
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
     try:
         await load_backup_schedules()
         await load_cleanup_schedules()
+        await load_agent_backup_plans()
     except Exception:
         logger.exception("No se pudieron rehidratar las programaciones")
     yield

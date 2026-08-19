@@ -12,6 +12,7 @@ export const BACKUP_KEYS = {
   agents:    ["backups", "agents"] as const,
   agentDatabases: (agentId?: string, profileId?: string) => ["backups", "agent-databases", agentId, profileId] as const,
   agentJob: (jobId?: string) => ["backups", "agent-job", jobId] as const,
+  agentPlans: ["backups", "agent-plans"] as const,
 };
 
 export function useBackupList(skip = 0, limit = 50) {
@@ -103,5 +104,38 @@ export function useTriggerAgentBackup() {
   return useMutation({
     mutationFn: backupsService.triggerAgentBackup,
     onSuccess: () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.all }),
+  });
+}
+
+export function useAgentBackupPlans() {
+  return useQuery({
+    queryKey: BACKUP_KEYS.agentPlans,
+    queryFn: () => backupsService.listAgentPlans(),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useCreateAgentBackupPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: backupsService.createAgentPlan,
+    onSuccess: () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.agentPlans }),
+  });
+}
+
+export function useUpdateAgentBackupPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ planId, payload }: { planId: string; payload: Parameters<typeof backupsService.updateAgentPlan>[1] }) =>
+      backupsService.updateAgentPlan(planId, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.agentPlans }),
+  });
+}
+
+export function useDeleteAgentBackupPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: backupsService.deleteAgentPlan,
+    onSuccess: () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.agentPlans }),
   });
 }

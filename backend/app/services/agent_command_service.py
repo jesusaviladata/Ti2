@@ -60,6 +60,7 @@ class AgentCommandService:
         payload: dict[str, Any],
         idempotency_key: str,
         job_id: str | None = None,
+        ttl_seconds: int | None = None,
     ) -> AgentCommand:
         if command_type not in ALLOWED_COMMAND_TYPES:
             raise DomainError(
@@ -96,7 +97,8 @@ class AgentCommandService:
             payload_hash=hashlib.sha256(payload_bytes).hexdigest(),
             status="pending",
             idempotency_key=normalized_key,
-            expires_at=self.now() + timedelta(seconds=self.command_ttl_seconds),
+            expires_at=self.now()
+            + timedelta(seconds=ttl_seconds or self.command_ttl_seconds),
             result_summary={},
         )
         self.db.add(command)
