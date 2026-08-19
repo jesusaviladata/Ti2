@@ -63,6 +63,47 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _normalize_host_key_sha256(value: str) -> str:
+    """Accept both OpenSSH's display form and padded Base64 configuration."""
+    fingerprint = value.strip()
+    if fingerprint.lower().startswith("sha256:"):
+        fingerprint = fingerprint[7:]
+    return fingerprint.rstrip("=")
+
+
+def _remove_work_files(files: list[Path], work_dir: Path) -> dict[str, Any]:
+    """Remove batch source files without turning a valid backup into a failure.
+
+    Compression and an optional remote transfer have already succeeded when this
+    helper runs.  A locked file is retained and reported so a duplicated remote
+    backup is not created merely because local housekeeping could not finish.
+    """
+    deleted: list[str] = []
+    retained: list[str] = []
+    for path in files:
+        try:
+            path.unlink()
+            deleted.append(path.name)
+        except FileNotFoundError:
+            deleted.append(path.name)
+        except OSError:
+            retained.append(str(path))
+
+    if not retained:
+        try:
+            work_dir.rmdir()
+            work_dir.parent.rmdir()
+        except OSError:
+            # Another retained/recovery batch may still exist below .work.
+            pass
+    return {
+        "attemptedFiles": len(files),
+        "deletedFiles": deleted,
+        "retainedFiles": retained,
+        "complete": not retained,
+    }
+
+
 def _wait_for_backup_file(
     path: Path, *, timeout_seconds: float = 90, sleep: Callable[[float], None] = time.sleep
 ) -> bool:
@@ -190,6 +231,14 @@ class BackupExecutor:
         run_id = str(payload.get("runId") or self.now().strftime("%Y%m%d%H%M%S"))
         if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", run_id):
             raise BackupError("RUN_ID_INVALID", "El identificador de ejecucion no es valido")
+        work_dir = dated_dir / ".work" / run_id
+        try:
+            work_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise BackupError(
+                "BACKUP_WORK_DIRECTORY_FAILED",
+                "No fue posible crear el espacio temporal del backup",
+            ) from exc
         files: list[Path] = []
         database_results: list[dict[str, Any]] = []
         try:
@@ -206,7 +255,7 @@ class BackupExecutor:
                             }
                         )
                     extension = ".trn" if backup_type == "log" else ".bak"
-                    file_path = dated_dir / f"{database}_{backup_type.upper()}_{run_id}{extension}"
+                    file_path = work_dir / f"{database}_{backup_type.upper()}_{run_id}{extension}"
                     verification_method = self._backup_database(
                         connection, database, backup_type, file_path
                     )
@@ -247,7 +296,11 @@ class BackupExecutor:
         zip_path = dated_dir / f"Backup_{date_text}_{run_id}.zip"
         try:
             with zipfile.ZipFile(
-                zip_path, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True
+                zip_path,
+                "w",
+                compression=zipfile.ZIP_DEFLATED,
+                compresslevel=1,
+                allowZip64=True,
             ) as archive:
                 for file_path in files:
                     archive.write(file_path, arcname=file_path.name)
@@ -258,6 +311,9 @@ class BackupExecutor:
             raise
         except (OSError, zipfile.BadZipFile) as exc:
             raise BackupError("ZIP_CREATION_FAILED", "No fue posible crear el ZIP diario") from exc
+
+        zip_size = zip_path.stat().st_size
+        zip_sha256 = _sha256(zip_path)
 
         transfer_result = {"type": "local", "path": str(zip_path), "verified": True}
         destination_profile_id = str(payload.get("destinationProfileId") or "").strip()
@@ -276,6 +332,17 @@ class BackupExecutor:
                 )
             transfer_result = self._transfer(zip_path, destination, date_text)
 
+        if progress:
+            progress(
+                {
+                    "phase": "cleaning_up",
+                    "processedUnits": len(databases),
+                    "totalUnits": len(databases),
+                    "foundCount": len(files),
+                }
+            )
+        cleanup_result = _remove_work_files(files, work_dir)
+
         result = {
             "runId": run_id,
             "sqlProfileId": sql_profile_id,
@@ -283,10 +350,11 @@ class BackupExecutor:
             "folder": str(dated_dir),
             "zipPath": str(zip_path),
             "zipFileName": zip_path.name,
-            "zipSizeBytes": zip_path.stat().st_size,
-            "zipSha256": _sha256(zip_path),
+            "zipSizeBytes": zip_size,
+            "zipSha256": zip_sha256,
             "databases": database_results,
             "transfer": transfer_result,
+            "localSourceCleanup": cleanup_result,
         }
         if progress:
             progress(
@@ -365,7 +433,9 @@ class BackupExecutor:
         username = str(destination.get("username") or "").strip()
         key_path = str(destination.get("privateKeyPath") or "").strip()
         remote_root = str(destination.get("path") or "").strip()
-        expected_fingerprint = str(destination.get("hostKeySha256") or "").strip()
+        expected_fingerprint = _normalize_host_key_sha256(
+            str(destination.get("hostKeySha256") or "")
+        )
         if not host or not username or not key_path or not remote_root.startswith("/"):
             raise BackupError("SFTP_PROFILE_INVALID", "El perfil SFTP esta incompleto")
         client = paramiko.SSHClient()
@@ -375,7 +445,7 @@ class BackupExecutor:
                 def missing_host_key(self, _client, _hostname, key):
                     actual = base64.b64encode(
                         hashlib.sha256(key.asbytes()).digest()
-                    ).decode("ascii")
+                    ).decode("ascii").rstrip("=")
                     if actual != expected_fingerprint:
                         raise BackupError(
                             "SFTP_HOST_KEY_MISMATCH",
@@ -396,7 +466,9 @@ class BackupExecutor:
                 timeout=30,
             )
             host_key = client.get_transport().get_remote_server_key()
-            fingerprint = base64.b64encode(hashlib.sha256(host_key.asbytes()).digest()).decode("ascii")
+            fingerprint = base64.b64encode(
+                hashlib.sha256(host_key.asbytes()).digest()
+            ).decode("ascii").rstrip("=")
             if expected_fingerprint and fingerprint != expected_fingerprint:
                 raise BackupError("SFTP_HOST_KEY_MISMATCH", "La identidad del servidor SFTP no coincide")
             sftp = client.open_sftp()

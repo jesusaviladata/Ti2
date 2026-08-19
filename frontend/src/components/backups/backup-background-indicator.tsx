@@ -20,6 +20,7 @@ function getAgentProgress(job?: {
   }
   if (job.phase === "compressing") return { percent: 88, label: "Creando ZIP…", done: false, failed: false };
   if (job.phase === "transferring") return { percent: 95, label: "Transfiriendo…", done: false, failed: false };
+  if (job.phase === "cleaning_up") return { percent: 99, label: "Liberando temporales…", done: false, failed: false };
   if (job.phase === "backing_up") {
     const completed = Math.min(job.processedUnits, total);
     return {
