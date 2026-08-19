@@ -255,7 +255,9 @@ class BackupExecutor:
                             }
                         )
                     extension = ".trn" if backup_type == "log" else ".bak"
-                    file_path = work_dir / f"{database}_{backup_type.upper()}_{run_id}{extension}"
+                    # The unique run id already lives in the isolated work directory.
+                    # Keep archive member names readable for operators and restores.
+                    file_path = work_dir / f"{database}_{backup_type.upper()}{extension}"
                     verification_method = self._backup_database(
                         connection, database, backup_type, file_path
                     )

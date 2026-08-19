@@ -148,6 +148,10 @@ def test_backup_batch_creates_verified_zip_and_removes_temporary_baks(tmp_path):
     assert result["zipSizeBytes"] > 0
     assert len(result["zipSha256"]) == 64
     assert [item["databaseName"] for item in result["databases"]] == ["DX", "IPSOFACTU"]
+    assert [item["fileName"] for item in result["databases"]] == [
+        "DX_FULL.bak",
+        "IPSOFACTU_FULL.bak",
+    ]
     assert all(item["verified"] for item in result["databases"])
     assert all(item["verificationMethod"] == "restore_verifyonly" for item in result["databases"])
     assert all("COMPRESSION" not in sql for sql in connection.statements)
