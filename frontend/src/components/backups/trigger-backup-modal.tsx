@@ -326,7 +326,7 @@ function jobProgress(job?: {
   if (job.status === "failed" || job.status === "cancelled") return { percent: 100, label: "El proceso terminó con error" };
   if (job.phase === "compressing") return { percent: 88, label: "Comprimiendo y validando el ZIP…" };
   if (job.phase === "transferring") return { percent: 95, label: "Transfiriendo el ZIP al destino…" };
-  if (job.phase === "cleaning_up") return { percent: 99, label: "Liberando archivos temporales…" };
+  if (job.phase === "cleaning_up") return { percent: 100, label: "Backup listo; liberando temporales en segundo plano…" };
   if (job.phase === "backing_up") {
     const completed = Math.min(job.processedUnits, total);
     const current = Math.min(completed + 1, total);

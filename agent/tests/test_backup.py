@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import time
 
 from agent.data_express_agent.backup import (
     BackupError,
     BackupExecutor,
     _consume_sql_results,
     _normalize_host_key_sha256,
+    _remove_work_files,
     _sql_unicode_literal,
     _wait_for_backup_file,
 )
@@ -130,6 +132,7 @@ def test_backup_batch_creates_verified_zip_and_removes_temporary_baks(tmp_path):
         ),
         connect=lambda _profile: connection,
         now=lambda: datetime(2026, 8, 12, 10, 30, 0),
+        cleanup_submit=_remove_work_files,
     )
     progress = []
 
@@ -159,7 +162,24 @@ def test_backup_batch_creates_verified_zip_and_removes_temporary_baks(tmp_path):
     assert len(result["localSourceCleanup"]["deletedFiles"]) == 2
     assert list(tmp_path.rglob("*.bak")) == []
     assert not (tmp_path / "2026-08-12" / ".work").exists()
+    assert "cleaning_up" not in [item["phase"] for item in progress]
     assert progress[-1]["phase"] == "completed"
+
+
+def test_temporary_backup_cleanup_runs_in_background(tmp_path):
+    work_dir = tmp_path / "2026-08-12" / ".work" / "job-background"
+    work_dir.mkdir(parents=True)
+    backup = work_dir / "DX_FULL.bak"
+    backup.write_bytes(b"backup")
+    executor = BackupExecutor()
+
+    result = executor._schedule_cleanup([backup], work_dir)
+
+    assert result["scheduled"] is True
+    deadline = time.monotonic() + 2
+    while backup.exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not backup.exists()
 
 
 def test_backup_batch_uses_file_hash_when_express_cannot_run_restore_verifyonly(tmp_path):

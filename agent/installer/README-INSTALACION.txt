@@ -49,7 +49,7 @@ sale a la red como la cuenta del servidor) debe tener acceso al recurso comparti
 Para SFTP se recomienda una llave privada local con permisos exclusivos para la cuenta
 del servicio. Nunca agregue password o connectionString al archivo de perfiles.
 
-FUNCIONES DE LA VERSION 0.2.10
+FUNCIONES DE LA VERSION 0.2.11
 
 - Usa una carpeta temporal por lote y elimina los .bak despues de validar y transferir el ZIP.
 - Si la compresion o transferencia falla, conserva los .bak temporales para recuperacion.
@@ -59,6 +59,8 @@ FUNCIONES DE LA VERSION 0.2.10
   con limites por cantidad y tamano y omision de archivos cambiados o inaccesibles.
 - Guarda los archivos internos con nombres legibles, por ejemplo BASE_FULL.bak,
   sin agregar el identificador tecnico del lote despues del tipo de backup.
+- Marca el backup como completado al terminar la validacion y transferencia del ZIP;
+  la eliminacion de los .bak temporales continua en segundo plano y se reintenta.
 
 ACTUALIZACION DE UNA INSTALACION EXISTENTE
 

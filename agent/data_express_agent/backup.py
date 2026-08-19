@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import posixpath
 import re
 import shutil
+import threading
 import time
 import zipfile
 from collections.abc import Callable
@@ -16,6 +18,7 @@ from typing import Any
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
+_CLEANUP_MARKER = ".dataexpress-cleanup-ready.json"
 
 
 class BackupError(RuntimeError):
@@ -166,11 +169,13 @@ class BackupExecutor:
         destination_profiles: tuple[dict[str, Any], ...] = (),
         connect: Callable[..., Any] | None = None,
         now: Callable[[], datetime] | None = None,
+        cleanup_submit: Callable[[list[Path], Path], dict[str, Any]] | None = None,
     ):
         self.sql_profiles = sql_profiles
         self.destination_profiles = destination_profiles
         self._connect_override = connect
         self.now = now or datetime.now
+        self._cleanup_submit = cleanup_submit
 
     def _connect(self, profile: dict[str, Any]):
         if self._connect_override is not None:
@@ -221,6 +226,7 @@ class BackupExecutor:
         configured_root = Path(str(profile.get("backupRoot") or "D:\\"))
         if not configured_root.is_absolute():
             raise BackupError("BACKUP_ROOT_INVALID", "La raiz de backup debe ser absoluta")
+        self._resume_pending_cleanups(configured_root)
         date_text = self.now().strftime("%Y-%m-%d")
         dated_dir = configured_root / date_text
         try:
@@ -334,16 +340,7 @@ class BackupExecutor:
                 )
             transfer_result = self._transfer(zip_path, destination, date_text)
 
-        if progress:
-            progress(
-                {
-                    "phase": "cleaning_up",
-                    "processedUnits": len(databases),
-                    "totalUnits": len(databases),
-                    "foundCount": len(files),
-                }
-            )
-        cleanup_result = _remove_work_files(files, work_dir)
+        cleanup_result = self._schedule_cleanup(files, work_dir)
 
         result = {
             "runId": run_id,
@@ -368,6 +365,68 @@ class BackupExecutor:
                 }
             )
         return result
+
+    def _schedule_cleanup(self, files: list[Path], work_dir: Path) -> dict[str, Any]:
+        if self._cleanup_submit is not None:
+            return self._cleanup_submit(files, work_dir)
+        marker = work_dir / _CLEANUP_MARKER
+        try:
+            temporary = marker.with_suffix(marker.suffix + ".tmp")
+            temporary.write_text(
+                json.dumps({"files": [path.name for path in files]}, sort_keys=True),
+                encoding="utf-8",
+            )
+            os.replace(temporary, marker)
+            self._start_cleanup_thread(marker, files, work_dir)
+            return {
+                "scheduled": True,
+                "status": "background",
+                "attemptedFiles": len(files),
+            }
+        except OSError:
+            return {
+                "scheduled": False,
+                "status": "retained",
+                "attemptedFiles": len(files),
+                "retainedFiles": [str(path) for path in files],
+            }
+
+    @staticmethod
+    def _start_cleanup_thread(marker: Path, files: list[Path], work_dir: Path) -> None:
+        def cleanup() -> None:
+            result = _remove_work_files(files, work_dir)
+            if not result["complete"]:
+                return
+            try:
+                marker.unlink(missing_ok=True)
+                work_dir.rmdir()
+                work_dir.parent.rmdir()
+            except OSError:
+                pass
+
+        threading.Thread(
+            target=cleanup,
+            name=f"dataexpress-cleanup-{work_dir.name}",
+            daemon=True,
+        ).start()
+
+    def _resume_pending_cleanups(self, configured_root: Path) -> None:
+        """Retry only work directories explicitly marked after a successful ZIP/transfer."""
+        try:
+            markers = list(configured_root.glob(f"*/.work/*/{_CLEANUP_MARKER}"))[:100]
+        except OSError:
+            return
+        for marker in markers:
+            try:
+                document = json.loads(marker.read_text(encoding="utf-8"))
+                names = [str(item) for item in document.get("files", [])]
+                if not names or any(Path(name).name != name for name in names):
+                    continue
+                work_dir = marker.parent
+                files = [work_dir / name for name in names]
+                self._start_cleanup_thread(marker, files, work_dir)
+            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                continue
 
     def _backup_database(
         self, connection: Any, database: str, backup_type: str, file_path: Path
