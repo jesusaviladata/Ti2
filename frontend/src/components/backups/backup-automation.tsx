@@ -49,7 +49,7 @@ export function BackupAutomationList({ onNew }: { onNew: () => void }) {
         </div>
       )}
       {plans.map((plan) => (
-        <div key={plan.id} className="flex flex-col gap-3 rounded-xl border border-musgo/20 bg-fondo/30 p-4 lg:flex-row lg:items-center">
+        <div key={plan.id} className="flex flex-col gap-3 rounded-xl border border-musgo/20 bg-carbon p-4 lg:flex-row lg:items-center">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${plan.enabled ? "bg-green-400" : "bg-crema/25"}`} />
@@ -118,7 +118,7 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[1.5rem] border border-musgo/25 bg-fondo shadow-2xl">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[1.5rem] border border-musgo/40 bg-carbon shadow-2xl shadow-black/60">
         <div className="flex items-start justify-between border-b border-musgo/20 px-6 py-5">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-arcilla">Programación automática</p>
