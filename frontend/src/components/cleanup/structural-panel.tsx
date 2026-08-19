@@ -35,6 +35,8 @@ export function StructuralPanel({
   const [archivos, setArchivos]   = useState("BD_log.txt");
   const [contenedora, setCont]    = useState("core");
   const [maxProps, setMaxProps]   = useState(0);   // 0 = todas
+  const [maxFiles, setMaxFiles]   = useState(50000);
+  const [maxGb, setMaxGb]         = useState(20);
   const [report, setReport]       = useState<StructuralReport | null>(null);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
@@ -49,7 +51,7 @@ export function StructuralPanel({
     if (!isAgent) return;
     setCarpetas((server.targetFolders ?? []).join(", "));
     setArchivos((server.targetFiles ?? []).join(", "));
-    setModo("cuarentena");
+    setModo("directo");
     setReport(null);
   }, [isAgent, server.id, server.targetFiles, server.targetFolders]);
 
@@ -114,6 +116,7 @@ export function StructuralPanel({
       if (isAgent) {
         const { jobId } = await remoteCleanupService.agentStructuralSimulate(
           server.agentId!, server.id, contenedora.trim() || "Core", maxProps,
+          maxFiles, Math.round(maxGb * 1024 ** 3),
         );
         const job = await pollAgentJob(jobId);
         setProgress(null);
@@ -170,14 +173,14 @@ export function StructuralPanel({
     try {
       if (isAgent) {
         if (!report.simulationId || !report.manifestHash) throw new Error("La simulacion del agente no es valida");
-        const { jobId } = await remoteCleanupService.agentStructuralExecute(
+        const { jobId } = await remoteCleanupService.agentStructuralExecuteDirect(
           server.agentId!, report.simulationId, report.manifestHash,
         );
         const job = await pollAgentJob(jobId);
         setProgress(null);
         if (job.status === "failed") throw new Error(job.error ?? "Error al ejecutar");
         const value = job.result ?? {};
-        setExecMsg(`Movidos a cuarentena: ${value.movedCount ?? 0} · fallidos: ${value.failedCount ?? 0}`);
+        setExecMsg(`Logs eliminados: ${value.deletedCount ?? 0} · omitidos: ${value.failedCount ?? 0} · espacio liberado: ${formatBytes(Number(value.bytesDeleted ?? 0))}`);
         setReport(null); setConfirm("");
         onExecuted();
         return;
@@ -242,9 +245,21 @@ export function StructuralPanel({
           </div>
         </div>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1">Máximo de archivos</label>
+          <input type="number" min={0} max={200000} value={maxFiles}
+            onChange={(e) => setMaxFiles(Math.max(0, Number(e.target.value)))} className={INPUT} />
+        </div>
+        <div>
+          <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1">Máximo por ejecución (GB)</label>
+          <input type="number" min={0} max={1024} step={1} value={maxGb}
+            onChange={(e) => setMaxGb(Math.max(0, Number(e.target.value)))} className={INPUT} />
+        </div>
+      </div>
       <p className="font-mono text-[9px] text-crema/30 -mt-1">
         Límite de propiedades: <span className="text-crema/50">0 = todas</span>. Pon un número (ej. 5) para probar en pocas
-        mientras afinas las reglas.
+        mientras afinas las reglas. En archivos y GB, <span className="text-crema/50">0 = sin límite</span>.
       </p>
 
       <button onClick={run} disabled={loading || executing}
@@ -331,8 +346,8 @@ export function StructuralPanel({
           {/* Ejecución */}
           {report.elegiblesCount > 0 && (
             <div className="pt-3 mt-1 border-t border-musgo/15 space-y-2.5">
-              {/* Modo */}
-              <div className="flex items-center gap-2">
+              {/* Los servidores por agente eliminan logs directamente. El modo heredado conserva ambas opciones. */}
+              {!isAgent && <div className="flex items-center gap-2">
                 <span className="font-mono text-[10px] text-crema/40 uppercase tracking-wider">Modo:</span>
                 <div className="flex rounded-[0.5rem] border border-musgo/25 overflow-hidden">
                   <button onClick={() => { setModo("cuarentena"); setConfirm(""); }}
@@ -346,8 +361,8 @@ export function StructuralPanel({
                     <Trash2 size={10} /> Directo
                   </button>
                 </div>
-              </div>
-              <p className="font-mono text-[10px] text-crema/45 leading-relaxed">
+              </div>}
+              {!isAgent && <p className="font-mono text-[10px] text-crema/45 leading-relaxed">
                 {modo === "cuarentena" ? (
                   <>Mover <span className="text-arcilla/80">{report.elegiblesCount}</span> archivo(s) a cuarentena
                     (reversible). Escribe <span className="text-crema/85 font-bold">MOVER</span> para confirmar:</>
@@ -356,9 +371,9 @@ export function StructuralPanel({
                     de forma <span className="font-bold">DEFINITIVA</span> (sin vuelta atrás) en{" "}
                     {report.propiedadesAfectadas} propiedad(es). Escribe <span className="font-bold">BORRAR</span> para confirmar:</span>
                 )}
-              </p>
-              <input value={confirmText} onChange={(e) => setConfirm(e.target.value)} placeholder={confirmWord} className={INPUT} />
-              <button onClick={execute} disabled={executing || confirmText.trim().toUpperCase() !== confirmWord}
+              </p>}
+              {!isAgent && <input value={confirmText} onChange={(e) => setConfirm(e.target.value)} placeholder={confirmWord} className={INPUT} />}
+              <button onClick={execute} disabled={executing || (!isAgent && confirmText.trim().toUpperCase() !== confirmWord)}
                 className={cn(
                   "w-full h-9 rounded-[0.5rem] border font-mono text-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-30",
                   modo === "directo"
@@ -367,7 +382,7 @@ export function StructuralPanel({
                 )}>
                 {executing
                   ? <><Loader2 size={12} className="animate-spin" /> {modo === "directo" ? "Borrando…" : "Moviendo…"}</>
-                  : modo === "directo" ? <><Trash2 size={12} /> Borrar definitivamente</> : <><Archive size={12} /> Mover a cuarentena</>}
+                  : modo === "directo" ? <><Trash2 size={12} /> Eliminar logs</> : <><Archive size={12} /> Mover a cuarentena</>}
               </button>
             </div>
           )}

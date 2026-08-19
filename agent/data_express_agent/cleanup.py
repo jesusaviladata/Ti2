@@ -86,6 +86,8 @@ class StructuralCleanupExecutor:
         if not target_folders and not target_files:
             raise CleanupError("CLEANUP_TARGET_REQUIRED", "Defina al menos un objetivo de limpieza")
         max_properties = max(0, int(payload.get("maxProperties") or 0))
+        max_files = max(0, int(payload.get("maxFiles") or 0))
+        max_bytes = max(0, int(payload.get("maxBytes") or 0))
         candidates: list[dict[str, Any]] = []
         protected: list[dict[str, str]] = []
         properties = []
@@ -122,6 +124,24 @@ class StructuralCleanupExecutor:
                 )
             if len(candidates) >= self.max_candidates:
                 break
+
+        limited = False
+        if max_files and len(candidates) > max_files:
+            candidates = candidates[:max_files]
+            limited = True
+        if max_bytes:
+            selected: list[dict[str, Any]] = []
+            selected_bytes = 0
+            for item in candidates:
+                item_bytes = int(item["sizeBytes"])
+                if selected and selected_bytes + item_bytes > max_bytes:
+                    limited = True
+                    break
+                selected.append(item)
+                selected_bytes += item_bytes
+            if len(selected) < len(candidates):
+                limited = True
+            candidates = selected
 
         simulation_id = str(uuid.uuid4())
         created_at = self.now()
@@ -161,7 +181,58 @@ class StructuralCleanupExecutor:
             "protectedCount": len(protected),
             "samples": candidates[:100],
             "protected": protected[:100],
-            "truncated": len(candidates) >= self.max_candidates,
+            "truncated": len(candidates) >= self.max_candidates or limited,
+        }
+
+    def execute_direct(
+        self,
+        payload: dict[str, Any],
+        *,
+        progress: ProgressCallback | None = None,
+    ) -> dict[str, Any]:
+        """Delete exactly the unchanged files captured by a valid simulation."""
+        simulation_id = str(payload["simulationId"])
+        expected_hash = str(payload["manifestHash"])
+        manifest = self._load_manifest(simulation_id, expected_hash)
+        root = _safe_directory(str(manifest["root"]))
+        deleted: list[dict[str, Any]] = []
+        errors: list[dict[str, str]] = []
+        candidates = list(manifest["candidates"])
+
+        for index, item in enumerate(candidates, start=1):
+            source = Path(str(item["path"]))
+            relative = Path(str(item["relativePath"]))
+            try:
+                if not _inside(source, root) or not source.is_file() or source.is_symlink():
+                    raise OSError("source changed")
+                stat = source.stat()
+                if stat.st_size != int(item["sizeBytes"]) or stat.st_mtime_ns != int(item["mtimeNs"]):
+                    raise OSError("source changed")
+                source.unlink()
+                deleted.append(
+                    {
+                        "relativePath": str(relative),
+                        "sizeBytes": int(item["sizeBytes"]),
+                    }
+                )
+            except OSError:
+                errors.append({"relativePath": str(relative), "code": "FILE_CHANGED_OR_INACCESSIBLE"})
+            if progress and (index == len(candidates) or index % 25 == 0):
+                progress(
+                    {
+                        "phase": "deleting_logs",
+                        "processedUnits": index,
+                        "totalUnits": len(candidates),
+                        "foundCount": len(deleted),
+                    }
+                )
+
+        return {
+            "deletedCount": len(deleted),
+            "bytesDeleted": sum(int(item["sizeBytes"]) for item in deleted),
+            "failedCount": len(errors),
+            "errors": errors[:100],
+            "root": str(root),
         }
 
     def execute_quarantine(
@@ -274,10 +345,10 @@ class StructuralCleanupExecutor:
             current_path = Path(current)
             directory_names[:] = [
                 name
-                for name in directory_names
+                for name in sorted(directory_names, key=str.casefold)
                 if not _is_reparse_point(current_path / name)
             ]
-            for file_name in file_names:
+            for file_name in sorted(file_names, key=str.casefold):
                 self._append_candidate(current_path / file_name, root, candidates, protected)
                 if len(candidates) >= self.max_candidates:
                     return

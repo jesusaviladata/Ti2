@@ -49,12 +49,14 @@ sale a la red como la cuenta del servidor) debe tener acceso al recurso comparti
 Para SFTP se recomienda una llave privada local con permisos exclusivos para la cuenta
 del servicio. Nunca agregue password o connectionString al archivo de perfiles.
 
-FUNCIONES DE LA VERSION 0.2.8
+FUNCIONES DE LA VERSION 0.2.9
 
 - Usa una carpeta temporal por lote y elimina los .bak despues de validar y transferir el ZIP.
 - Si la compresion o transferencia falla, conserva los .bak temporales para recuperacion.
 - Usa compresion ZIP rapida para reducir el tiempo de CPU.
 - Acepta huellas SFTP en formato OpenSSH o Base64 con relleno.
+- Permite eliminar directamente los logs estructurales validados por una simulacion,
+  con limites por cantidad y tamano y omision de archivos cambiados o inaccesibles.
 
 ACTUALIZACION DE UNA INSTALACION EXISTENTE
 

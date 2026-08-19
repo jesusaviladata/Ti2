@@ -210,3 +210,31 @@ async def test_completed_backup_batch_creates_one_success_notification():
     assert notifications[0].kind == "backup_success"
     assert "2 bases" in notifications[0].message
 
+
+@pytest.mark.asyncio
+async def test_completed_direct_cleanup_creates_success_notification():
+    agent, db, repo, service = _fixture()
+    command = AgentCommand(
+        id=uuid.uuid4(),
+        tenant_id=agent.tenant_id,
+        agent_id=agent.id,
+        command_type="execute_structural_direct",
+        payload={"simulationId": str(uuid.uuid4())},
+        payload_hash="3" * 64,
+        status="claimed",
+        idempotency_key="cleanup-direct-1",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
+    repo.commands.append(command)
+
+    await service.complete(
+        agent,
+        str(command.id),
+        {"deletedCount": 12, "failedCount": 1, "bytesDeleted": 4096},
+    )
+
+    notifications = [item for item in db.added if isinstance(item, Notification)]
+    assert len(notifications) == 1
+    assert notifications[0].kind == "cleanup_success"
+    assert "12 archivo" in notifications[0].message
+

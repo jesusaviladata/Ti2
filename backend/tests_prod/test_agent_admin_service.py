@@ -202,3 +202,20 @@ async def test_cleanup_uses_only_the_saved_validated_server_configuration():
     assert payload["targetFolders"] == ["Log", "Respuesta"]
     assert payload["targetFiles"] == ["BD_log.txt"]
 
+
+@pytest.mark.asyncio
+async def test_direct_cleanup_queues_typed_destructive_command():
+    agent, _, _, commands, service = _fixture()
+
+    job = await service.start_cleanup_direct(
+        str(agent.tenant_id),
+        str(agent.id),
+        simulation_id=str(uuid.uuid4()),
+        manifest_hash="a" * 64,
+    )
+
+    call = commands.calls[0]
+    assert job.kind == "agent_cleanup_direct"
+    assert call["command_type"] == "execute_structural_direct"
+    assert call["payload"]["manifestHash"] == "a" * 64
+

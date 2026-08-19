@@ -19,6 +19,7 @@ ALLOWED_COMMAND_TYPES = frozenset(
         "validate_structure",
         "simulate_structural_cleanup",
         "execute_structural_quarantine",
+        "execute_structural_direct",
         "restore_quarantine_item",
         "purge_quarantine_items",
         "cancel_job",
@@ -169,6 +170,8 @@ class AgentCommandService:
         if command.command_type == "run_backup_batch":
             await self._complete_backups(command, result, now)
             self._create_backup_success_notification(command, result)
+        elif command.command_type == "execute_structural_direct":
+            self._create_cleanup_notification(command, result, success=True)
         await self.db.flush()
         return command
 
@@ -201,6 +204,12 @@ class AgentCommandService:
                 job.finished_at = now
         if command.command_type == "run_backup_batch":
             await self._fail_backups(command, error_message, now)
+        elif command.command_type == "execute_structural_direct":
+            self._create_cleanup_notification(
+                command,
+                {"errorMessage": error_message},
+                success=False,
+            )
         await self.db.flush()
         return command
 
@@ -285,6 +294,34 @@ class AgentCommandService:
                     "jobId": str(command.job_id) if command.job_id else None,
                     "databaseCount": total,
                     "zipPath": result.get("zipPath"),
+                },
+            )
+        )
+
+    def _create_cleanup_notification(
+        self, command: AgentCommand, result: dict[str, Any], *, success: bool
+    ) -> None:
+        from app.models.operations import Notification
+
+        deleted = int(result.get("deletedCount") or 0)
+        failed = int(result.get("failedCount") or 0)
+        self.db.add(
+            Notification(
+                tenant_id=command.tenant_id,
+                user_id=None,
+                kind="cleanup_success" if success else "cleanup_failed",
+                title="Limpieza de logs completada" if success else "Limpieza de logs fallida",
+                message=(
+                    f"{deleted} archivo(s) eliminado(s) · {failed} omitido(s)"
+                    if success
+                    else str(result.get("errorMessage") or "El agente no pudo completar la limpieza")
+                ),
+                severity="success" if success else "error",
+                metadata_json={
+                    "jobId": str(command.job_id) if command.job_id else None,
+                    "deletedCount": deleted,
+                    "failedCount": failed,
+                    "bytesDeleted": int(result.get("bytesDeleted") or 0),
                 },
             )
         )

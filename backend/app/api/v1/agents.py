@@ -55,6 +55,8 @@ class CleanupSimulationRequest(BaseModel):
     server_id: str = Field(alias="serverId")
     container_folder: str = Field("Core", alias="containerFolder", min_length=1, max_length=64)
     max_properties: int = Field(0, alias="maxProperties", ge=0, le=10000)
+    max_files: int = Field(50000, alias="maxFiles", ge=0, le=200000)
+    max_bytes: int = Field(20 * 1024**3, alias="maxBytes", ge=0, le=1024**4)
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -195,6 +197,8 @@ async def simulate_agent_cleanup(
         server_id=body.server_id,
         container_folder=body.container_folder,
         max_properties=body.max_properties,
+        max_files=body.max_files,
+        max_bytes=body.max_bytes,
     )
     await db.commit()
     return {"jobId": str(job.id)}
@@ -209,6 +213,24 @@ async def execute_agent_cleanup(
 ):
     _require_enabled()
     job = await AgentAdminService(db).start_cleanup_quarantine(
+        str(current_user.tenant_id),
+        agent_id,
+        simulation_id=body.simulation_id,
+        manifest_hash=body.manifest_hash,
+    )
+    await db.commit()
+    return {"jobId": str(job.id)}
+
+
+@router.post("/{agent_id}/cleanup/direct", status_code=status.HTTP_202_ACCEPTED)
+async def execute_agent_cleanup_direct(
+    agent_id: str,
+    body: CleanupExecutionRequest,
+    current_user: User = Depends(execute_cleanup),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    job = await AgentAdminService(db).start_cleanup_direct(
         str(current_user.tenant_id),
         agent_id,
         simulation_id=body.simulation_id,

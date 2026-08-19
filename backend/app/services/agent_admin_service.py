@@ -118,6 +118,8 @@ class AgentAdminService:
         server_id: str,
         container_folder: str,
         max_properties: int,
+        max_files: int = 50000,
+        max_bytes: int = 20 * 1024**3,
     ) -> BackgroundJob:
         agent = await self._active_agent(tenant_id, agent_id)
         server = await self._configured_server(tenant_id, agent, server_id)
@@ -140,9 +142,43 @@ class AgentAdminService:
                 "targetFolders": server.target_folders,
                 "targetFiles": server.target_files,
                 "maxProperties": max_properties,
+                "maxFiles": max_files,
+                "maxBytes": max_bytes,
             },
             idempotency_key=f"cleanup-simulate:{job.id}",
             job_id=str(job.id),
+        )
+        return job
+
+    async def start_cleanup_direct(
+        self,
+        tenant_id: str,
+        agent_id: str,
+        *,
+        simulation_id: str,
+        manifest_hash: str,
+    ) -> BackgroundJob:
+        agent = await self._active_agent(tenant_id, agent_id)
+        job = BackgroundJob(
+            tenant_id=agent.tenant_id,
+            kind="agent_cleanup_direct",
+            status="queued",
+            phase="queued",
+            resource_id=agent.id,
+        )
+        self.db.add(job)
+        await self.db.flush()
+        await self.commands.create_command(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            command_type="execute_structural_direct",
+            payload={
+                "simulationId": simulation_id,
+                "manifestHash": manifest_hash,
+            },
+            idempotency_key=f"cleanup-direct:{job.id}",
+            job_id=str(job.id),
+            ttl_seconds=24 * 60 * 60,
         )
         return job
 

@@ -19,6 +19,7 @@ logger = logging.getLogger("data_express_agent")
 DESTRUCTIVE_COMMANDS = frozenset(
     {
         "execute_structural_quarantine",
+        "execute_structural_direct",
         "restore_quarantine_item",
         "purge_quarantine_items",
         "run_backup_batch",
@@ -59,6 +60,7 @@ class AgentRunner:
             "run_backup_batch": self._run_backup_batch,
             "simulate_structural_cleanup": self._simulate_structural_cleanup,
             "execute_structural_quarantine": self._execute_structural_quarantine,
+            "execute_structural_direct": self._execute_structural_direct,
             "restore_quarantine_item": self._restore_quarantine_item,
             "purge_quarantine_items": self._purge_quarantine_items,
         }
@@ -202,6 +204,12 @@ class AgentRunner:
 
     def _execute_structural_quarantine(self, payload: dict[str, Any], command_id: str):
         return self.cleanup.execute_quarantine(
+            payload,
+            progress=lambda value: self.client.progress(command_id, value),
+        )
+
+    def _execute_structural_direct(self, payload: dict[str, Any], command_id: str):
+        return self.cleanup.execute_direct(
             payload,
             progress=lambda value: self.client.progress(command_id, value),
         )
