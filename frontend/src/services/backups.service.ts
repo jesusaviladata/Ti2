@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { AgentBackupPlan, BackupRecord, BackupListResponse, DatabasesResponse } from "@/types/backup";
+import type { AgentBackupPlan, AgentJob, BackupAgent, BackupRecord, BackupListResponse, DatabasesResponse } from "@/types/backup";
 import type { ConnectionPayload } from "@/types/connection";
 
 export const backupsService = {
@@ -18,6 +18,46 @@ export const backupsService = {
   async listDatabasesForConnection(conn: ConnectionPayload): Promise<DatabasesResponse> {
     const { data } = await api.post("/api/v1/connections/databases", conn);
     return data;
+  },
+
+  async listAgents(): Promise<{ items: BackupAgent[]; total: number }> {
+    const { data } = await api.get("/api/v1/backups/agents");
+    return data;
+  },
+
+  async startAgentDatabaseList(agentId: string, sqlProfileId: string): Promise<{ jobId: string }> {
+    const { data } = await api.post("/api/v1/backups/agent-databases", {
+      agent_id: agentId,
+      sql_profile_id: sqlProfileId,
+    });
+    return data;
+  },
+
+  async getAgentJob(jobId: string): Promise<AgentJob> {
+    const { data } = await api.get(`/api/v1/backups/agent-jobs/${jobId}`);
+    return data;
+  },
+
+  async listAgentDatabases(agentId: string, sqlProfileId: string): Promise<DatabasesResponse> {
+    const { jobId } = await this.startAgentDatabaseList(agentId, sqlProfileId);
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const job = await this.getAgentJob(jobId);
+      if (job.status === "completed") {
+        return {
+          databases: (job.result?.databases as string[]) ?? [],
+          connected: true,
+        };
+      }
+      if (job.status === "failed" || job.status === "cancelled") {
+        return { databases: [], connected: false, error: job.error ?? "El agente no pudo consultar SQL Server" } as DatabasesResponse;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    return {
+      databases: [],
+      connected: false,
+      error: "El agente no respondio dentro de 2 minutos",
+    } as DatabasesResponse;
   },
 
   /** Test a connection — returns { connected, error?, databases? } */
@@ -44,30 +84,47 @@ export const backupsService = {
     backupType: "full" | "differential" | "log";
     destinationProfileId?: string;
   }): Promise<{ jobId: string; backups: BackupRecord[] }> {
-    const { data } = await api.post("/api/v1/backups/runs", payload);
+    const { data } = await api.post("/api/v1/backups/manual-agent", {
+      agent_id: payload.agentId,
+      sql_profile_id: payload.sqlProfileId,
+      database_names: payload.databaseNames,
+      backup_type: payload.backupType,
+      destination_profile_id: payload.destinationProfileId,
+    });
     return data;
   },
 
   async listAgentPlans(): Promise<{ items: AgentBackupPlan[]; total: number }> {
-    const { data } = await api.get("/api/v1/backups/plans");
+    const { data } = await api.get("/api/v1/backups/agent-plans");
     return data;
   },
 
   async createAgentPlan(payload: {
+    name: string;
     agentId: string;
     sqlProfileId: string;
     destinationProfileId?: string;
     databaseNames: string[];
     fullDays: number[];
     differentialDays: number[];
-    hourUtc: number;
+    localTime: string;
+    timezone: string;
+    enabled: boolean;
   }): Promise<AgentBackupPlan> {
-    const { data } = await api.post("/api/v1/backups/plans", payload);
+    const { data } = await api.post("/api/v1/backups/agent-plans", payload);
+    return data;
+  },
+
+  async updateAgentPlan(
+    planId: string,
+    payload: Partial<Pick<AgentBackupPlan, "name" | "databaseNames" | "fullDays" | "differentialDays" | "localTime" | "timezone" | "enabled" | "destinationProfileId">>,
+  ): Promise<AgentBackupPlan> {
+    const { data } = await api.put(`/api/v1/backups/agent-plans/${planId}`, payload);
     return data;
   },
 
   async deleteAgentPlan(planId: string): Promise<void> {
-    await api.delete(`/api/v1/backups/plans/${planId}`);
+    await api.delete(`/api/v1/backups/agent-plans/${planId}`);
   },
 
   async retryDelivery(backupId: string): Promise<{ jobId: string }> {

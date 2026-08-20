@@ -36,12 +36,16 @@ def _server_payload(server: RemoteServer) -> dict[str, Any]:
     return {
         "id": str(server.id),
         "name": server.name,
+        "transport": server.transport,
+        "agentId": str(server.agent_id) if server.agent_id else None,
         "protocol": server.protocol,
         "host": server.host,
         "port": server.port,
         "username": server.username,
         "rutaBase": server.base_path,
         "allowlist": server.allowlist,
+        "targetFolders": server.target_folders,
+        "targetFiles": server.target_files,
         "createdAt": server.created_at.isoformat(),
     }
 

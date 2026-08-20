@@ -59,12 +59,8 @@ FUNCIONES DE LA VERSION 0.3.0
   con limites por cantidad y tamano y omision de archivos cambiados o inaccesibles.
 - Guarda los archivos internos con nombres legibles, por ejemplo BASE_FULL.bak,
   sin agregar el identificador tecnico del lote despues del tipo de backup.
-- Marca el backup como listo solo despues de RESTORE VERIFYONLY.
-- Separa el estado del .bak del ZIP y de la entrega remota.
-- Permite reintentar una entrega fallida sin volver a ejecutar el backup SQL.
-- Verifica por SHA-256 el contenido transferido por SMB o SFTP.
-- Elimina directamente los archivos de Log, LogSec, LogsRadian, Respuesta y
-  BD_log.txt despues de una simulacion aprobada; conserva las carpetas.
+- Marca el backup como completado al terminar la validacion y transferencia del ZIP;
+  la eliminacion de los .bak temporales continua en segundo plano y se reintenta.
 
 ACTUALIZACION DE UNA INSTALACION EXISTENTE
 
@@ -76,9 +72,10 @@ Abra PowerShell como administrador dentro de la carpeta installer y ejecute:
 El actualizador conserva agent.json, la identidad, las llaves SFTP y el emparejamiento.
 - Exploracion de discos y carpetas.
 - Simulacion de limpieza estructural.
-- Eliminacion estructural directa limitada a la raiz validada.
+- Movimiento reversible a cuarentena, restauracion y purga.
 - Descubrimiento de bases por instancia SQL configurada.
-- Backups .bak/.trn en D:\AAAA-MM-DD y ZIP diario. RESTORE VERIFYONLY es
-  obligatorio; no se sustituye por validacion de tamano o hash.
+- Backups .bak/.trn en D:\AAAA-MM-DD y ZIP diario. Cuando SQL Server Express
+  no permite RESTORE VERIFYONLY sin privilegios amplios, valida tamano y SHA-256
+  del .bak antes de comprimir, y la integridad del ZIP despues de crearlo.
 - Transferencia opcional del ZIP por SFTP o SMB.
 

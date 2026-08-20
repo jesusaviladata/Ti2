@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { X, Database, Loader2, Search, ChevronDown, Check, Eye, EyeOff, CheckCircle2, XCircle, Clock, FolderOpen } from "lucide-react";
+import { X, Database, Loader2, Search, ChevronDown, Check, Eye, EyeOff, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useDatabases, useTriggerBackup, useBackupStatus } from "@/hooks/useBackups";
+import { useAgentDatabases, useBackupAgentJob, useBackupAgents, useBackupStatuses, useDatabases, useTriggerAgentBackup, useTriggerBackup } from "@/hooks/useBackups";
 import { useConnectionsStore } from "@/store/connections.store";
-import { formatBytes } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useBackupProgressStore } from "@/store/backup-progress.store";
 
 type BackupType  = "full" | "differential" | "log";
 type Destination = "local" | "nas" | "secondary_server";
+type ExecutionMode = "agent" | "direct";
 
 interface DestinationCreds {
   host:     string;
@@ -312,92 +313,103 @@ function DestinationCredentials({
   );
 }
 
-// ── Multi-backup progress list ────────────────────────────────────────────────
-function BackupProgressRow({ backupId }: { backupId: string }) {
-  const { data: backup } = useBackupStatus(backupId);
-
-  const status = backup?.status ?? "pending";
-
-  const barColor = {
-    pending:   "bg-musgo/40",
-    running:   "bg-arcilla",
-    completed: "bg-green-500",
-    failed:    "bg-red-500",
-  }[status];
-
-  const isRunning   = status === "running";
-  const isCompleted = status === "completed";
-  const isFailed    = status === "failed";
-
-  return (
-    <div className="rounded-[0.875rem] border border-musgo/20 bg-musgo/5 p-3.5 space-y-2.5">
-      {/* Name + status icon */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-xs text-crema/80 truncate">{backup?.databaseName ?? "…"}</span>
-        <span className="shrink-0">
-          {isCompleted && <CheckCircle2 size={14} className="text-green-400" />}
-          {isFailed    && <XCircle      size={14} className="text-red-400"   />}
-          {!isCompleted && !isFailed && <Clock size={14} className="text-crema/25" />}
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <div className="h-1.5 rounded-full bg-musgo/20 overflow-hidden">
-        <div
-          className={cn(
-            "h-full rounded-full transition-all duration-500",
-            barColor,
-            isRunning && "animate-pulse w-3/4",
-            isCompleted && "w-full",
-            isFailed && "w-full",
-            status === "pending" && "w-0",
-          )}
-        />
-      </div>
-
-      {/* Meta row */}
-      <div className="flex items-center justify-between">
-        <span className={cn("font-mono text-[10px]", {
-          "text-crema/30":  status === "pending",
-          "text-arcilla/70": status === "running",
-          "text-green-400/70": isCompleted,
-          "text-red-400/70": isFailed,
-        })}>
-          {status === "pending"   && "En cola…"}
-          {status === "running"   && "Ejecutando…"}
-          {isCompleted            && "Completado"}
-          {isFailed               && "Fallido"}
-        </span>
-        {isCompleted && backup?.fileSizeBytes ? (
-          <span className="font-mono text-[10px] text-crema/40">
-            {formatBytes(backup.fileSizeBytes)}
-          </span>
-        ) : isFailed && backup?.errorMessage ? (
-          <span className="font-mono text-[10px] text-red-400/60 truncate max-w-[60%] text-right">
-            {backup.errorMessage.split("]").pop()?.trim().slice(0, 60)}
-          </span>
-        ) : null}
-      </div>
-
-      {/* File path when done */}
-      {isCompleted && backup?.filePath && (
-        <p className="font-mono text-[10px] text-green-400/50 break-all leading-relaxed border-t border-musgo/15 pt-2">
-          {backup.filePath}
-        </p>
-      )}
-    </div>
-  );
+// ── Unified multi-backup progress ────────────────────────────────────────────
+function jobProgress(job?: {
+  status: string;
+  phase: string;
+  processedUnits: number;
+  totalUnits: number;
+}) {
+  if (!job) return { percent: 4, label: "Enviando orden al agente…" };
+  const total = Math.max(1, job.totalUnits);
+  if (job.status === "completed") return { percent: 100, label: "Backup y ZIP completados" };
+  if (job.status === "failed" || job.status === "cancelled") return { percent: 100, label: "El proceso terminó con error" };
+  if (job.phase === "compressing") return { percent: 88, label: "Comprimiendo y validando el ZIP…" };
+  if (job.phase === "transferring") return { percent: 95, label: "Transfiriendo el ZIP al destino…" };
+  if (job.phase === "cleaning_up") return { percent: 100, label: "Backup listo; liberando temporales en segundo plano…" };
+  if (job.phase === "backing_up") {
+    const completed = Math.min(job.processedUnits, total);
+    const current = Math.min(completed + 1, total);
+    return {
+      percent: Math.max(10, Math.round(10 + (completed / total) * 70)),
+      label: `Procesando base ${current} de ${total}`,
+    };
+  }
+  return { percent: 6, label: "Esperando respuesta del agente…" };
 }
 
-function MultiBackupProgress({ backupIds }: { backupIds: string[] }) {
+function MultiBackupProgress({
+  backupIds,
+  jobId,
+  databaseNames,
+  starting,
+}: {
+  backupIds: string[];
+  jobId?: string;
+  databaseNames: string[];
+  starting: boolean;
+}) {
+  const { data: job } = useBackupAgentJob(jobId);
+  const backupQueries = useBackupStatuses(backupIds);
+  const backups = backupQueries.flatMap((query) => query.data ? [query.data] : []);
+  const directFinished = backups.filter((backup) => backup.status === "completed" || backup.status === "failed").length;
+  const directFailed = backups.filter((backup) => backup.status === "failed").length;
+  const directTotal = Math.max(1, backupIds.length || databaseNames.length);
+  const directCompleted = backupIds.length > 0 && directFinished === backupIds.length && directFailed === 0;
+  const directDone = backupIds.length > 0 && directFinished === backupIds.length;
+  const directPercent = directDone ? 100 : Math.max(6, Math.round((directFinished / directTotal) * 100));
+  const directLabel = directDone
+    ? directFailed ? `${directFinished - directFailed} completados · ${directFailed} fallidos` : "Backups completados"
+    : `Procesando ${Math.min(directFinished + 1, directTotal)} de ${directTotal}`;
+  const progress = jobId ? jobProgress(job) : { percent: directPercent, label: directLabel };
+  const failed = jobId
+    ? job?.status === "failed" || job?.status === "cancelled"
+    : directDone && directFailed > 0;
+  const completed = jobId ? job?.status === "completed" : directCompleted;
+
   return (
-    <div className="space-y-2">
-      <p className="font-mono text-[10px] text-crema/30 uppercase tracking-wider mb-3">
-        {backupIds.length} tarea{backupIds.length !== 1 ? "s" : ""} en progreso
-      </p>
-      {backupIds.map((id) => (
-        <BackupProgressRow key={id} backupId={id} />
-      ))}
+    <div className="space-y-4">
+      <div className="rounded-[1rem] border border-musgo/25 bg-musgo/5 p-5 space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-mono text-[10px] text-crema/30 uppercase tracking-wider">Progreso general</p>
+            <p className={cn("font-sans text-sm mt-1", failed ? "text-red-400" : completed ? "text-green-400" : "text-crema/80")}>
+              {starting && !job ? "Preparando el proceso…" : progress.label}
+            </p>
+          </div>
+          <span className={cn("font-mono text-xl tabular-nums", failed ? "text-red-400" : completed ? "text-green-400" : "text-arcilla")}>
+            {progress.percent}%
+          </span>
+        </div>
+
+        <div className="h-3 rounded-full bg-musgo/20 overflow-hidden">
+          <div
+            className={cn(
+              "h-full rounded-full transition-[width] duration-700 ease-out",
+              failed ? "bg-red-500" : completed ? "bg-green-500" : "bg-arcilla",
+            )}
+            style={{ width: `${progress.percent}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 font-mono text-[10px] text-crema/30">
+          <span>{databaseNames.length} base{databaseNames.length !== 1 ? "s" : ""} seleccionada{databaseNames.length !== 1 ? "s" : ""}</span>
+          {!failed && !completed && <span>No cierres el agente</span>}
+        </div>
+
+        {job?.error && <p className="font-mono text-[10px] text-red-400/80 break-words">{job.error}</p>}
+      </div>
+
+      <div className="rounded-[0.875rem] border border-musgo/20 bg-musgo/5 p-4">
+        <p className="font-mono text-[10px] text-crema/30 uppercase tracking-wider mb-2">Bases incluidas</p>
+        <div className="flex flex-wrap gap-1.5">
+          {databaseNames.map((name) => (
+            <span key={name} className="px-2 py-1 rounded-md bg-musgo/15 border border-musgo/20 font-mono text-[10px] text-crema/55">
+              {name}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -416,8 +428,41 @@ export function TriggerBackupModal({ open, onClose }: Props) {
   const activeConn  = getActive();
   const connPayload = activeConn ? toPayload(activeConn) : null;
 
-  const { data: dbData, isLoading: loadingDbs } = useDatabases(connPayload, activeConn?.id, open);
+  const [executionMode, setExecutionMode] = useState<ExecutionMode>("agent");
+  const [agentId, setAgentId] = useState("");
+  const [sqlProfileId, setSqlProfileId] = useState("");
+  const [destinationProfileId, setDestinationProfileId] = useState("");
+  const { data: agentData, isLoading: loadingAgents, isError: agentsUnavailable } = useBackupAgents(open);
+  const selectedAgent = agentData?.items.find((item) => item.id === agentId);
+
+  useEffect(() => {
+    if (!agentId && agentData?.items.length) setAgentId(agentData.items[0].id);
+  }, [agentData, agentId]);
+
+  useEffect(() => {
+    const profiles = selectedAgent?.sqlInstances ?? [];
+    if (!profiles.some((item) => item.id === sqlProfileId)) {
+      setSqlProfileId(profiles[0]?.id ?? "");
+    }
+    setDestinationProfileId("");
+    setSelectedDbs([]);
+  }, [selectedAgent, sqlProfileId]);
+
+  const directDatabases = useDatabases(
+    connPayload,
+    activeConn?.id,
+    open && executionMode === "direct",
+  );
+  const agentDatabases = useAgentDatabases(
+    agentId,
+    sqlProfileId,
+    open && executionMode === "agent",
+  );
+  const dbData = executionMode === "agent" ? agentDatabases.data : directDatabases.data;
+  const loadingDbs = executionMode === "agent" ? agentDatabases.isLoading : directDatabases.isLoading;
   const trigger = useTriggerBackup();
+  const triggerAgent = useTriggerAgentBackup();
+  const showInBackground = useBackupProgressStore((state) => state.showInBackground);
 
   const [selectedDbs,     setSelectedDbs]     = useState<string[]>([]);
   const [backupType,      setBackupType]      = useState<BackupType>("full");
@@ -427,6 +472,11 @@ export function TriggerBackupModal({ open, onClose }: Props) {
     host: "", username: "", password: "", path: "", domain: "",
   });
   const [activeBackupIds, setActiveBackupIds] = useState<string[]>([]);
+  const [activeJobId, setActiveJobId] = useState("");
+  const [submittedDatabases, setSubmittedDatabases] = useState<string[]>([]);
+  const [showProgress, setShowProgress] = useState(false);
+  const backgroundRequestedRef = useRef(false);
+  const submittedDatabasesRef = useRef<string[]>([]);
 
   if (!open) return null;
 
@@ -437,20 +487,96 @@ export function TriggerBackupModal({ open, onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedDbs.length) return;
-    const result = await trigger.mutateAsync({
-      database_names: selectedDbs,
-      backup_type:    backupType,
-      destination,
-      local_path:     destination === "local" ? localPath.trim() || undefined : undefined,
-      connection:     connPayload ?? undefined,
-    });
-    setActiveBackupIds(result.backups.map((b) => b.id));
+    const databases = [...selectedDbs];
+    submittedDatabasesRef.current = databases;
+    setSubmittedDatabases(databases);
+    setShowProgress(true);
+    try {
+      const result = executionMode === "agent"
+        ? await triggerAgent.mutateAsync({
+          agentId,
+          sqlProfileId,
+          databaseNames: selectedDbs,
+          backupType,
+          destinationProfileId: destinationProfileId || undefined,
+        })
+        : await trigger.mutateAsync({
+          database_names: selectedDbs,
+          backup_type:    backupType,
+          destination,
+          local_path:     destination === "local" ? localPath.trim() || undefined : undefined,
+          connection:     connPayload ?? undefined,
+        });
+      const backupIds = result.backups.map((backup) => backup.id);
+      const jobId = "jobId" in result && typeof result.jobId === "string"
+        ? result.jobId
+        : undefined;
+      if (backgroundRequestedRef.current) {
+        showInBackground({
+          jobId,
+          backupIds,
+          databaseNames: databases,
+          startedAt: new Date().toISOString(),
+        });
+        backgroundRequestedRef.current = false;
+        submittedDatabasesRef.current = [];
+        trigger.reset();
+        triggerAgent.reset();
+        return;
+      }
+      setActiveBackupIds(backupIds);
+      setActiveJobId(jobId ?? "");
+    } catch {
+      if (backgroundRequestedRef.current) {
+        showInBackground({
+          backupIds: [],
+          databaseNames: databases,
+          startedAt: new Date().toISOString(),
+          submissionError: "Railway rechazó o no pudo iniciar el lote",
+        });
+        backgroundRequestedRef.current = false;
+        submittedDatabasesRef.current = [];
+        trigger.reset();
+        triggerAgent.reset();
+      } else {
+        setShowProgress(false);
+      }
+    }
   }
 
   function handleClose() {
+    if (showProgress && (trigger.isPending || triggerAgent.isPending)) {
+      backgroundRequestedRef.current = true;
+      showInBackground({
+        backupIds: [],
+        databaseNames: submittedDatabasesRef.current,
+        startedAt: new Date().toISOString(),
+      });
+      setActiveBackupIds([]);
+      setActiveJobId("");
+      setSubmittedDatabases([]);
+      setShowProgress(false);
+      setLocalPath(todayLocalPath());
+      onClose();
+      return;
+    }
+    if (showProgress && (activeJobId || activeBackupIds.length)) {
+      showInBackground({
+        jobId: activeJobId || undefined,
+        backupIds: activeBackupIds,
+        databaseNames: submittedDatabases,
+        startedAt: new Date().toISOString(),
+      });
+    }
     setActiveBackupIds([]);
+    setActiveJobId("");
+    setSubmittedDatabases([]);
+    setShowProgress(false);
+    backgroundRequestedRef.current = false;
+    submittedDatabasesRef.current = [];
     setLocalPath(todayLocalPath());
     trigger.reset();
+    triggerAgent.reset();
     onClose();
   }
 
@@ -477,9 +603,72 @@ export function TriggerBackupModal({ open, onClose }: Props) {
 
         {/* Scrollable body */}
         <div className="p-6 overflow-y-auto">
-          {!activeBackupIds.length ? (
+          {!showProgress ? (
             <form onSubmit={handleSubmit} className="space-y-5">
-              {!activeConn && (
+              <div>
+                <label className="font-mono text-xs text-crema/40 uppercase tracking-wider block mb-2">
+                  Ejecucion
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setExecutionMode("agent"); setSelectedDbs([]); }}
+                    className={cn(
+                      "h-10 rounded-[0.75rem] border text-xs font-sans transition-colors",
+                      executionMode === "agent" ? "bg-arcilla/10 border-arcilla/40 text-crema" : "bg-musgo/10 border-musgo/20 text-crema/40",
+                    )}
+                  >
+                    Agente del servidor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setExecutionMode("direct"); setSelectedDbs([]); }}
+                    className={cn(
+                      "h-10 rounded-[0.75rem] border text-xs font-sans transition-colors",
+                      executionMode === "direct" ? "bg-arcilla/10 border-arcilla/40 text-crema" : "bg-musgo/10 border-musgo/20 text-crema/40",
+                    )}
+                  >
+                    Conexion directa
+                  </button>
+                </div>
+              </div>
+
+              {executionMode === "agent" && (
+                <div className="rounded-[1rem] border border-musgo/25 bg-musgo/5 p-4 space-y-3">
+                  <div>
+                    <label className="font-mono text-[10px] text-crema/35 uppercase tracking-wider block mb-1.5">
+                      Servidor / Agente
+                    </label>
+                    <select value={agentId} onChange={(event) => setAgentId(event.target.value)} className={INPUT}>
+                      <option value="">Seleccione un servidor</option>
+                      {agentData?.items.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.hostname} — {agent.status}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-mono text-[10px] text-crema/35 uppercase tracking-wider block mb-1.5">
+                      Instancia SQL
+                    </label>
+                    <select value={sqlProfileId} onChange={(event) => setSqlProfileId(event.target.value)} className={INPUT}>
+                      <option value="">Seleccione una instancia</option>
+                      {selectedAgent?.sqlInstances.map((profile) => (
+                        <option key={profile.id} value={profile.id}>{profile.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {loadingAgents && <p className="font-mono text-[10px] text-crema/30">Consultando agentes…</p>}
+                  {agentsUnavailable && (
+                    <p className="font-mono text-[10px] text-red-400/70">
+                      El modulo de agentes no esta disponible en Railway. Active el modulo o use conexion directa.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {executionMode === "direct" && !activeConn && (
                 <div className="flex items-center gap-2 rounded-[0.75rem] bg-musgo/10 border border-musgo/20 px-4 py-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-crema/20 shrink-0" />
                   <span className="font-mono text-xs text-crema/35">
@@ -556,7 +745,20 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 <label className="font-mono text-xs text-crema/40 uppercase tracking-wider block mb-2">
                   Destino
                 </label>
-                <div className="flex gap-2">
+                {executionMode === "agent" && (
+                  <div className="rounded-[1rem] border border-musgo/25 bg-musgo/5 p-4 space-y-2">
+                    <select value={destinationProfileId} onChange={(event) => setDestinationProfileId(event.target.value)} className={INPUT}>
+                      <option value="">Solo carpeta local + ZIP</option>
+                      {selectedAgent?.backupDestinations.map((profile) => (
+                        <option key={profile.id} value={profile.id}>{profile.label}</option>
+                      ))}
+                    </select>
+                    <p className="font-mono text-[10px] text-crema/25 leading-relaxed">
+                      El agente crea la carpeta fechada, verifica los .bak y genera el ZIP antes de transferirlo.
+                    </p>
+                  </div>
+                )}
+                {executionMode === "direct" && <div className="flex gap-2">
                   {DESTINATIONS.map(({ value, label }) => (
                     <button
                       key={value}
@@ -572,10 +774,10 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                       {label}
                     </button>
                   ))}
-                </div>
+                </div>}
 
                 {/* Local path config */}
-                {destination === "local" && (
+                {executionMode === "direct" && destination === "local" && (
                   <div className="mt-3 rounded-[1rem] border border-musgo/25 overflow-hidden">
                     <div className="flex items-center gap-2 px-4 py-2.5 bg-musgo/15 border-b border-musgo/20">
                       <FolderOpen size={12} className="text-arcilla/60 shrink-0" />
@@ -599,7 +801,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 )}
 
                 {/* Credential fields for NAS / secondary server */}
-                {destination !== "local" && (
+                {executionMode === "direct" && destination !== "local" && (
                   <div className="mt-3">
                     <DestinationCredentials
                       destination={destination}
@@ -610,9 +812,9 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 )}
               </div>
 
-              {trigger.isError && (
+              {(trigger.isError || triggerAgent.isError) && (
                 <p className="font-mono text-xs text-red-400 bg-red-900/10 border border-red-800/20 rounded-[0.75rem] px-4 py-3">
-                  {(trigger.error as any)?.response?.data?.detail ?? "Error al iniciar backup"}
+                  {((triggerAgent.error ?? trigger.error) as any)?.response?.data?.detail ?? "Error al iniciar backup"}
                 </p>
               )}
 
@@ -623,9 +825,9 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 <Button
                   type="submit"
                   className="flex-1"
-                  disabled={!selectedDbs.length || trigger.isPending || !dbData?.connected}
+                  disabled={!selectedDbs.length || trigger.isPending || triggerAgent.isPending || !dbData?.connected || (executionMode === "agent" && (!agentId || !sqlProfileId))}
                 >
-                  {trigger.isPending ? (
+                  {(trigger.isPending || triggerAgent.isPending) ? (
                     <><Loader2 size={14} className="animate-spin mr-2" />Iniciando…</>
                   ) : (
                     <><Database size={14} className="mr-2" />
@@ -637,9 +839,18 @@ export function TriggerBackupModal({ open, onClose }: Props) {
             </form>
           ) : (
             <div className="space-y-4">
-              <MultiBackupProgress backupIds={activeBackupIds} />
-              <Button onClick={handleClose} variant="outline" className="w-full">
-                Cerrar — los backups continúan en segundo plano
+              <MultiBackupProgress
+                backupIds={activeBackupIds}
+                jobId={activeJobId || undefined}
+                databaseNames={submittedDatabases}
+                starting={trigger.isPending || triggerAgent.isPending}
+              />
+              <Button
+                onClick={handleClose}
+                variant="outline"
+                className="w-full"
+              >
+                Ver en segundo plano
               </Button>
             </div>
           )}

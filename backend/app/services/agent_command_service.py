@@ -64,6 +64,7 @@ class AgentCommandService:
         payload: dict[str, Any],
         idempotency_key: str,
         job_id: str | None = None,
+        ttl_seconds: int | None = None,
     ) -> AgentCommand:
         if command_type not in ALLOWED_COMMAND_TYPES:
             raise DomainError(
@@ -100,7 +101,8 @@ class AgentCommandService:
             payload_hash=hashlib.sha256(payload_bytes).hexdigest(),
             status="pending",
             idempotency_key=normalized_key,
-            expires_at=self.now() + timedelta(seconds=self.command_ttl_seconds),
+            expires_at=self.now()
+            + timedelta(seconds=ttl_seconds or self.command_ttl_seconds),
             result_summary={},
         )
         self.db.add(command)
@@ -108,7 +110,13 @@ class AgentCommandService:
         return command
 
     async def claim_next(self, agent: RemoteAgent) -> AgentCommand | None:
-        return await self.repo.claim_next_command(agent.id, self.now())
+        command = await self.repo.claim_next_command(agent.id, self.now())
+        if command is not None and command.job_id:
+            job = await self.repo.get_background_job(command.job_id)
+            if job is not None:
+                job.status = "running"
+                job.phase = "claimed"
+        return command
 
     async def progress(
         self,
@@ -129,6 +137,7 @@ class AgentCommandService:
         if command.job_id:
             job = await self.repo.get_background_job(command.job_id)
             if job is not None:
+                job.status = "running"
                 job.phase = phase[:100]
                 job.processed_units = max(0, processed_units)
                 job.total_units = max(0, total_units)
@@ -178,6 +187,10 @@ class AgentCommandService:
                 job.finished_at = now
         await self._project_backup_complete(command, result, now)
         await self._project_cleanup_complete(command, result, now)
+        if command.command_type == "run_backup_batch":
+            self._create_backup_success_notification(command, result)
+        elif command.command_type == "execute_structural_direct":
+            self._create_cleanup_notification(command, result, success=True)
         await self.db.flush()
         return command
 
@@ -210,6 +223,12 @@ class AgentCommandService:
                 job.finished_at = now
         await self._project_backup_failure(command, command.error_message, now)
         await self._project_cleanup_failure(command, command.error_message, now)
+        if command.command_type == "execute_structural_direct":
+            self._create_cleanup_notification(
+                command,
+                {"errorMessage": command.error_message},
+                success=False,
+            )
         await self.db.flush()
         return command
 
@@ -383,3 +402,58 @@ class AgentCommandService:
         execution.status = "failed"
         execution.summary = {**dict(execution.summary or {}), "error": message}
         execution.finished_at = now
+
+    def _create_backup_success_notification(
+        self, command: AgentCommand, result: dict[str, Any]
+    ) -> None:
+        from app.models.operations import Notification
+
+        databases = result.get("databases", [])
+        total = len(databases)
+        zip_name = str(result.get("zipFileName") or "archivo ZIP")
+        self.db.add(
+            Notification(
+                tenant_id=command.tenant_id,
+                user_id=None,
+                kind="backup_success",
+                title="Lote de respaldos completado",
+                message=(
+                    f"{total} base{'s' if total != 1 else ''} respaldada"
+                    f"{'s' if total != 1 else ''} correctamente · {zip_name}"
+                ),
+                severity="success",
+                metadata_json={
+                    "jobId": str(command.job_id) if command.job_id else None,
+                    "databaseCount": total,
+                    "zipPath": result.get("zipPath"),
+                },
+            )
+        )
+
+    def _create_cleanup_notification(
+        self, command: AgentCommand, result: dict[str, Any], *, success: bool
+    ) -> None:
+        from app.models.operations import Notification
+
+        deleted = int(result.get("deletedCount") or 0)
+        failed = int(result.get("failedCount") or 0)
+        self.db.add(
+            Notification(
+                tenant_id=command.tenant_id,
+                user_id=None,
+                kind="cleanup_success" if success else "cleanup_failed",
+                title="Limpieza de logs completada" if success else "Limpieza de logs fallida",
+                message=(
+                    f"{deleted} archivo(s) eliminado(s) · {failed} omitido(s)"
+                    if success
+                    else str(result.get("errorMessage") or "El agente no pudo completar la limpieza")
+                ),
+                severity="success" if success else "error",
+                metadata_json={
+                    "jobId": str(command.job_id) if command.job_id else None,
+                    "deletedCount": deleted,
+                    "failedCount": failed,
+                    "bytesDeleted": int(result.get("bytesDeleted") or 0),
+                },
+            )
+        )

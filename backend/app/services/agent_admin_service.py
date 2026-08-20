@@ -110,6 +110,144 @@ class AgentAdminService:
         )
         return job
 
+    async def start_cleanup_simulation(
+        self,
+        tenant_id: str,
+        agent_id: str,
+        *,
+        server_id: str,
+        container_folder: str,
+        max_properties: int,
+        max_files: int = 50000,
+        max_bytes: int = 20 * 1024**3,
+    ) -> BackgroundJob:
+        agent = await self._active_agent(tenant_id, agent_id)
+        server = await self._configured_server(tenant_id, agent, server_id)
+        job = BackgroundJob(
+            tenant_id=agent.tenant_id,
+            kind="agent_cleanup_simulation",
+            status="queued",
+            phase="queued",
+            resource_id=agent.id,
+        )
+        self.db.add(job)
+        await self.db.flush()
+        await self.commands.create_command(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            command_type="simulate_structural_cleanup",
+            payload={
+                "root": server.base_path,
+                "containerFolder": container_folder,
+                "targetFolders": server.target_folders,
+                "targetFiles": server.target_files,
+                "maxProperties": max_properties,
+                "maxFiles": max_files,
+                "maxBytes": max_bytes,
+            },
+            idempotency_key=f"cleanup-simulate:{job.id}",
+            job_id=str(job.id),
+        )
+        return job
+
+    async def start_cleanup_direct(
+        self,
+        tenant_id: str,
+        agent_id: str,
+        *,
+        simulation_id: str,
+        manifest_hash: str,
+    ) -> BackgroundJob:
+        agent = await self._active_agent(tenant_id, agent_id)
+        job = BackgroundJob(
+            tenant_id=agent.tenant_id,
+            kind="agent_cleanup_direct",
+            status="queued",
+            phase="queued",
+            resource_id=agent.id,
+        )
+        self.db.add(job)
+        await self.db.flush()
+        await self.commands.create_command(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            command_type="execute_structural_direct",
+            payload={
+                "simulationId": simulation_id,
+                "manifestHash": manifest_hash,
+            },
+            idempotency_key=f"cleanup-direct:{job.id}",
+            job_id=str(job.id),
+            ttl_seconds=24 * 60 * 60,
+        )
+        return job
+
+    async def start_cleanup_quarantine(
+        self,
+        tenant_id: str,
+        agent_id: str,
+        *,
+        simulation_id: str,
+        manifest_hash: str,
+    ) -> BackgroundJob:
+        agent = await self._active_agent(tenant_id, agent_id)
+        job = BackgroundJob(
+            tenant_id=agent.tenant_id,
+            kind="agent_cleanup_quarantine",
+            status="queued",
+            phase="queued",
+            resource_id=agent.id,
+        )
+        self.db.add(job)
+        await self.db.flush()
+        await self.commands.create_command(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            command_type="execute_structural_quarantine",
+            payload={
+                "simulationId": simulation_id,
+                "manifestHash": manifest_hash,
+                "executionId": str(job.id),
+            },
+            idempotency_key=f"cleanup-quarantine:{job.id}",
+            job_id=str(job.id),
+        )
+        return job
+
+    async def start_quarantine_action(
+        self,
+        tenant_id: str,
+        agent_id: str,
+        *,
+        command_type: str,
+        server_id: str,
+        execution_id: str,
+        relative_path: str | None = None,
+    ) -> BackgroundJob:
+        agent = await self._active_agent(tenant_id, agent_id)
+        server = await self._configured_server(tenant_id, agent, server_id)
+        job = BackgroundJob(
+            tenant_id=agent.tenant_id,
+            kind=f"agent_{command_type}",
+            status="queued",
+            phase="queued",
+            resource_id=agent.id,
+        )
+        self.db.add(job)
+        await self.db.flush()
+        payload = {"root": server.base_path, "executionId": execution_id}
+        if relative_path:
+            payload["relativePath"] = relative_path
+        await self.commands.create_command(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            command_type=command_type,
+            payload=payload,
+            idempotency_key=f"{command_type}:{job.id}",
+            job_id=str(job.id),
+        )
+        return job
+
     async def get_job(self, tenant_id: str, job_id: str) -> dict[str, Any]:
         job = await self.admin_repo.get_job(tenant_id, job_id)
         if job is None:
@@ -225,6 +363,24 @@ class AgentAdminService:
         if agent.status == "revoked" or agent.revoked_at is not None:
             raise ConflictError("El agente está revocado", code="AGENT_REVOKED")
         return agent
+
+    async def _configured_server(
+        self, tenant_id: str, agent: RemoteAgent, server_id: str
+    ) -> RemoteServer:
+        server = await self.admin_repo.get_server(tenant_id, server_id)
+        if server is None:
+            raise NotFoundError("Servidor")
+        if (
+            server.transport != "agent"
+            or server.agent_id != agent.id
+            or not server.base_path
+            or not server.validated_at
+        ):
+            raise ConflictError(
+                "El servidor no tiene una ruta validada para este agente",
+                code="AGENT_SERVER_NOT_VALIDATED",
+            )
+        return server
 
 
 def server_payload(server: RemoteServer) -> dict[str, Any]:

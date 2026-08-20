@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Search, Bell, Sun, Moon, X,
   LogOut, User, Database, Monitor, ShieldAlert,
-  AlertTriangle, CheckCircle2,
+  AlertTriangle, CheckCircle2, Trash2,
 } from "lucide-react";
 import type { User as AuthUser } from "@/types";
 import { useAuthStore } from "@/store/auth.store";
@@ -32,7 +32,7 @@ type SearchStatus = "idle" | "loading" | "success" | "error";
 
 interface Notification {
   id: string;
-  kind: "backup_fail" | "suspicious";
+  kind: "backup_fail" | "backup_success" | "suspicious" | "test";
   title: string;
   body: string;
   ts: string;
@@ -164,18 +164,32 @@ function SearchPanel({
 
 // ── Notifications panel ───────────────────────────────────────────────────────
 function NotificationsPanel({
-  notifications, onClose,
+  notifications, onClose, onClear, clearing,
 }: {
   notifications: Notification[];
   onClose: () => void;
+  onClear: () => void;
+  clearing: boolean;
 }) {
   return (
     <div className="absolute right-0 top-full mt-2 w-[300px] z-[60] rounded-[1rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden">
       <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-musgo/15">
         <span className="font-sans text-sm font-medium text-crema/70">Notificaciones</span>
-        <button onClick={onClose} className="text-crema/25 hover:text-crema/60 transition-colors">
-          <X size={13} />
-        </button>
+        <div className="flex items-center gap-2">
+          {notifications.length > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={clearing}
+              className="flex items-center gap-1 font-mono text-[9px] text-crema/30 transition-colors hover:text-red-300 disabled:opacity-40"
+            >
+              <Trash2 size={11} /> {clearing ? "Limpiando…" : "Limpiar"}
+            </button>
+          )}
+          <button onClick={onClose} className="text-crema/25 hover:text-crema/60 transition-colors">
+            <X size={13} />
+          </button>
+        </div>
       </div>
 
       {notifications.length === 0 ? (
@@ -191,10 +205,9 @@ function NotificationsPanel({
               className="flex items-start gap-3 px-4 py-3 hover:bg-musgo/10 transition-colors border-b border-musgo/10 last:border-0"
             >
               <div className="mt-0.5 shrink-0">
-                {n.kind === "backup_fail"
-                  ? <AlertTriangle size={13} className="text-red-400/80" />
-                  : <ShieldAlert   size={13} className="text-orange-400/80" />
-                }
+                {n.kind === "backup_fail" && <AlertTriangle size={13} className="text-red-400/80" />}
+                {n.kind === "backup_success" && <CheckCircle2 size={13} className="text-green-400/80" />}
+                {n.kind !== "backup_fail" && n.kind !== "backup_success" && <ShieldAlert size={13} className="text-orange-400/80" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-sans text-xs font-medium text-crema/80">{n.title}</p>
@@ -276,6 +289,7 @@ export function Topbar() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [readIds,        setReadIds]       = useState<Set<string>>(new Set());
   const [notifOpen,      setNotifOpen]     = useState(false);
+  const [clearingNotifs, setClearingNotifs] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
   // Profile / settings
@@ -375,6 +389,27 @@ export function Topbar() {
     return () => clearInterval(id);
   }, [loadNotifs]);
 
+  useEffect(() => {
+    const cleared = () => {
+      setNotifications([]);
+      setReadIds(new Set());
+    };
+    window.addEventListener("data-express:notifications-cleared", cleared);
+    return () => window.removeEventListener("data-express:notifications-cleared", cleared);
+  }, []);
+
+  const clearNotifs = useCallback(async () => {
+    setClearingNotifs(true);
+    try {
+      await api.delete("/api/v1/notifications");
+      setNotifications([]);
+      setReadIds(new Set());
+      window.dispatchEvent(new Event("data-express:notifications-cleared"));
+    } finally {
+      setClearingNotifs(false);
+    }
+  }, []);
+
   const unread = notifications.filter((n) => !readIds.has(n.id)).length;
 
   const initials = user?.fullName
@@ -460,6 +495,8 @@ export function Topbar() {
             <NotificationsPanel
               notifications={notifications}
               onClose={() => setNotifOpen(false)}
+              onClear={clearNotifs}
+              clearing={clearingNotifs}
             />
           )}
         </div>

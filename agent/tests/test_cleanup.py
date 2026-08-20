@@ -1,70 +1,146 @@
-from pathlib import Path
+from __future__ import annotations
 
-import pytest
-
-from agent.data_express_agent.cleanup import CleanupError, StructuralCleanupExecutor
+from agent.data_express_agent.cleanup import StructuralCleanupExecutor
 
 
-FIXED_FOLDERS = ["Log", "LogSec", "LogsRadian", "Respuesta"]
-FIXED_FILES = ["BD_log.txt"]
-
-
-def _payload(root: Path, **overrides):
-    payload = {
-        "root": str(root),
-        "containerFolder": "core",
-        "targetFolders": FIXED_FOLDERS,
-        "targetFiles": FIXED_FILES,
-    }
-    payload.update(overrides)
-    return payload
-
-
-def test_simulation_empties_every_file_type_but_preserves_scope(tmp_path: Path):
-    root = tmp_path / "properties"
-    log = root / "Hotel-A" / "core" / "Log"
-    nested = log / "archive"
-    nested.mkdir(parents=True)
-    (log / "runtime.exe").write_bytes(b"binary log")
-    (nested / "snapshot.bak").write_bytes(b"backup-shaped log")
-    (root / "Hotel-A" / "core" / "database.mdf").write_bytes(b"protected")
+def test_cleanup_simulation_quarantine_restore_and_purge(tmp_path):
+    root = tmp_path / "Ipsofactu"
+    logs = root / "P001" / "Core" / "Log"
+    logs.mkdir(parents=True)
+    removable = logs / "old.log"
+    protected = logs / "important.bak"
+    removable.write_text("old log", encoding="utf-8")
+    protected.write_text("backup", encoding="utf-8")
     executor = StructuralCleanupExecutor(tmp_path / "agent-data")
 
-    report = executor.simulate(_payload(root))
+    simulation = executor.simulate(
+        {
+            "root": str(root),
+            "containerFolder": "Core",
+            "targetFolders": ["Log"],
+            "targetFiles": [],
+        }
+    )
 
-    assert report["eligibleCount"] == 2
-    assert report["protectedCount"] == 0
-    paths = {Path(item["relativePath"]).name for item in report["samples"]}
-    assert paths == {"runtime.exe", "snapshot.bak"}
+    assert simulation["eligibleCount"] == 1
+    assert simulation["protectedCount"] == 1
+    execution = executor.execute_quarantine(
+        {
+            "simulationId": simulation["simulationId"],
+            "manifestHash": simulation["manifestHash"],
+            "executionId": "execution-1",
+        }
+    )
+    assert execution["movedCount"] == 1
+    assert not removable.exists()
+    assert protected.exists()
+
+    restored = executor.restore(
+        {"root": str(root), "executionId": "execution-1"}
+    )
+    assert restored["restoredCount"] == 1
+    assert removable.exists()
+
+    second = executor.simulate(
+        {
+            "root": str(root),
+            "containerFolder": "Core",
+            "targetFolders": ["Log"],
+            "targetFiles": [],
+        }
+    )
+    executor.execute_quarantine(
+        {
+            "simulationId": second["simulationId"],
+            "manifestHash": second["manifestHash"],
+            "executionId": "execution-2",
+        }
+    )
+    purged = executor.purge({"root": str(root), "executionId": "execution-2"})
+    assert purged["purged"] is True
+    assert not removable.exists()
 
 
-def test_simulation_rejects_targets_outside_fixed_policy(tmp_path: Path):
-    root = tmp_path / "properties"
-    root.mkdir()
+def test_cleanup_detects_changed_file_after_simulation(tmp_path):
+    root = tmp_path / "Ipsofactu"
+    logs = root / "P001" / "Core" / "Log"
+    logs.mkdir(parents=True)
+    candidate = logs / "old.log"
+    candidate.write_text("before", encoding="utf-8")
+    executor = StructuralCleanupExecutor(tmp_path / "agent-data")
+    simulation = executor.simulate(
+        {
+            "root": str(root),
+            "containerFolder": "Core",
+            "targetFolders": ["Log"],
+            "targetFiles": [],
+        }
+    )
+    candidate.write_text("changed after simulation", encoding="utf-8")
+
+    result = executor.execute_quarantine(
+        {
+            "simulationId": simulation["simulationId"],
+            "manifestHash": simulation["manifestHash"],
+            "executionId": "execution-changed",
+        }
+    )
+
+    assert result["movedCount"] == 0
+    assert result["failedCount"] == 1
+    assert candidate.exists()
+
+
+def test_cleanup_direct_deletes_only_unchanged_unprotected_files(tmp_path):
+    root = tmp_path / "Ipsofactu"
+    logs = root / "P001" / "Core" / "Log"
+    logs.mkdir(parents=True)
+    removable = logs / "trace.log"
+    protected = logs / "respaldo.zip"
+    removable.write_text("log", encoding="utf-8")
+    protected.write_text("zip", encoding="utf-8")
     executor = StructuralCleanupExecutor(tmp_path / "agent-data")
 
-    with pytest.raises(CleanupError) as rejected:
-        executor.simulate(_payload(root, targetFolders=["OtherLogs"]))
-
-    assert rejected.value.code == "CLEANUP_POLICY_INVALID"
-
-
-def test_direct_cleanup_deletes_files_and_keeps_directories(tmp_path: Path):
-    root = tmp_path / "properties"
-    nested = root / "Hotel-A" / "core" / "Respuesta" / "2026"
-    nested.mkdir(parents=True)
-    target = nested / "response.json"
-    target.write_text("{}", encoding="utf-8")
-    executor = StructuralCleanupExecutor(tmp_path / "agent-data")
-    report = executor.simulate(_payload(root))
-
+    simulation = executor.simulate(
+        {
+            "root": str(root),
+            "containerFolder": "Core",
+            "targetFolders": ["Log"],
+            "targetFiles": [],
+        }
+    )
     result = executor.execute_direct(
         {
-            "simulationId": report["simulationId"],
-            "manifestHash": report["manifestHash"],
+            "simulationId": simulation["simulationId"],
+            "manifestHash": simulation["manifestHash"],
         }
     )
 
     assert result["deletedCount"] == 1
-    assert not target.exists()
-    assert nested.is_dir()
+    assert result["failedCount"] == 0
+    assert not removable.exists()
+    assert protected.exists()
+
+
+def test_cleanup_simulation_applies_file_and_byte_limits(tmp_path):
+    root = tmp_path / "Ipsofactu"
+    logs = root / "P001" / "Core" / "Log"
+    logs.mkdir(parents=True)
+    for name in ("a.log", "b.log", "c.log"):
+        (logs / name).write_text("1234", encoding="utf-8")
+    executor = StructuralCleanupExecutor(tmp_path / "agent-data")
+
+    simulation = executor.simulate(
+        {
+            "root": str(root),
+            "containerFolder": "Core",
+            "targetFolders": ["Log"],
+            "targetFiles": [],
+            "maxFiles": 2,
+            "maxBytes": 4,
+        }
+    )
+
+    assert simulation["eligibleCount"] == 1
+    assert simulation["bytesEligible"] == 4
+    assert simulation["truncated"] is True

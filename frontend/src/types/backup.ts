@@ -40,22 +40,52 @@ export interface BackupListResponse {
   limit: number;
 }
 
-export interface DatabasesResponse {
-  databases: string[];
-  connected: boolean;
-  error?:    string;
+export interface BackupAgentProfile {
+  id: string;
+  label: string;
+  type?: string;
+}
+
+export interface BackupAgent {
+  id: string;
+  hostname: string;
+  status: string;
+  lastSeenAt: string | null;
+  sqlInstances: BackupAgentProfile[];
+  backupDestinations: BackupAgentProfile[];
+}
+
+export interface AgentJob {
+  id: string;
+  kind: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  phase: string;
+  totalUnits: number;
+  processedUnits: number;
+  foundCount: number;
+  result?: Record<string, any> | null;
+  error?: string | null;
 }
 
 export interface AgentBackupPlan {
   id: string;
+  name: string;
   agentId: string;
   sqlProfileId: string;
-  destinationProfileId: string | null;
+  destinationProfileId?: string | null;
   databaseNames: string[];
+  localTime: string;
+  timezone: string;
+  enabled: boolean;
   fullDays: number[];
   differentialDays: number[];
-  hourUtc: number;
-  enabled: boolean;
-  lastRunAt: string | null;
+  lastRunAt?: string | null;
+  nextRunAt?: string | null;
   createdAt: string;
+}
+
+export interface DatabasesResponse {
+  databases: string[];
+  connected: boolean;
+  error?:    string;
 }

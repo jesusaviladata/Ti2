@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.core.errors import ConflictError
-from app.models.operations import AgentCommand, RemoteAgent
+from app.models.operations import AgentCommand, RemoteAgent, RemoteServer
 from app.services.agent_admin_service import AgentAdminService, configuration_hash
 
 
@@ -39,6 +39,7 @@ class FakeAdminRepo:
     def __init__(self):
         self.jobs = {}
         self.commands = {}
+        self.servers = {}
 
     async def get_job(self, _tenant_id, job_id):
         return self.jobs.get(job_id)
@@ -47,7 +48,7 @@ class FakeAdminRepo:
         return self.commands.get(job_id)
 
     async def get_server(self, _tenant_id, _server_id):
-        return None
+        return self.servers.get(_server_id)
 
 
 class FakeCommandService:
@@ -170,4 +171,51 @@ def test_configuration_hash_changes_when_any_target_changes():
     first = configuration_hash(agent_id, "D:\\Ipsofactu", ["Logs"], ["BD_log.txt"])
     second = configuration_hash(agent_id, "D:\\Ipsofactu", ["LogSec"], ["BD_log.txt"])
     assert first != second
+
+
+@pytest.mark.asyncio
+async def test_cleanup_uses_only_the_saved_validated_server_configuration():
+    agent, _, admin_repo, commands, service = _fixture()
+    server = RemoteServer(
+        id=uuid.uuid4(),
+        tenant_id=agent.tenant_id,
+        name="Ipsofactu",
+        transport="agent",
+        agent_id=agent.id,
+        base_path="D:\\Ipsofactu",
+        target_folders=["Log", "Respuesta"],
+        target_files=["BD_log.txt"],
+        validated_at=datetime.now(timezone.utc),
+    )
+    admin_repo.servers[str(server.id)] = server
+
+    await service.start_cleanup_simulation(
+        str(agent.tenant_id),
+        str(agent.id),
+        server_id=str(server.id),
+        container_folder="Core",
+        max_properties=50,
+    )
+
+    payload = commands.calls[0]["payload"]
+    assert payload["root"] == "D:\\Ipsofactu"
+    assert payload["targetFolders"] == ["Log", "Respuesta"]
+    assert payload["targetFiles"] == ["BD_log.txt"]
+
+
+@pytest.mark.asyncio
+async def test_direct_cleanup_queues_typed_destructive_command():
+    agent, _, _, commands, service = _fixture()
+
+    job = await service.start_cleanup_direct(
+        str(agent.tenant_id),
+        str(agent.id),
+        simulation_id=str(uuid.uuid4()),
+        manifest_hash="a" * 64,
+    )
+
+    call = commands.calls[0]
+    assert job.kind == "agent_cleanup_direct"
+    assert call["command_type"] == "execute_structural_direct"
+    assert call["payload"]["manifestHash"] == "a" * 64
 

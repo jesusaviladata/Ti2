@@ -16,9 +16,19 @@ from .explorer import _is_reparse_point, _safe_directory, _safe_target_name
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 _SAFE_CONTAINER = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
-_FIXED_CONTAINER = "core"
-_FIXED_TARGET_FOLDERS = ("Log", "LogSec", "LogsRadian", "Respuesta")
-_FIXED_TARGET_FILES = ("BD_log.txt",)
+_PROTECTED_EXTENSIONS = {
+    ".bak",
+    ".trn",
+    ".zip",
+    ".rar",
+    ".7z",
+    ".exe",
+    ".dll",
+    ".key",
+    ".pem",
+    ".pfx",
+    ".config",
+}
 
 
 class CleanupError(RuntimeError):
@@ -70,22 +80,11 @@ class StructuralCleanupExecutor:
         root = _safe_directory(str(payload["root"]))
         if root.parent == root:
             raise CleanupError("ROOT_TOO_BROAD", "No se permite limpiar la raiz del sistema")
-        container = _safe_container(str(payload.get("containerFolder") or _FIXED_CONTAINER))
+        container = _safe_container(str(payload.get("containerFolder") or "Core"))
         target_folders = [_safe_target_name(str(item)) for item in payload.get("targetFolders", [])]
         target_files = [_safe_target_name(str(item)) for item in payload.get("targetFiles", [])]
-        if (
-            container.casefold() != _FIXED_CONTAINER
-            or {item.casefold() for item in target_folders}
-            != {item.casefold() for item in _FIXED_TARGET_FOLDERS}
-            or {item.casefold() for item in target_files}
-            != {item.casefold() for item in _FIXED_TARGET_FILES}
-        ):
-            raise CleanupError(
-                "CLEANUP_POLICY_INVALID",
-                "La limpieza solo admite la estructura fija de Ipsofactu",
-            )
-        target_folders = list(_FIXED_TARGET_FOLDERS)
-        target_files = list(_FIXED_TARGET_FILES)
+        if not target_folders and not target_files:
+            raise CleanupError("CLEANUP_TARGET_REQUIRED", "Defina al menos un objetivo de limpieza")
         max_properties = max(0, int(payload.get("maxProperties") or 0))
         max_files = max(0, int(payload.get("maxFiles") or 0))
         max_bytes = max(0, int(payload.get("maxBytes") or 0))
@@ -362,6 +361,9 @@ class StructuralCleanupExecutor:
         protected: list[dict[str, str]],
     ) -> None:
         if path.is_symlink() or not _inside(path, root):
+            return
+        if path.suffix.casefold() in _PROTECTED_EXTENSIONS:
+            protected.append({"path": str(path), "reason": "protected_extension"})
             return
         try:
             stat = path.stat()

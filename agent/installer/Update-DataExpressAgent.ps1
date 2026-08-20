@@ -33,32 +33,8 @@ $configBackup = "$configPath.before-$version-$timestamp.bak"
 Copy-Item -LiteralPath $configPath -Destination $configBackup -Force
 & $serviceWrapper stop
 
-$stopDeadline = (Get-Date).AddSeconds(45)
-do {
-    $service = Get-Service -Name DataExpressAgent -ErrorAction SilentlyContinue
-    $agentProcesses = @(Get-Process -Name DataExpressAgent -ErrorAction SilentlyContinue)
-    if (($null -eq $service -or $service.Status -eq "Stopped") -and $agentProcesses.Count -eq 0) {
-        break
-    }
-    Start-Sleep -Milliseconds 500
-} while ((Get-Date) -lt $stopDeadline)
-
-if (($null -ne $service -and $service.Status -ne "Stopped") -or $agentProcesses.Count -gt 0) {
-    throw "El servicio no libero sus procesos dentro del tiempo permitido. No se modificaron binarios."
-}
-
 try {
-    $moveDeadline = (Get-Date).AddSeconds(20)
-    while ($true) {
-        try {
-            Move-Item -LiteralPath $currentBundle -Destination $previousBundle
-            break
-        }
-        catch [System.IO.IOException] {
-            if ((Get-Date) -ge $moveDeadline) { throw }
-            Start-Sleep -Milliseconds 500
-        }
-    }
+    Move-Item -LiteralPath $currentBundle -Destination $previousBundle
     Copy-Item -LiteralPath $bundleSource -Destination $currentBundle -Recurse -Force
 
     $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json

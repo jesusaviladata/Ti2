@@ -4,9 +4,11 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from unittest.mock import AsyncMock
 
 from app.core.errors import ConflictError
 from app.models.operations import AgentCommand, BackgroundJob, RemoteAgent
+from app.models.operations import Notification
 from app.services.agent_command_service import AgentCommandService
 
 
@@ -111,6 +113,24 @@ async def test_create_command_is_idempotent_and_claim_is_single_delivery():
 
 
 @pytest.mark.asyncio
+async def test_create_command_can_extend_ttl_for_queued_scheduled_batches():
+    agent, _db, _repo, service = _fixture()
+    fixed_now = datetime(2026, 8, 19, 8, 0, tzinfo=timezone.utc)
+    service.now = lambda: fixed_now
+
+    command = await service.create_command(
+        tenant_id=str(agent.tenant_id),
+        agent_id=str(agent.id),
+        command_type="run_backup_batch",
+        payload={},
+        idempotency_key="scheduled-batch-1",
+        ttl_seconds=24 * 60 * 60,
+    )
+
+    assert command.expires_at == fixed_now + timedelta(hours=24)
+
+
+@pytest.mark.asyncio
 async def test_duplicate_completion_is_idempotent_but_conflicting_transition_is_rejected():
     agent, db, repo, service = _fixture()
     command = AgentCommand(
@@ -154,4 +174,67 @@ async def test_destructive_claim_is_not_automatically_requeued_after_uncertain_d
 
     assert await service.claim_next(agent) is None
     assert command.status == "claimed"
+
+
+@pytest.mark.asyncio
+async def test_completed_backup_batch_creates_one_success_notification():
+    agent, db, repo, service = _fixture()
+    command = AgentCommand(
+        id=uuid.uuid4(),
+        tenant_id=agent.tenant_id,
+        agent_id=agent.id,
+        command_type="run_backup_batch",
+        payload={"backupRecordIds": []},
+        payload_hash="2" * 64,
+        status="claimed",
+        idempotency_key="backup-1",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
+    repo.commands.append(command)
+    service._complete_backups = AsyncMock()
+
+    await service.complete(
+        agent,
+        str(command.id),
+        {
+            "databases": [
+                {"databaseName": "Core"},
+                {"databaseName": "Emision"},
+            ],
+            "zipFileName": "Backup_2026-08-12.zip",
+        },
+    )
+
+    notifications = [item for item in db.added if isinstance(item, Notification)]
+    assert len(notifications) == 1
+    assert notifications[0].kind == "backup_success"
+    assert "2 bases" in notifications[0].message
+
+
+@pytest.mark.asyncio
+async def test_completed_direct_cleanup_creates_success_notification():
+    agent, db, repo, service = _fixture()
+    command = AgentCommand(
+        id=uuid.uuid4(),
+        tenant_id=agent.tenant_id,
+        agent_id=agent.id,
+        command_type="execute_structural_direct",
+        payload={"simulationId": str(uuid.uuid4())},
+        payload_hash="3" * 64,
+        status="claimed",
+        idempotency_key="cleanup-direct-1",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
+    repo.commands.append(command)
+
+    await service.complete(
+        agent,
+        str(command.id),
+        {"deletedCount": 12, "failedCount": 1, "bytesDeleted": 4096},
+    )
+
+    notifications = [item for item in db.added if isinstance(item, Notification)]
+    assert len(notifications) == 1
+    assert notifications[0].kind == "cleanup_success"
+    assert "12 archivo" in notifications[0].message
 

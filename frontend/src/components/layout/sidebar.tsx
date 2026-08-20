@@ -18,6 +18,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import { useAuth } from "@/hooks/useAuth";
+import { BackupBackgroundIndicator } from "@/components/backups/backup-background-indicator";
 
 function UserBadge({ collapsed }: { collapsed: boolean }) {
   const user = useAuthStore((state) => state.user);
@@ -110,6 +111,7 @@ export function Sidebar() {
       </nav>
 
       <div className="space-y-1 border-t border-musgo/25 px-2 py-4">
+        <BackupBackgroundIndicator collapsed={collapsed} />
         {BOTTOM_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (

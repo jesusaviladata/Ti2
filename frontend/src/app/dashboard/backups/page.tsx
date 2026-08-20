@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { BackupList } from "@/components/backups/backup-list";
 import { AgentTriggerBackupModal } from "@/components/backups/agent-trigger-backup-modal";
 import { AgentSelector } from "@/components/agents/agent-selector";
-import { WeeklyBackupScheduler } from "@/components/backups/weekly-backup-scheduler";
 import { useBackupList } from "@/hooks/useBackups";
+import { BackupAutomationList, BackupAutomationModal } from "@/components/backups/backup-automation";
 import { useAgents, useSelectedAgentId } from "@/hooks/useAgents";
 
 function BackupStats() {
@@ -47,6 +47,7 @@ function BackupStats() {
 
 export default function BackupsPage() {
   const [backupModalOpen, setBackupModalOpen] = useState(false);
+  const [automationModalOpen, setAutomationModalOpen] = useState(false);
   const agentsQuery = useAgents();
   const agents = agentsQuery.data?.items ?? [];
   const [agentId, setAgentId] = useSelectedAgentId(agents);
@@ -76,7 +77,7 @@ export default function BackupsPage() {
       {/* Stats */}
       <BackupStats />
 
-      <WeeklyBackupScheduler agentId={agentId} />
+      <BackupAutomationList onNew={() => setAutomationModalOpen(true)} />
 
       {/* Historial */}
       <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 overflow-hidden">
@@ -85,6 +86,7 @@ export default function BackupsPage() {
 
       {/* Modals */}
       <AgentTriggerBackupModal open={backupModalOpen} onClose={() => setBackupModalOpen(false)} agentId={agentId} />
+      <BackupAutomationModal open={automationModalOpen} onClose={() => setAutomationModalOpen(false)} />
     </div>
   );
 }

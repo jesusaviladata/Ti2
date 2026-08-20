@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.core.database import engine
 
 
-EXPECTED_ALEMBIC_REVISION = "0003"
+EXPECTED_ALEMBIC_REVISION = "0005"
 router = APIRouter(tags=["health"])
 
 

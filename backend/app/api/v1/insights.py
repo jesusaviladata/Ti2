@@ -73,7 +73,9 @@ async def alerts(
     current_user: User = Depends(read_dashboard),
     db: AsyncSession = Depends(get_db),
 ):
-    items = await InsightsService(db).notifications(str(current_user.tenant_id))
+    items = await InsightsService(db).notifications(
+        str(current_user.tenant_id), str(current_user.id)
+    )
     return {"alerts": items, "total": len(items)}
 
 
@@ -93,8 +95,20 @@ async def notifications(
     current_user: User = Depends(read_dashboard),
     db: AsyncSession = Depends(get_db),
 ):
-    items = await InsightsService(db).notifications(str(current_user.tenant_id))
+    items = await InsightsService(db).notifications(
+        str(current_user.tenant_id), str(current_user.id)
+    )
     return {"notifications": items, "total": len(items)}
+
+
+@notifications_router.delete("")
+async def clear_notifications(
+    current_user: User = Depends(read_dashboard),
+    db: AsyncSession = Depends(get_db),
+):
+    return await InsightsService(db).clear_notifications(
+        str(current_user.tenant_id), str(current_user.id)
+    )
 
 
 @notifications_router.post("/test")

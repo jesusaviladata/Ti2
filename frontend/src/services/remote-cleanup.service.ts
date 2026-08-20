@@ -3,6 +3,7 @@ import type {
   CleanupServer, RemoteListResponse, SimulationReport, SimRule,
   ExecutionRecord, QuarantineItem, RemoteCreds,
   StructuralRule, StructuralReport, CleanupJob,
+  AgentCleanupJob,
 } from "@/types/remote-cleanup";
 
 export const remoteCleanupService = {
@@ -55,6 +56,30 @@ export const remoteCleanupService = {
 
   structuralJobCancel: (jobId: string) =>
     api.post(`/api/v1/cleanup/remote/structural/job/${jobId}/cancel`).then((r) => r.data),
+
+  agentStructuralSimulate: (
+    agentId: string, serverId: string, containerFolder: string, maxProperties = 0,
+    maxFiles = 50000, maxBytes = 20 * 1024 ** 3,
+  ) =>
+    api.post<{ jobId: string }>(`/api/v1/agents/${agentId}/cleanup/simulate`, {
+      serverId, containerFolder, maxProperties, maxFiles, maxBytes,
+    }).then((r) => r.data),
+
+  agentStructuralExecute: (agentId: string, simulationId: string, manifestHash: string) =>
+    api.post<{ jobId: string }>(`/api/v1/agents/${agentId}/cleanup/quarantine`, {
+      simulationId, manifestHash,
+    }).then((r) => r.data),
+
+  agentStructuralExecuteDirect: (agentId: string, simulationId: string, manifestHash: string) =>
+    api.post<{ jobId: string }>(`/api/v1/agents/${agentId}/cleanup/direct`, {
+      simulationId, manifestHash,
+    }).then((r) => r.data),
+
+  agentJob: (jobId: string) =>
+    api.get<AgentCleanupJob>(`/api/v1/agents/jobs/${jobId}`).then((r) => r.data),
+
+  agentJobCancel: (jobId: string) =>
+    api.post(`/api/v1/agents/jobs/${jobId}/cancel`).then((r) => r.data),
 
   history: () =>
     api.get<{ items: ExecutionRecord[]; total: number }>("/api/v1/cleanup/remote/history").then((r) => r.data),
