@@ -35,7 +35,14 @@ class AgentHealthService:
         self.now = now
 
     @staticmethod
-    def _severity(volume: AgentVolumePayload) -> tuple[str | None, float | None]:
+    def _severity(
+        volume: AgentVolumePayload,
+        *,
+        warning_free_percent: float,
+        warning_free_bytes: int,
+        critical_free_percent: float,
+        critical_free_bytes: int,
+    ) -> tuple[str | None, float | None]:
         if (
             volume.error
             or volume.total_bytes is None
@@ -44,9 +51,9 @@ class AgentHealthService:
         ):
             return None, None
         free_percent = volume.free_bytes / volume.total_bytes * 100
-        if free_percent <= CRITICAL_FREE_PERCENT or volume.free_bytes <= CRITICAL_FREE_BYTES:
+        if free_percent <= critical_free_percent or volume.free_bytes <= critical_free_bytes:
             return "critical", free_percent
-        if free_percent <= WARNING_FREE_PERCENT or volume.free_bytes <= WARNING_FREE_BYTES:
+        if free_percent <= warning_free_percent or volume.free_bytes <= warning_free_bytes:
             return "warning", free_percent
         return "healthy", free_percent
 
@@ -63,6 +70,23 @@ class AgentHealthService:
         if health is not None:
             agent.applied_config_revision = health.applied_config_revision
 
+        configured = None
+        get_thresholds = getattr(self.repo, "get_thresholds", None)
+        if get_thresholds is not None:
+            configured = await get_thresholds(agent=agent)
+        warning_free_percent = float(
+            configured.warning_free_percent if configured else WARNING_FREE_PERCENT
+        )
+        warning_free_bytes = int(
+            configured.warning_free_bytes if configured else WARNING_FREE_BYTES
+        )
+        critical_free_percent = float(
+            configured.critical_free_percent if configured else CRITICAL_FREE_PERCENT
+        )
+        critical_free_bytes = int(
+            configured.critical_free_bytes if configured else CRITICAL_FREE_BYTES
+        )
+
         for volume in volumes:
             observed_at = volume.observed_at.astimezone(timezone.utc)
             await self.repo.upsert_volume(
@@ -70,7 +94,13 @@ class AgentHealthService:
                 volume=volume,
                 observed_at=observed_at,
             )
-            severity, free_percent = self._severity(volume)
+            severity, free_percent = self._severity(
+                volume,
+                warning_free_percent=warning_free_percent,
+                warning_free_bytes=warning_free_bytes,
+                critical_free_percent=critical_free_percent,
+                critical_free_bytes=critical_free_bytes,
+            )
             if severity is None:
                 continue
 
@@ -89,10 +119,10 @@ class AgentHealthService:
                 continue
 
             thresholds = {
-                "warningFreePercent": WARNING_FREE_PERCENT,
-                "warningFreeBytes": WARNING_FREE_BYTES,
-                "criticalFreePercent": CRITICAL_FREE_PERCENT,
-                "criticalFreeBytes": CRITICAL_FREE_BYTES,
+                "warningFreePercent": warning_free_percent,
+                "warningFreeBytes": warning_free_bytes,
+                "criticalFreePercent": critical_free_percent,
+                "criticalFreeBytes": critical_free_bytes,
             }
             if alert is None:
                 self.repo.add_alert(

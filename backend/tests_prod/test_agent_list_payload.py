@@ -18,11 +18,15 @@ def test_agent_list_payload_exposes_frontend_selection_fields():
         public_key="test-public-key",
         status="connected",
         last_seen_at=datetime.now(timezone.utc),
+        last_heartbeat_at=datetime.now(timezone.utc),
+        health_status="busy",
         metadata_json={"sqlInstances": [{"id": "main"}]},
     )
 
     payload = _serialize(agent)
 
     assert payload["online"] is True
+    assert payload["healthStatus"] == "busy"
+    assert payload["lastHeartbeatAt"] is not None
     assert payload["metadata"] == {"sqlInstances": [{"id": "main"}]}
     assert payload["configuration"] is None

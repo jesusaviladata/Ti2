@@ -8,6 +8,9 @@ def test_admin_and_agent_routes_are_versioned_and_separated():
     assert "/api/v1/agents/pairing-codes" in paths
     assert "/api/v1/agents/{agent_id}/replace" in paths
     assert "/api/v1/agents/{agent_id}/revoke" in paths
+    assert "/api/v1/agent-storage" in paths
+    assert "/api/v1/agent-storage/alerts" in paths
+    assert "/api/v1/agent-storage/thresholds" in paths
     assert "/agent/v1/enroll" in paths
     assert "/api/v1/backups/runs" in paths
     assert "/api/v1/backups/plans" in paths

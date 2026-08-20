@@ -93,6 +93,15 @@ def _require_enabled() -> None:
 
 
 def _serialize(agent: RemoteAgent, configuration: dict | None = None) -> dict:
+    online = _is_online(agent)
+    if agent.status == "revoked" or agent.revoked_at is not None:
+        health_status = "revoked"
+    elif not online:
+        health_status = "offline"
+    elif agent.health_status in {"connected", "busy", "degraded"}:
+        health_status = agent.health_status
+    else:
+        health_status = "connected"
     return {
         "id": str(agent.id),
         "hostname": agent.hostname,
@@ -102,7 +111,13 @@ def _serialize(agent: RemoteAgent, configuration: dict | None = None) -> dict:
         "lastSeenAt": agent.last_seen_at.isoformat() if agent.last_seen_at else None,
         "revokedAt": agent.revoked_at.isoformat() if agent.revoked_at else None,
         "createdAt": agent.created_at.isoformat() if agent.created_at else None,
-        "online": _is_online(agent),
+        "online": online,
+        "healthStatus": health_status,
+        "lastHeartbeatAt": (
+            agent.last_heartbeat_at.isoformat() if agent.last_heartbeat_at else None
+        ),
+        "desiredConfigRevision": agent.desired_config_revision or 0,
+        "appliedConfigRevision": agent.applied_config_revision or 0,
         "metadata": agent.metadata_json or {},
         "configuration": configuration,
     }

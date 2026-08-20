@@ -7,7 +7,12 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.operations import AgentStorageAlert, AgentVolumeState, RemoteAgent
+from app.models.operations import (
+    AgentStorageAlert,
+    AgentStorageThreshold,
+    AgentVolumeState,
+    RemoteAgent,
+)
 from app.schemas.agent import AgentVolumePayload
 
 
@@ -64,3 +69,13 @@ class AgentHealthRepository:
 
     def add_alert(self, alert: AgentStorageAlert) -> None:
         self.db.add(alert)
+
+    async def get_thresholds(
+        self, *, agent: RemoteAgent
+    ) -> AgentStorageThreshold | None:
+        result = await self.db.execute(
+            select(AgentStorageThreshold).where(
+                AgentStorageThreshold.tenant_id == agent.tenant_id
+            )
+        )
+        return result.scalar_one_or_none()

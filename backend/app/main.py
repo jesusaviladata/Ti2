@@ -10,7 +10,7 @@ from app.core.scheduler import scheduler
 from app.core.errors import DomainError, domain_error_handler
 from app.middleware.audit import AuditMiddleware
 from app.api import agent as agent_api, health
-from app.api.v1 import agents, auth, users
+from app.api.v1 import agent_storage, agents, auth, users
 from app.api.v1 import cleanup_runtime, remote_cleanup, file_manager
 from app.api.v1 import access_runtime, backups_runtime, connections, insights
 from app.services.backup_runtime_service import load_backup_schedules
@@ -57,6 +57,7 @@ app.add_middleware(CSRFMiddleware)
 app.include_router(health.router)
 app.include_router(agent_api.router, prefix="/agent/v1", tags=["agent"] )
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"] )
+app.include_router(agent_storage.router, prefix="/api/v1/agent-storage", tags=["agent-storage"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(cleanup_runtime.router, prefix="/api/v1/cleanup", tags=["cleanup"])

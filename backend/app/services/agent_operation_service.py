@@ -328,10 +328,11 @@ class AgentOperationService:
 
 
 def _is_online(agent: RemoteAgent, *, now: datetime | None = None) -> bool:
-    if agent.status == "revoked" or agent.revoked_at is not None or agent.last_seen_at is None:
+    liveness_at = agent.last_heartbeat_at or agent.last_seen_at
+    if agent.status == "revoked" or agent.revoked_at is not None or liveness_at is None:
         return False
     current = now or datetime.now(timezone.utc)
-    seen = agent.last_seen_at
+    seen = liveness_at
     if seen.tzinfo is None:
         seen = seen.replace(tzinfo=timezone.utc)
-    return (current - seen).total_seconds() <= 180
+    return (current - seen).total_seconds() <= 150

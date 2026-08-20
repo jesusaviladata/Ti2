@@ -271,6 +271,26 @@ class AgentStorageAlert(TenantRecord, Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class AgentStorageThreshold(TenantRecord, Base):
+    __tablename__ = "agent_storage_thresholds"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", name="uq_agent_storage_threshold_tenant"),
+    )
+
+    warning_free_percent: Mapped[float] = mapped_column(
+        Float, nullable=False, default=20.0
+    )
+    warning_free_bytes: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=20 * 1024**3
+    )
+    critical_free_percent: Mapped[float] = mapped_column(
+        Float, nullable=False, default=10.0
+    )
+    critical_free_bytes: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=10 * 1024**3
+    )
+
+
 class AgentConnectionProfile(TenantRecord, Base):
     __tablename__ = "agent_connection_profiles"
     __table_args__ = (

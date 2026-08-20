@@ -8,7 +8,7 @@ from app.models.auth_session import AuthLoginLimit, AuthRefreshHistory, AuthSess
 from app.models.backup_schedule import BackupSchedule
 from app.models.operations import (
     AgentBackupPlan, AgentCommand, AgentConnectionProfile, AgentPairingToken,
-    AgentRequestNonce, AgentStorageAlert, AgentVolumeState, BackgroundJob,
+    AgentRequestNonce, AgentStorageAlert, AgentStorageThreshold, AgentVolumeState, BackgroundJob,
     CleanupExecution, CleanupFolder, CleanupRule, CleanupSchedule, CleanupSimulation,
     CleanupTrashItem, Notification, RemoteAgent, RemoteCleanupExecution,
     RemoteQuarantineItem, RemoteServer, RemoteStructureValidation, SshHostKey,
@@ -19,7 +19,7 @@ __all__ = [
     "User", "UserRole", "Tenant", "Backup", "CleanupLog", "AccessLog", "AuditLog",
     "AuthSession", "AuthRefreshHistory", "AuthLoginLimit",
     "AgentBackupPlan", "AgentCommand", "AgentConnectionProfile", "AgentPairingToken",
-    "AgentRequestNonce", "AgentStorageAlert", "AgentVolumeState", "BackupSchedule",
+    "AgentRequestNonce", "AgentStorageAlert", "AgentStorageThreshold", "AgentVolumeState", "BackupSchedule",
     "BackgroundJob", "CleanupExecution", "CleanupFolder", "CleanupRule",
     "CleanupSchedule", "CleanupSimulation", "CleanupTrashItem", "Notification",
     "RemoteAgent", "RemoteCleanupExecution", "RemoteQuarantineItem", "RemoteServer",
