@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import base64
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -106,6 +107,36 @@ async def test_enrollment_consumes_token_and_rejects_reuse_with_generic_error():
 
 
 @pytest.mark.asyncio
+async def test_enrollment_accepts_optional_x25519_public_key_without_breaking_030():
+    db = FakeDb()
+    repo = FakeRepo()
+    service = AgentEnrollmentService(db, repo=repo)
+    tenant_id = uuid.uuid4()
+    code = "ENCR-YPTI-ONKE-Y123"
+    token = AgentPairingToken(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        token_hash=service.hash_pairing_code(code),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+    )
+    repo.tokens[token.token_hash] = token
+    encryption_public_key = base64.b64encode(bytes(range(32))).decode("ascii")
+
+    agent = await service.enroll(
+        code,
+        installation_id=str(uuid.uuid4()),
+        hostname="CORE-01",
+        os_version="Windows Server 2022",
+        agent_version="0.4.0",
+        public_key=_public_key(),
+        encryption_public_key=encryption_public_key,
+    )
+
+    assert agent.encryption_public_key == encryption_public_key
+
+
+
+@pytest.mark.asyncio
 async def test_replacement_revokes_old_identity_and_links_new_agent():
     db = FakeDb()
     repo = FakeRepo()
@@ -178,4 +209,3 @@ async def test_duplicate_active_installation_is_rejected():
             public_key=_public_key(),
         )
     assert duplicate.value.code == "AGENT_ALREADY_ENROLLED"
-

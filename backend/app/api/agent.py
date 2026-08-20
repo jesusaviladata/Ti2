@@ -23,6 +23,7 @@ from app.schemas.agent import (
 )
 from app.services.agent_command_service import AgentCommandService, canonical_json
 from app.services.agent_enrollment_service import AgentEnrollmentService
+from app.services.agent_health_service import AgentHealthService
 
 
 router = APIRouter()
@@ -85,6 +86,7 @@ async def enroll_agent(
         os_version=body.os_version,
         agent_version=body.agent_version,
         public_key=body.public_key,
+        encryption_public_key=body.encryption_public_key,
     )
     await db.commit()
     return {
@@ -173,6 +175,11 @@ async def heartbeat(
     if body.agent_version:
         agent.agent_version = body.agent_version
     agent.metadata_json = body.metadata
+    await AgentHealthService(db).record(
+        agent=agent,
+        health=body.health,
+        volumes=body.volumes,
+    )
     await db.commit()
     return {
         "status": "ok",

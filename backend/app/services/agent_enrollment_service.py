@@ -79,6 +79,18 @@ class AgentEnrollmentService:
             401,
         )
 
+    @classmethod
+    def _canonical_encryption_public_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            raw = base64.b64decode(value.encode("ascii"), validate=True)
+        except (ValueError, UnicodeEncodeError) as exc:
+            raise cls._invalid_enrollment() from exc
+        if len(raw) != 32:
+            raise cls._invalid_enrollment()
+        return base64.b64encode(raw).decode("ascii")
+
     async def enroll(
         self,
         pairing_code: str,
@@ -88,12 +100,16 @@ class AgentEnrollmentService:
         os_version: str,
         agent_version: str,
         public_key: str,
+        encryption_public_key: str | None = None,
     ) -> RemoteAgent:
         try:
             canonical_public_key = public_key_to_base64(load_public_key(public_key))
             uuid.UUID(installation_id)
         except (AgentProtocolError, ValueError):
             raise self._invalid_enrollment()
+        canonical_encryption_public_key = self._canonical_encryption_public_key(
+            encryption_public_key
+        )
 
         pairing = await self.repo.get_pairing_for_update(
             self.hash_pairing_code(pairing_code)
@@ -129,6 +145,7 @@ class AgentEnrollmentService:
             os_version=os_version.strip(),
             agent_version=agent_version.strip(),
             public_key=canonical_public_key,
+            encryption_public_key=canonical_encryption_public_key,
             status="connected",
             last_seen_at=now,
             metadata_json={},
@@ -154,4 +171,3 @@ class AgentEnrollmentService:
             agent.status = "revoked"
         await self.db.flush()
         return agent
-
