@@ -32,6 +32,7 @@ def serialize_backup(item: Backup) -> dict:
         "archivePath": item.archive_path,
         "archiveSizeBytes": item.archive_size_bytes,
         "archiveSha256": item.archive_sha256,
+        "origin": item.origin_snapshot,
         "startedAt": item.started_at.isoformat() if item.started_at else None,
         "finishedAt": item.finished_at.isoformat() if item.finished_at else None,
         "durationSecs": duration,

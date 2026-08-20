@@ -174,6 +174,12 @@ class AgentCommandService:
                 "La orden ya terminó con error", code="AGENT_COMMAND_FINALIZED"
             )
         self._require_claimed(command)
+        if command.command_type == "run_backup_batch" and command.payload.get("origin"):
+            if result.get("origin") != command.payload["origin"]:
+                raise ConflictError(
+                    "El origen reportado no coincide con la orden",
+                    code="BACKUP_ORIGIN_MISMATCH",
+                )
         now = self.now()
         command.status = "completed"
         command.completed_at = now

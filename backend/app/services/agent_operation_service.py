@@ -13,6 +13,7 @@ from app.repositories.agent_admin_repository import AgentAdminRepository
 from app.repositories.agent_repository import AgentRepository
 from app.repositories.cleanup_repository import tenant_uuid
 from app.services.agent_command_service import AgentCommandService
+from app.services.backup_origin import create_backup_origin_snapshot
 
 
 FIXED_TARGET_FOLDERS = ["Log", "LogSec", "LogsRadian", "Respuesta"]
@@ -82,6 +83,11 @@ class AgentOperationService:
             raise DomainError("BACKUP_TYPE_INVALID", "El tipo de backup no es válido", 422)
 
         run_id = str(uuid.uuid4())
+        origin = create_backup_origin_snapshot(
+            agent,
+            sql_profile_id=sql_profile_id,
+            destination_profile_id=destination_profile_id,
+        )
         job = self._job(agent, "agent_backup", agent.id)
         destination = BackupDestination.nas if destination_profile_id else BackupDestination.local
         records = [
@@ -98,6 +104,7 @@ class AgentOperationService:
                 trigger_reason=trigger_reason,
                 delivery_status="pending",
                 delivery_profile_id=destination_profile_id,
+                origin_snapshot=origin,
             )
             for name in names
         ]
@@ -114,6 +121,7 @@ class AgentOperationService:
                 "backupType": parsed_type.value,
                 "destinationProfileId": destination_profile_id,
                 "backupIds": {item.database_name: str(item.id) for item in records},
+                "origin": origin,
             },
             idempotency_key=f"backup-run:{run_id}",
             job_id=str(job.id),

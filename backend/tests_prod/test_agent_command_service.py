@@ -238,3 +238,35 @@ async def test_completed_direct_cleanup_creates_success_notification():
     assert notifications[0].kind == "cleanup_success"
     assert "12 archivo" in notifications[0].message
 
+
+@pytest.mark.asyncio
+async def test_backup_completion_rejects_origin_different_from_signed_command():
+    agent, _db, repo, service = _fixture()
+    expected = {
+        "agent": {"id": str(agent.id), "hostname": "CORE-01"},
+        "sqlProfile": {"id": "main", "label": "SQL"},
+        "destinationProfile": None,
+        "sourceLabel": "CORE-01 · SQL",
+    }
+    command = AgentCommand(
+        id=uuid.uuid4(),
+        tenant_id=agent.tenant_id,
+        agent_id=agent.id,
+        command_type="run_backup_batch",
+        payload={"origin": expected},
+        payload_hash="4" * 64,
+        status="claimed",
+        idempotency_key="backup-origin-1",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
+    repo.commands.append(command)
+
+    with pytest.raises(ConflictError) as mismatch:
+        await service.complete(
+            agent,
+            str(command.id),
+            {"origin": {**expected, "sourceLabel": "OTRO · SQL"}},
+        )
+
+    assert mismatch.value.code == "BACKUP_ORIGIN_MISMATCH"
+

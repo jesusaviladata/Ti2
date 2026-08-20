@@ -4,7 +4,12 @@ import zipfile
 
 import pytest
 
-from agent.data_express_agent.backup import BackupError, BackupExecutor
+from agent.data_express_agent.backup import (
+    BackupError,
+    BackupExecutor,
+    backup_member_name,
+    daily_archive_path,
+)
 
 
 class _Cursor:
@@ -99,8 +104,8 @@ def test_backup_is_ready_only_after_restore_verifyonly(tmp_path: Path):
 
 
 def test_retry_delivery_uses_existing_verified_zip_without_repeating_sql(tmp_path: Path):
-    dated = tmp_path / "2026-08-20"
-    dated.mkdir()
+    dated = tmp_path / "2026-08-20" / "FULL"
+    dated.mkdir(parents=True)
     zip_path = dated / "Backup_run-1.zip"
     with zipfile.ZipFile(zip_path, "w") as archive:
         archive.writestr("Ipsofactu_FULL.bak", b"validated backup")
@@ -111,8 +116,8 @@ def test_retry_delivery_uses_existing_verified_zip_without_repeating_sql(tmp_pat
         connect=lambda _profile: (_ for _ in ()).throw(AssertionError("SQL must not run")),
         cleanup_submit=lambda _files, _work_dir: {"scheduled": True},
     )
-    executor._transfer = lambda path, _destination, date: {
-        "type": "smb", "path": f"remote/{date}/{path.name}", "verified": True
+    executor._transfer = lambda path, _destination, date, type_folder: {
+        "type": "smb", "path": f"remote/{date}/{type_folder}/{path.name}", "verified": True
     }
 
     result = executor.retry_delivery(
@@ -127,3 +132,37 @@ def test_retry_delivery_uses_existing_verified_zip_without_repeating_sql(tmp_pat
 
     assert result["zipSha256"] == digest
     assert result["transfer"]["verified"] is True
+
+
+def test_daily_visible_names_do_not_include_run_id(tmp_path: Path):
+    assert backup_member_name("Ipsofactu", "2026-08-20", "full") == (
+        "Ipsofactu_2026-08-20.bak"
+    )
+    assert backup_member_name("Ipsofactu", "2026-08-20", "differential") == (
+        "Ipsofactu_2026-08-20_DIF.bak"
+    )
+    assert daily_archive_path(tmp_path, "2026-08-20", "full") == (
+        tmp_path / "2026-08-20" / "FULL" / "Backup_2026-08-20.zip"
+    )
+    assert daily_archive_path(tmp_path, "2026-08-20", "differential") == (
+        tmp_path / "2026-08-20" / "DIFERENCIAL" / "Backup_2026-08-20.zip"
+    )
+
+
+def test_atomic_archive_keeps_previous_daily_zip_if_replacement_fails(tmp_path: Path):
+    final_path = tmp_path / "Backup_2026-08-20.zip"
+    with zipfile.ZipFile(final_path, "w") as archive:
+        archive.writestr("previous.bak", b"previous valid backup")
+        archive.writestr("manifest.json", "{}")
+    previous_hash = hashlib.sha256(final_path.read_bytes()).hexdigest()
+
+    with pytest.raises(FileNotFoundError):
+        BackupExecutor._build_archive_atomically(
+            [tmp_path / "missing.bak"],
+            final_path,
+            {"version": 1},
+            "new-run",
+        )
+
+    assert hashlib.sha256(final_path.read_bytes()).hexdigest() == previous_hash
+    assert not list(tmp_path.glob("*.tmp"))

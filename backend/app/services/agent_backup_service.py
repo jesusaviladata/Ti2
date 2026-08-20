@@ -10,6 +10,7 @@ from app.models.operations import BackgroundJob
 from app.repositories.agent_repository import AgentRepository
 from app.repositories.cleanup_repository import tenant_uuid
 from app.services.agent_command_service import AgentCommandService
+from app.services.backup_origin import create_backup_origin_snapshot
 
 
 class AgentBackupService:
@@ -93,6 +94,11 @@ class AgentBackupService:
             else BackupDestination.local
         )
         run_id = str(uuid.uuid4())
+        origin = create_backup_origin_snapshot(
+            agent,
+            sql_profile_id=sql_profile_id,
+            destination_profile_id=destination_profile_id,
+        )
         records: list[Backup] = []
         for name in names:
             record = Backup(
@@ -108,6 +114,7 @@ class AgentBackupService:
                 delivery_status="pending",
                 delivery_profile_id=destination_profile_id,
                 started_at=datetime.now(timezone.utc),
+                origin_snapshot=origin,
             )
             self.db.add(record)
             records.append(record)
@@ -134,6 +141,7 @@ class AgentBackupService:
                 "backupType": backup_type,
                 "destinationProfileId": destination_profile_id,
                 "backupRecordIds": [str(item.id) for item in records],
+                "origin": origin,
             },
             idempotency_key=f"backup:{job.id}",
             job_id=str(job.id),

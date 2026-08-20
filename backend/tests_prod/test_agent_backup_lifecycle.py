@@ -46,7 +46,7 @@ async def test_bak_becomes_ready_before_archive_and_delivery():
     await service._project_backup_progress(
         command(), phase="backup_ready", database="Ipsofactu",
         details={
-            "fileName": "Ipsofactu_FULL.bak", "fileSizeBytes": 128,
+            "fileName": "Ipsofactu_2026-08-20.bak", "fileSizeBytes": 128,
             "fileSha256": "a" * 64, "verificationMethod": "restore_verifyonly",
         }, processed_units=1, total_units=1,
     )

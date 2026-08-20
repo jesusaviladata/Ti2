@@ -19,6 +19,11 @@ from typing import Any
 ProgressCallback = Callable[[dict[str, Any]], None]
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 _CLEANUP_MARKER = ".dataexpress-cleanup-ready.json"
+_BACKUP_TYPE_FOLDERS = {
+    "full": "FULL",
+    "differential": "DIFERENCIAL",
+    "log": "LOG",
+}
 
 
 class BackupError(RuntimeError):
@@ -46,6 +51,27 @@ def _safe_database_name(value: str) -> str:
     if not _SAFE_NAME.fullmatch(name):
         raise BackupError("DATABASE_NAME_INVALID", "El nombre de base de datos no es valido")
     return name
+
+
+def backup_member_name(database: str, date_text: str, backup_type: str) -> str:
+    safe_database = _safe_database_name(database)
+    if backup_type == "full":
+        suffix, extension = "", ".bak"
+    elif backup_type == "differential":
+        suffix, extension = "_DIF", ".bak"
+    elif backup_type == "log":
+        suffix, extension = "_LOG", ".trn"
+    else:
+        raise BackupError("BACKUP_TYPE_INVALID", "El tipo de backup no es valido")
+    return f"{safe_database}_{date_text}{suffix}{extension}"
+
+
+def daily_archive_path(root: Path, date_text: str, backup_type: str) -> Path:
+    try:
+        folder = _BACKUP_TYPE_FOLDERS[backup_type]
+    except KeyError as exc:
+        raise BackupError("BACKUP_TYPE_INVALID", "El tipo de backup no es valido") from exc
+    return root / date_text / folder / f"Backup_{date_text}.zip"
 
 
 def _sql_unicode_literal(value: str) -> str:
@@ -245,6 +271,47 @@ class BackupExecutor:
             "databases": [str(row[0]) for row in rows],
         }
 
+    @staticmethod
+    def _build_archive_atomically(
+        files: list[Path],
+        final_path: Path,
+        manifest: dict[str, Any],
+        run_id: str,
+    ) -> None:
+        temporary = final_path.with_name(f".{final_path.name}.{run_id}.tmp")
+        try:
+            with zipfile.ZipFile(
+                temporary,
+                "w",
+                compression=zipfile.ZIP_DEFLATED,
+                compresslevel=1,
+                allowZip64=True,
+            ) as archive:
+                for file_path in files:
+                    archive.write(file_path, arcname=file_path.name)
+                archive.writestr(
+                    "manifest.json",
+                    json.dumps(
+                        manifest,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                )
+            with zipfile.ZipFile(temporary, "r") as archive:
+                if archive.testzip() is not None:
+                    raise BackupError(
+                        "ZIP_INTEGRITY_FAILED",
+                        "El ZIP generado no supero la validacion",
+                    )
+                if "manifest.json" not in archive.namelist():
+                    raise BackupError(
+                        "ZIP_MANIFEST_MISSING", "El ZIP no contiene su manifiesto"
+                    )
+            os.replace(temporary, final_path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
     def run_batch(
         self,
         payload: dict[str, Any],
@@ -280,8 +347,9 @@ class BackupExecutor:
         self._resume_pending_cleanups(configured_root)
         date_text = self.now().strftime("%Y-%m-%d")
         dated_dir = configured_root / date_text
+        zip_path = daily_archive_path(configured_root, date_text, backup_type)
         try:
-            dated_dir.mkdir(parents=True, exist_ok=True)
+            zip_path.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise BackupError("BACKUP_DIRECTORY_FAILED", "No fue posible crear la carpeta diaria") from exc
 
@@ -311,10 +379,9 @@ class BackupExecutor:
                                 "database": database,
                             }
                         )
-                    extension = ".trn" if backup_type == "log" else ".bak"
-                    # The unique run id already lives in the isolated work directory.
-                    # Keep archive member names readable for operators and restores.
-                    file_path = work_dir / f"{database}_{backup_type.upper()}{extension}"
+                    file_path = work_dir / backup_member_name(
+                        database, date_text, backup_type
+                    )
                     verification_method = self._backup_database(
                         connection,
                         database,
@@ -379,20 +446,16 @@ class BackupExecutor:
                     "foundCount": len(files),
                 }
             )
-        zip_path = dated_dir / f"Backup_{date_text}_{run_id}.zip"
+        manifest = {
+            "version": 1,
+            "runId": run_id,
+            "createdAt": self.now().isoformat(),
+            "backupType": backup_type,
+            "origin": dict(payload.get("origin") or {}),
+            "databases": database_results,
+        }
         try:
-            with zipfile.ZipFile(
-                zip_path,
-                "w",
-                compression=zipfile.ZIP_DEFLATED,
-                compresslevel=1,
-                allowZip64=True,
-            ) as archive:
-                for file_path in files:
-                    archive.write(file_path, arcname=file_path.name)
-            with zipfile.ZipFile(zip_path, "r") as archive:
-                if archive.testzip() is not None:
-                    raise BackupError("ZIP_INTEGRITY_FAILED", "El ZIP generado no supero la validacion")
+            self._build_archive_atomically(files, zip_path, manifest, run_id)
         except BackupError:
             raise
         except (OSError, zipfile.BadZipFile) as exc:
@@ -430,7 +493,12 @@ class BackupExecutor:
                         "foundCount": len(files),
                     }
                 )
-            transfer_result = self._transfer(zip_path, destination, date_text)
+            transfer_result = self._transfer(
+                zip_path,
+                destination,
+                date_text,
+                _BACKUP_TYPE_FOLDERS[backup_type],
+            )
 
         cleanup_result = self._schedule_cleanup(files, work_dir)
 
@@ -438,7 +506,7 @@ class BackupExecutor:
             "runId": run_id,
             "sqlProfileId": sql_profile_id,
             "backupType": backup_type,
-            "folder": str(dated_dir),
+            "folder": str(zip_path.parent),
             "zipPath": str(zip_path),
             "zipFileName": zip_path.name,
             "zipSizeBytes": zip_size,
@@ -447,6 +515,7 @@ class BackupExecutor:
             "transfer": transfer_result,
             "localSourceCleanup": cleanup_result,
             "storagePreflight": preflight,
+            "origin": manifest["origin"],
         }
         if progress:
             progress(
@@ -489,9 +558,12 @@ class BackupExecutor:
             raise BackupError("ZIP_INTEGRITY_FAILED", "El ZIP no superó la validación") from exc
         if progress:
             progress({"phase": "transferring", "processedUnits": 0, "totalUnits": 1, "foundCount": 0})
-        date_text = zip_path.parent.name
-        transfer = self._transfer(zip_path, destination, date_text)
-        work_dir = zip_path.parent / ".work" / run_id
+        type_folder = zip_path.parent.name
+        date_text = zip_path.parent.parent.name
+        if type_folder not in set(_BACKUP_TYPE_FOLDERS.values()):
+            raise BackupError("DELIVERY_SOURCE_INVALID", "La ruta diaria del ZIP no es válida")
+        transfer = self._transfer(zip_path, destination, date_text, type_folder)
+        work_dir = zip_path.parent.parent / ".work" / run_id
         files = [work_dir / name for name in member_names if Path(name).name == name]
         cleanup = self._schedule_cleanup(files, work_dir) if files else {"scheduled": False, "status": "no_sources"}
         return {
@@ -601,23 +673,30 @@ class BackupExecutor:
         return "restore_verifyonly"
 
     def _transfer(
-        self, zip_path: Path, destination: dict[str, Any], date_text: str
+        self,
+        zip_path: Path,
+        destination: dict[str, Any],
+        date_text: str,
+        type_folder: str,
     ) -> dict[str, Any]:
         destination_type = str(destination.get("type") or "").lower()
         if destination_type == "smb":
-            return self._transfer_smb(zip_path, destination, date_text)
+            return self._transfer_smb(zip_path, destination, date_text, type_folder)
         if destination_type == "sftp":
-            return self._transfer_sftp(zip_path, destination, date_text)
+            return self._transfer_sftp(zip_path, destination, date_text, type_folder)
         raise BackupError("DESTINATION_TYPE_INVALID", "El tipo de destino no esta soportado")
 
     @staticmethod
     def _transfer_smb(
-        zip_path: Path, destination: dict[str, Any], date_text: str
+        zip_path: Path,
+        destination: dict[str, Any],
+        date_text: str,
+        type_folder: str,
     ) -> dict[str, Any]:
         root = Path(str(destination.get("path") or ""))
         if not str(root).startswith(("\\\\", "//")):
             raise BackupError("SMB_PATH_INVALID", "El destino SMB debe ser una ruta UNC")
-        target_dir = root / date_text
+        target_dir = root / date_text / type_folder
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / zip_path.name
         partial = target.with_suffix(target.suffix + ".part")
@@ -637,7 +716,10 @@ class BackupExecutor:
 
     @staticmethod
     def _transfer_sftp(
-        zip_path: Path, destination: dict[str, Any], date_text: str
+        zip_path: Path,
+        destination: dict[str, Any],
+        date_text: str,
+        type_folder: str,
     ) -> dict[str, Any]:
         try:
             import paramiko
@@ -686,7 +768,9 @@ class BackupExecutor:
             if expected_fingerprint and fingerprint != expected_fingerprint:
                 raise BackupError("SFTP_HOST_KEY_MISMATCH", "La identidad del servidor SFTP no coincide")
             sftp = client.open_sftp()
-            remote_dir = posixpath.join(remote_root.rstrip("/"), date_text)
+            remote_dir = posixpath.join(
+                remote_root.rstrip("/"), date_text, type_folder
+            )
             current = ""
             for part in remote_dir.split("/"):
                 if not part:
