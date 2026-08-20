@@ -174,7 +174,8 @@ def test_heartbeat_sends_versioned_health_and_volume_payload():
 
     def handler(request):
         body = json.loads(request.content)
-        assert body["agentVersion"] == "0.4.0"
+        assert body["agentVersion"] == "0.4.1"
+        assert body["encryptionPublicKey"] == identity.encryption_public_key
         assert body["health"]["status"] == "busy"
         assert body["volumes"][0]["volumeKey"] == "D:"
         return httpx.Response(200, json={"status": "ok"})
@@ -187,4 +188,34 @@ def test_heartbeat_sends_versioned_health_and_volume_payload():
         health={"status": "busy", "appliedConfigRevision": 0},
         volumes=[{"volumeKey": "D:"}],
     )
+    client.close()
+
+
+def test_heartbeat_falls_back_once_for_a_legacy_backend_contract():
+    server_private_key = Ed25519PrivateKey.generate()
+    identity = AgentIdentity.generate()
+    identity.agent_id = str(uuid.uuid4())
+    identity.tenant_id = str(uuid.uuid4())
+    bodies: list[dict] = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        bodies.append(body)
+        if "health" in body or "volumes" in body:
+            return httpx.Response(422, json={"detail": "extra fields forbidden"})
+        return httpx.Response(200, json={"status": "ok"})
+
+    client = AgentClient(
+        _config(server_private_key), identity, transport=httpx.MockTransport(handler)
+    )
+    for _ in range(2):
+        client.heartbeat(
+            {"hostname": "CORE-01"},
+            health={"status": "busy", "appliedConfigRevision": 0},
+            volumes=[{"volumeKey": "D:"}],
+        )
+
+    assert len(bodies) == 3
+    assert "health" in bodies[0]
+    assert all(set(body) == {"agentVersion", "metadata"} for body in bodies[1:])
     client.close()

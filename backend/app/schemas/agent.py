@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import uuid
 from datetime import datetime
@@ -112,11 +113,27 @@ class AgentVolumePayload(BaseModel):
 
 class AgentHeartbeatRequest(BaseModel):
     agent_version: str | None = Field(None, alias="agentVersion", max_length=50)
+    encryption_public_key: str | None = Field(
+        None, alias="encryptionPublicKey", min_length=40, max_length=128
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
     health: AgentHealthPayload | None = None
     volumes: list[AgentVolumePayload] = Field(default_factory=list, max_length=32)
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("encryption_public_key")
+    @classmethod
+    def validate_encryption_public_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            raw = base64.b64decode(value.encode("ascii"), validate=True)
+        except (ValueError, UnicodeEncodeError) as exc:
+            raise ValueError("encryptionPublicKey no es Base64 válido") from exc
+        if len(raw) != 32:
+            raise ValueError("encryptionPublicKey debe contener una clave X25519")
+        return base64.b64encode(raw).decode("ascii")
 
     @field_validator("metadata")
     @classmethod

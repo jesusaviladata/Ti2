@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import base64
 
 import pytest
 from pydantic import ValidationError
@@ -49,6 +50,15 @@ def test_040_heartbeat_accepts_health_and_bounded_volume_telemetry():
     assert body.volumes[0].roles == ["backup", "destination"]
 
 
+def test_041_heartbeat_accepts_agent_encryption_public_key():
+    public_key = base64.b64encode(b"k" * 32).decode("ascii")
+    body = AgentHeartbeatRequest.model_validate(
+        {"agentVersion": "0.4.1", "encryptionPublicKey": public_key}
+    )
+
+    assert body.encryption_public_key == public_key
+
+
 @pytest.mark.parametrize(
     "volume_patch",
     [
@@ -80,4 +90,3 @@ def test_heartbeat_rejects_secrets_in_public_metadata(secret_key):
         AgentHeartbeatRequest.model_validate(
             {"metadata": {"nested": {secret_key: "must-not-leave-agent"}}}
         )
-

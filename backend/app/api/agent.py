@@ -174,6 +174,17 @@ async def heartbeat(
 ):
     if body.agent_version:
         agent.agent_version = body.agent_version
+    if body.encryption_public_key:
+        if (
+            agent.encryption_public_key
+            and agent.encryption_public_key != body.encryption_public_key
+        ):
+            raise DomainError(
+                "AGENT_ENCRYPTION_KEY_MISMATCH",
+                "La clave de cifrado del agente cambió; vuelva a vincularlo",
+                409,
+            )
+        agent.encryption_public_key = body.encryption_public_key
     if int(agent.desired_config_revision or 0) > 0:
         managed = dict(agent.metadata_json or {})
         for key, value in body.metadata.items():

@@ -14,10 +14,18 @@ from .protocol import AgentProtocolError, load_public_key, sign_request, verify_
 
 
 class AgentClientError(RuntimeError):
-    def __init__(self, code: str, message: str, *, recoverable: bool = False):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        recoverable: bool = False,
+        status_code: int | None = None,
+    ):
         super().__init__(message)
         self.code = code
         self.recoverable = recoverable
+        self.status_code = status_code
 
 
 def canonical_json(value: dict[str, Any]) -> bytes:
@@ -46,6 +54,7 @@ class AgentClient:
             transport=transport,
             follow_redirects=False,
         )
+        self._legacy_heartbeat = False
         self.command_public_key = load_public_key(config.command_signing_public_key)
 
     def close(self) -> None:
@@ -107,15 +116,23 @@ class AgentClient:
             "agentVersion": self.config.agent_version,
             "metadata": metadata,
         }
-        if health is not None:
+        if not self._legacy_heartbeat:
+            payload["encryptionPublicKey"] = self.identity.encryption_public_key
+        if health is not None and not self._legacy_heartbeat:
             payload["health"] = health
-        if volumes is not None:
+        if volumes is not None and not self._legacy_heartbeat:
             payload["volumes"] = volumes
-        self._request(
-            "POST",
-            "/agent/v1/heartbeat",
-            payload,
-        )
+        try:
+            self._request("POST", "/agent/v1/heartbeat", payload)
+        except AgentClientError as exc:
+            if exc.status_code != 422 or self._legacy_heartbeat:
+                raise
+            legacy_payload = {
+                "agentVersion": self.config.agent_version,
+                "metadata": metadata,
+            }
+            self._request("POST", "/agent/v1/heartbeat", legacy_payload)
+            self._legacy_heartbeat = True
 
     def next_command(self) -> dict[str, Any] | None:
         path = f"/agent/v1/commands/next?wait={self.config.poll_wait_seconds}"
@@ -212,6 +229,7 @@ class AgentClient:
                 "AGENT_REQUEST_REJECTED",
                 f"Railway rechazó la solicitud ({response.status_code})",
                 recoverable=recoverable,
+                status_code=response.status_code,
             )
         return response
 
