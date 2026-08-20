@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.errors import DomainError
 from app.models.operations import RemoteAgent
 from app.models.user import User
+from app.repositories.agent_admin_repository import AgentAdminRepository
 from app.services.agent_admin_service import (
     DEFAULT_TARGET_FILES,
     DEFAULT_TARGET_FOLDERS,
@@ -17,11 +18,13 @@ from app.services.agent_admin_service import (
     server_payload,
 )
 from app.services.agent_enrollment_service import AgentEnrollmentService
+from app.services.agent_operation_service import AgentOperationService, _is_online
 
 
 router = APIRouter()
 manage_config = require_capabilities(Capability.CONFIG_MANAGE)
 read_operation = require_capabilities(Capability.OPERATION_READ)
+run_backup = require_capabilities(Capability.BACKUP_RUN)
 simulate_cleanup = require_capabilities(Capability.CLEANUP_SIMULATE)
 execute_cleanup = require_capabilities(Capability.CLEANUP_EXECUTE)
 purge_cleanup = require_capabilities(Capability.PURGE)
@@ -49,6 +52,12 @@ class ConfigurationRequest(ValidateRequest):
     name: str = Field(min_length=1, max_length=255)
     validation_job_id: str = Field(alias="validationJobId")
     server_id: str | None = Field(None, alias="serverId")
+
+
+class DatabaseCatalogRequest(BaseModel):
+    sql_profile_id: str = Field(alias="sqlProfileId", min_length=1, max_length=128)
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
 
 
 class CleanupSimulationRequest(BaseModel):
@@ -83,7 +92,7 @@ def _require_enabled() -> None:
         )
 
 
-def _serialize(agent: RemoteAgent) -> dict:
+def _serialize(agent: RemoteAgent, configuration: dict | None = None) -> dict:
     return {
         "id": str(agent.id),
         "hostname": agent.hostname,
@@ -93,17 +102,55 @@ def _serialize(agent: RemoteAgent) -> dict:
         "lastSeenAt": agent.last_seen_at.isoformat() if agent.last_seen_at else None,
         "revokedAt": agent.revoked_at.isoformat() if agent.revoked_at else None,
         "createdAt": agent.created_at.isoformat() if agent.created_at else None,
+        "online": _is_online(agent),
+        "metadata": agent.metadata_json or {},
+        "configuration": configuration,
     }
 
 
 @router.get("")
 async def list_agents(
-    current_user: User = Depends(manage_config),
+    current_user: User = Depends(read_operation),
     db: AsyncSession = Depends(get_db),
 ):
     _require_enabled()
     items = await AgentEnrollmentService(db).list_agents(str(current_user.tenant_id))
-    return {"items": [_serialize(item) for item in items], "total": len(items)}
+    admin_repo = AgentAdminRepository(db)
+    payloads = []
+    for item in items:
+        server = await admin_repo.get_server_for_agent(
+            str(current_user.tenant_id), str(item.id)
+        )
+        configuration = server_payload(server) if server else None
+        payloads.append(_serialize(item, configuration))
+    return {"items": payloads, "total": len(payloads)}
+
+
+@router.get("/{agent_id}/profiles")
+async def agent_profiles(
+    agent_id: str,
+    current_user: User = Depends(read_operation),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    return await AgentOperationService(db).profiles(
+        str(current_user.tenant_id), agent_id
+    )
+
+
+@router.post("/{agent_id}/database-catalogs", status_code=status.HTTP_202_ACCEPTED)
+async def create_database_catalog(
+    agent_id: str,
+    body: DatabaseCatalogRequest,
+    current_user: User = Depends(run_backup),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    job = await AgentOperationService(db).start_database_catalog(
+        str(current_user.tenant_id), agent_id, body.sql_profile_id
+    )
+    await db.commit()
+    return {"jobId": str(job.id)}
 
 
 @router.post("/pairing-codes", status_code=status.HTTP_201_CREATED)
