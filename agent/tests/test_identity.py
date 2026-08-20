@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent.data_express_agent.identity import IdentityStore
+from agent.data_express_agent.identity import AgentIdentity, IdentityStore
 
 
 class FakeProtector:
@@ -38,3 +38,32 @@ def test_enrollment_fields_survive_an_atomic_identity_save(tmp_path):
     assert restored.tenant_id == identity.tenant_id
     assert not store.path.with_suffix(".json.tmp").exists()
 
+
+def test_version_one_identity_migrates_without_changing_installation_or_signing_key(tmp_path):
+    path = tmp_path / "identity.json"
+    protector = FakeProtector()
+    original = AgentIdentity.generate()
+    import base64
+    import json
+    from agent.data_express_agent.protocol import private_key_to_base64
+
+    protected = protector.protect(private_key_to_base64(original.private_key).encode("ascii"))
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "installationId": original.installation_id,
+                "agentId": None,
+                "tenantId": None,
+                "protectedPrivateKey": base64.b64encode(protected).decode("ascii"),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    migrated = IdentityStore(path, protector=protector).load_or_create()
+
+    assert migrated.installation_id == original.installation_id
+    assert migrated.private_key.private_bytes_raw() == original.private_key.private_bytes_raw()
+    assert migrated.encryption_public_key
+    assert json.loads(path.read_text(encoding="utf-8"))["version"] == 2

@@ -5,7 +5,7 @@ from app.api import health
 
 
 def test_readiness_tracks_latest_database_migration():
-    assert health.EXPECTED_ALEMBIC_REVISION == "0007"
+    assert health.EXPECTED_ALEMBIC_REVISION == "0009"
 
 
 def _client(readiness):

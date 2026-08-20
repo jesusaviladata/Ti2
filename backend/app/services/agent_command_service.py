@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.core.errors import ConflictError, DomainError, NotFoundError
 from app.models.backup import Backup, BackupStatus
-from app.models.operations import AgentCommand, RemoteAgent, RemoteCleanupExecution
+from app.models.operations import AgentCommand, AgentConnectionProfile, RemoteAgent, RemoteCleanupExecution
 from app.repositories.agent_repository import AgentRepository
 
 
@@ -28,6 +28,9 @@ ALLOWED_COMMAND_TYPES = frozenset(
         "run_backup_batch",
         "retry_backup_delivery",
         "execute_structural_direct",
+        "apply_connection_profiles",
+        "test_connection_profile",
+        "discover_agent_environment",
     }
 )
 
@@ -193,6 +196,7 @@ class AgentCommandService:
                 job.finished_at = now
         await self._project_backup_complete(command, result, now)
         await self._project_cleanup_complete(command, result, now)
+        await self._project_profile_complete(command, result, now)
         if command.command_type == "run_backup_batch":
             self._create_backup_success_notification(command, result)
         elif command.command_type == "execute_structural_direct":
@@ -229,6 +233,7 @@ class AgentCommandService:
                 job.finished_at = now
         await self._project_backup_failure(command, command.error_message, now)
         await self._project_cleanup_failure(command, command.error_message, now)
+        await self._project_profile_failure(command, command.error_message, now)
         if command.command_type == "execute_structural_direct":
             self._create_cleanup_notification(
                 command,
@@ -337,8 +342,9 @@ class AgentCommandService:
                 backup.file_size_bytes = int(data.get("fileSizeBytes") or 0) or backup.file_size_bytes
                 backup.sha256_hash = str(data.get("fileSha256") or "") or backup.sha256_hash
                 backup.finished_at = backup.finished_at or now
-                backup.delivery_status = "delivered"
-                backup.delivery_phase = "delivered"
+                local_only = transfer.get("type") == "local"
+                backup.delivery_status = "local_ready" if local_only else "delivered"
+                backup.delivery_phase = "local_ready" if local_only else "delivered"
                 backup.delivery_progress = 100
                 backup.archive_path = str(transfer.get("path") or result.get("zipPath") or "") or None
                 backup.archive_size_bytes = int(result.get("zipSizeBytes") or 0) or None
@@ -408,6 +414,74 @@ class AgentCommandService:
         execution.status = "failed"
         execution.summary = {**dict(execution.summary or {}), "error": message}
         execution.finished_at = now
+
+    async def _project_profile_complete(
+        self, command: AgentCommand, result: dict[str, Any], now: datetime
+    ) -> None:
+        if command.command_type == "apply_connection_profiles":
+            revision = int(result.get("configRevision") or command.payload.get("configRevision") or 0)
+            profile_ids = [
+                uuid.UUID(str(item["id"]))
+                for item in command.payload.get("profiles", [])
+                if item.get("id")
+            ]
+            if profile_ids:
+                rows = await self.db.execute(
+                    select(AgentConnectionProfile).where(
+                        AgentConnectionProfile.tenant_id == command.tenant_id,
+                        AgentConnectionProfile.agent_id == command.agent_id,
+                        AgentConnectionProfile.id.in_(profile_ids),
+                    )
+                )
+                for item in rows.scalars().all():
+                    item.applied_revision = item.desired_revision
+                    item.sync_status = "applied"
+                    item.last_error = None
+            agent = await self.repo.get_agent(str(command.tenant_id), str(command.agent_id))
+            if agent is not None:
+                agent.applied_config_revision = max(agent.applied_config_revision or 0, revision)
+        elif command.command_type == "test_connection_profile":
+            profile_id = command.payload.get("profileId")
+            if profile_id:
+                rows = await self.db.execute(
+                    select(AgentConnectionProfile).where(
+                        AgentConnectionProfile.id == uuid.UUID(str(profile_id)),
+                        AgentConnectionProfile.tenant_id == command.tenant_id,
+                    )
+                )
+                item = rows.scalar_one_or_none()
+                if item is not None:
+                    item.last_test_status = "ok"
+                    item.last_test_at = now
+                    item.last_error = None
+
+    async def _project_profile_failure(
+        self, command: AgentCommand, message: str, now: datetime
+    ) -> None:
+        if command.command_type not in {"apply_connection_profiles", "test_connection_profile"}:
+            return
+        profile_ids = [
+            str(item.get("id"))
+            for item in command.payload.get("profiles", [])
+            if item.get("id")
+        ]
+        if command.payload.get("profileId"):
+            profile_ids.append(str(command.payload["profileId"]))
+        if not profile_ids:
+            return
+        rows = await self.db.execute(
+            select(AgentConnectionProfile).where(
+                AgentConnectionProfile.tenant_id == command.tenant_id,
+                AgentConnectionProfile.id.in_([uuid.UUID(value) for value in profile_ids]),
+            )
+        )
+        for item in rows.scalars().all():
+            if command.command_type == "apply_connection_profiles":
+                item.sync_status = "error"
+            else:
+                item.last_test_status = "error"
+                item.last_test_at = now
+            item.last_error = message[:1000]
 
     def _create_backup_success_notification(
         self, command: AgentCommand, result: dict[str, Any]

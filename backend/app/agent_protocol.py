@@ -9,6 +9,8 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import json
+import os
 from collections.abc import Callable
 
 from cryptography.exceptions import InvalidSignature
@@ -17,11 +19,19 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
 )
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
 
 
 REQUEST_CONTEXT = b"DATAEXPRESS-AGENT-REQUEST-V1"
 COMMAND_CONTEXT = b"DATAEXPRESS-AGENT-COMMAND-V1"
 DEFAULT_MAX_CLOCK_SKEW_SECONDS = 120
+SECRET_ENVELOPE_INFO = b"DATAEXPRESS-AGENT-SECRET-V1"
 
 
 class AgentProtocolError(ValueError):
@@ -220,3 +230,48 @@ def load_public_key(value: str) -> Ed25519PublicKey:
     except (ValueError, TypeError, UnicodeError) as exc:
         raise AgentProtocolError("AGENT_KEY_INVALID") from exc
 
+
+def seal_secret_for_agent(
+    encryption_public_key: str,
+    value: dict,
+    *,
+    context: bytes,
+) -> str:
+    try:
+        raw_public = base64.b64decode(
+            encryption_public_key.encode("ascii"), validate=True
+        )
+        if len(raw_public) != 32:
+            raise ValueError
+        recipient = X25519PublicKey.from_public_bytes(raw_public)
+        ephemeral = X25519PrivateKey.generate()
+        shared = ephemeral.exchange(recipient)
+        key = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=None,
+            info=SECRET_ENVELOPE_INFO + context,
+        ).derive(shared)
+        nonce = os.urandom(12)
+        plaintext = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        ciphertext = AESGCM(key).encrypt(nonce, plaintext, context)
+        ephemeral_public = ephemeral.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        return json.dumps(
+            {
+                "version": 1,
+                "ephemeralPublicKey": base64.b64encode(ephemeral_public).decode("ascii"),
+                "nonce": base64.b64encode(nonce).decode("ascii"),
+                "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
+            },
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise AgentProtocolError("AGENT_ENCRYPTION_KEY_INVALID") from exc

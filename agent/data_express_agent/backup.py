@@ -10,6 +10,7 @@ import shutil
 import threading
 import time
 import zipfile
+import io
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -215,6 +216,17 @@ class BackupExecutor:
         payload: dict[str, Any],
     ) -> dict[str, int]:
         allocated = self._allocated_database_bytes(connection, databases)
+        missing_estimates = [
+            name
+            for name in databases
+            if max(int(self.size_history.get(name, 0)), int(allocated.get(name, 0))) <= 0
+        ]
+        if missing_estimates:
+            raise BackupError(
+                "BACKUP_SPACE_ESTIMATE_FAILED",
+                "No fue posible calcular de forma segura el espacio requerido para: "
+                + ", ".join(missing_estimates),
+            )
         estimates = [
             max(int(self.size_history.get(name, 0)), int(allocated.get(name, 0)))
             for name in databases
@@ -728,11 +740,12 @@ class BackupExecutor:
         host = str(destination.get("host") or "").strip()
         username = str(destination.get("username") or "").strip()
         key_path = str(destination.get("privateKeyPath") or "").strip()
+        key_data = str(destination.get("privateKey") or "").strip()
         remote_root = str(destination.get("path") or "").strip()
         expected_fingerprint = _normalize_host_key_sha256(
             str(destination.get("hostKeySha256") or "")
         )
-        if not host or not username or not key_path or not remote_root.startswith("/"):
+        if not host or not username or (not key_path and not key_data) or not remote_root.startswith("/"):
             raise BackupError("SFTP_PROFILE_INVALID", "El perfil SFTP esta incompleto")
         client = paramiko.SSHClient()
         client.load_system_host_keys()
@@ -752,14 +765,36 @@ class BackupExecutor:
         else:
             client.set_missing_host_key_policy(paramiko.RejectPolicy())
         try:
+            connect_options = {
+                "hostname": host,
+                "port": int(destination.get("port") or 22),
+                "username": username,
+                "look_for_keys": False,
+                "allow_agent": False,
+                "timeout": 30,
+            }
+            if key_data:
+                password = str(destination.get("privateKeyPassphrase") or "") or None
+                parsed_key = None
+                for key_type in (
+                    paramiko.Ed25519Key,
+                    paramiko.RSAKey,
+                    paramiko.ECDSAKey,
+                ):
+                    try:
+                        parsed_key = key_type.from_private_key(
+                            io.StringIO(key_data), password=password
+                        )
+                        break
+                    except (paramiko.SSHException, ValueError):
+                        continue
+                if parsed_key is None:
+                    raise BackupError("SFTP_PRIVATE_KEY_INVALID", "La llave privada SFTP no es válida")
+                connect_options["pkey"] = parsed_key
+            else:
+                connect_options["key_filename"] = key_path
             client.connect(
-                hostname=host,
-                port=int(destination.get("port") or 22),
-                username=username,
-                key_filename=key_path,
-                look_for_keys=False,
-                allow_agent=False,
-                timeout=30,
+                **connect_options,
             )
             host_key = client.get_transport().get_remote_server_key()
             fingerprint = base64.b64encode(

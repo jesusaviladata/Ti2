@@ -174,7 +174,14 @@ async def heartbeat(
 ):
     if body.agent_version:
         agent.agent_version = body.agent_version
-    agent.metadata_json = body.metadata
+    if int(agent.desired_config_revision or 0) > 0:
+        managed = dict(agent.metadata_json or {})
+        for key, value in body.metadata.items():
+            if key not in {"sqlInstances", "backupDestinations"}:
+                managed[key] = value
+        agent.metadata_json = managed
+    else:
+        agent.metadata_json = body.metadata
     await AgentHealthService(db).record(
         agent=agent,
         health=body.health,

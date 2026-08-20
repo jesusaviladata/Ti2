@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 from typing import Any
+from pathlib import Path
 
 from .backup import BackupError, BackupExecutor
 from .client import AgentClient, AgentClientError
@@ -12,6 +13,8 @@ from .health import AgentHealthSupervisor
 from .journal import ExecutionJournal
 from .runner_utils import retry_delay
 from .storage import StorageCollector
+from .profiles import ManagedProfileStore, ProfileApplyError
+from .discovery import discover_environment
 
 
 logger = logging.getLogger("data_express_agent")
@@ -48,6 +51,13 @@ class AgentRunner:
             destination_profiles=getattr(config, "backup_destinations", ()),
         )
         self.cleanup = cleanup_executor or StructuralCleanupExecutor(journal.path.parent)
+        identity = getattr(client, "identity", None)
+        data_dir = getattr(config, "data_dir", None) or journal.path.parent
+        self.profile_store = (
+            ManagedProfileStore(Path(data_dir) / "managed-profiles.json", identity)
+            if identity is not None
+            else None
+        )
         if health_supervisor is not None:
             self.health = health_supervisor
         else:
@@ -73,6 +83,9 @@ class AgentRunner:
             "execute_structural_direct": self._execute_structural_direct,
             "restore_quarantine_item": self._restore_quarantine_item,
             "purge_quarantine_items": self._purge_quarantine_items,
+            "apply_connection_profiles": self._apply_connection_profiles,
+            "test_connection_profile": self._test_connection_profile,
+            "discover_agent_environment": self._discover_agent_environment,
         }
 
     def recover_interrupted(self) -> None:
@@ -89,7 +102,7 @@ class AgentRunner:
             try:
                 result = self._execute(command)
                 self.journal.record_completed(command_id, result)
-            except (ExplorerError, BackupError, CleanupError, ValueError, KeyError) as exc:
+            except (ExplorerError, BackupError, CleanupError, ProfileApplyError, ValueError, KeyError) as exc:
                 code = getattr(exc, "code", "COMMAND_FAILED")
                 self.journal.record_failed(command_id, code, str(exc))
 
@@ -122,7 +135,7 @@ class AgentRunner:
         try:
             result = self._execute(command)
             self.journal.record_completed(command_id, result)
-        except (ExplorerError, BackupError, CleanupError, ValueError, KeyError) as exc:
+        except (ExplorerError, BackupError, CleanupError, ProfileApplyError, ValueError, KeyError) as exc:
             code = getattr(exc, "code", "COMMAND_FAILED")
             logger.exception("Command %s failed: %s", command_id, code)
             self.journal.record_failed(command_id, code, str(exc))
@@ -232,4 +245,22 @@ class AgentRunner:
 
     def _purge_quarantine_items(self, payload: dict[str, Any], _command_id: str):
         return self.cleanup.purge(payload)
+
+    def _apply_connection_profiles(self, payload: dict[str, Any], _command_id: str):
+        if self.profile_store is None:
+            raise ProfileApplyError("PROFILE_STORE_UNAVAILABLE", "No se pudo abrir el almacén de perfiles")
+        result = self.profile_store.apply(payload)
+        sql_profiles, destination_profiles = self.profile_store.runtime_profiles()
+        self.backups.sql_profiles = sql_profiles
+        self.backups.destination_profiles = destination_profiles
+        self.health.set_applied_config_revision(int(result["configRevision"]))
+        return result
+
+    def _test_connection_profile(self, payload: dict[str, Any], _command_id: str):
+        if self.profile_store is None:
+            raise ProfileApplyError("PROFILE_STORE_UNAVAILABLE", "No se pudo abrir el almacén de perfiles")
+        return self.profile_store.test_profile(str(payload["profileId"]))
+
+    def _discover_agent_environment(self, _payload: dict[str, Any], _command_id: str):
+        return discover_environment(self.backups.sql_profiles, self.backups.destination_profiles)
 

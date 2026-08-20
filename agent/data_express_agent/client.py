@@ -66,6 +66,7 @@ class AgentClient:
                 "osVersion": os_version,
                 "agentVersion": self.config.agent_version,
                 "publicKey": self.identity.public_key,
+                "encryptionPublicKey": self.identity.encryption_public_key,
             }
         )
         try:

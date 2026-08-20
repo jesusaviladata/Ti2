@@ -90,3 +90,29 @@ async def test_retry_completion_updates_only_delivery_lifecycle():
     assert item.status == BackupStatus.completed
     assert item.delivery_status == "delivered"
     assert item.delivery_progress == 100
+
+
+@pytest.mark.asyncio
+async def test_local_zip_is_ready_without_being_reported_as_remotely_delivered():
+    item = backup()
+    item.destination = BackupDestination.local
+    service = LifecycleService([item])
+
+    await service._project_backup_complete(
+        command(),
+        {
+            "databases": [
+                {
+                    "databaseName": "Ipsofactu",
+                    "fileName": "Ipsofactu_2026-08-20.bak",
+                    "verificationMethod": "restore_verifyonly",
+                }
+            ],
+            "zipPath": "D:/2026-08-20/FULL/Backup_2026-08-20.zip",
+            "transfer": {"type": "local", "verified": True},
+        },
+        datetime.now(timezone.utc),
+    )
+
+    assert item.delivery_status == "local_ready"
+    assert item.delivery_phase == "local_ready"
