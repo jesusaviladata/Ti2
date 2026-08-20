@@ -2,6 +2,13 @@ export type BackupType        = "full" | "differential" | "log";
 export type BackupStatus      = "pending" | "running" | "completed" | "failed";
 export type BackupDestination = "local" | "nas" | "secondary_server" | "private_cloud";
 
+export interface BackupOrigin {
+  agent: { id: string; hostname: string };
+  sqlProfile: { id: string; label: string };
+  destinationProfile?: { id: string; label: string; type?: string } | null;
+  sourceLabel: string;
+}
+
 export interface BackupRecord {
   id:            string;
   tenantId?:     string;
@@ -19,7 +26,7 @@ export interface BackupRecord {
   progressPercent?: number;
   validationMethod?: string | null;
   triggerReason?: string | null;
-  deliveryStatus?: "pending" | "processing" | "delivered" | "failed" | string;
+  deliveryStatus?: "pending" | "processing" | "local_ready" | "delivered" | "failed" | string;
   deliveryPhase?: string | null;
   deliveryProgress?: number;
   deliveryErrorMessage?: string | null;
@@ -27,6 +34,7 @@ export interface BackupRecord {
   archivePath?: string | null;
   archiveSizeBytes?: number | null;
   archiveSha256?: string | null;
+  origin?: BackupOrigin | null;
   startedAt?:    string | null;
   finishedAt?:   string | null;
   durationSecs?: number | null;

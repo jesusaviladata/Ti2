@@ -18,6 +18,10 @@ export interface AgentRecord {
   agentVersion: string;
   status: string;
   online: boolean;
+  healthStatus?: "connected" | "busy" | "degraded" | "offline" | "revoked";
+  lastHeartbeatAt?: string | null;
+  desiredConfigRevision?: number;
+  appliedConfigRevision?: number;
   lastSeenAt: string | null;
   revokedAt: string | null;
   createdAt: string | null;

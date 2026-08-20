@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Database,
-  FolderSync,
   LayoutDashboard,
   Monitor,
   Settings,
@@ -48,8 +47,7 @@ function UserBadge({ collapsed }: { collapsed: boolean }) {
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/backups", label: "Backups", icon: Database },
-  { href: "/dashboard/cleanup", label: "Archivos", icon: FolderSync },
-  { href: "/dashboard/limpieza-remota", label: "Limpieza", icon: ShieldCheck },
+  { href: "/dashboard/cleanup", label: "Limpieza", icon: ShieldCheck },
   { href: "/dashboard/access", label: "Acceso Remoto", icon: Monitor },
   { href: "/dashboard/alerts", label: "Notificaciones", icon: Bell },
 ];

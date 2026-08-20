@@ -55,8 +55,9 @@ export function BackupList() {
   return (
     <div className="overflow-x-auto">
       {/* Table header */}
-      <div className="grid min-w-[860px] grid-cols-[minmax(180px,1fr)_85px_110px_125px_80px_110px_70px] gap-3 px-4 py-2 text-[10px] font-mono text-crema/30 uppercase tracking-wider border-b border-musgo/15">
+      <div className="grid min-w-[1020px] grid-cols-[minmax(180px,1fr)_minmax(150px,0.8fr)_85px_110px_125px_80px_110px_70px] gap-3 px-4 py-2 text-[10px] font-mono text-crema/30 uppercase tracking-wider border-b border-musgo/15">
         <span>Base de datos</span>
+        <span>Origen</span>
         <span>Tipo</span>
         <span>Estado</span>
         <span>ZIP / envío</span>
@@ -71,7 +72,7 @@ export function BackupList() {
             key={b.id}
             onContextMenu={(e) => handleContextMenu(e, b.id)}
             className={cn(
-              "grid min-w-[860px] grid-cols-[minmax(180px,1fr)_85px_110px_125px_80px_110px_70px] gap-3 px-4 py-3.5 items-center",
+              "grid min-w-[1020px] grid-cols-[minmax(180px,1fr)_minmax(150px,0.8fr)_85px_110px_125px_80px_110px_70px] gap-3 px-4 py-3.5 items-center",
               "hover:bg-musgo/5 transition-colors cursor-context-menu select-none"
             )}
           >
@@ -81,6 +82,10 @@ export function BackupList() {
               {b.errorMessage && (
                 <p className="font-mono text-[10px] text-red-400/70 truncate mt-0.5">{b.errorMessage}</p>
               )}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs text-crema/55">{b.origin?.sourceLabel ?? "Origen anterior no registrado"}</p>
+              {b.origin?.destinationProfile ? <p className="mt-0.5 truncate text-[10px] text-crema/25">→ {b.origin.destinationProfile.label}</p> : null}
             </div>
             <span className="font-mono text-xs text-crema/40 capitalize">{b.backupType}</span>
             <BackupStatusBadge status={b.status} />
@@ -139,6 +144,7 @@ export function BackupList() {
 
 function DeliveryStatus({ status, phase, error, onRetry }: { status?: string; phase?: string | null; error?: string | null; onRetry?: () => void }) {
   if (status === "delivered") return <span className="text-xs text-green-400/80">Entregado</span>;
+  if (status === "local_ready") return <span className="text-xs text-green-400/80">ZIP local listo</span>;
   if (status === "failed") return <button type="button" title={error ?? "Reintentar entrega"} onClick={(event) => { event.stopPropagation(); onRetry?.(); }} className="truncate text-left text-xs text-amber-400 underline decoration-amber-400/30 underline-offset-2">Reintentar</button>;
   if (status === "processing") return <span className="text-xs text-arcilla">{phase === "transferring" ? "Enviando…" : "Comprimiendo…"}</span>;
   return <span className="text-xs text-crema/30">Pendiente</span>;

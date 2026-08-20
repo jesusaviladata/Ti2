@@ -1,366 +1,84 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import {
-  Wifi, WifiOff, Loader2, ChevronDown, Trash2, Eye, EyeOff,
-  CheckCircle2, XCircle, Clock, Server, Zap, KeyRound,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { FilePanel } from "@/components/filemanager/file-panel";
-import { QuickCleanupPanel } from "@/components/filemanager/quick-cleanup-panel";
-import { fmService } from "@/services/filemanager.service";
-import { useFMStore } from "@/store/fm-connections.store";
-import { cn } from "@/lib/utils";
-import type { FMConnection, FMProtocol, StatusMessage, FMOperation } from "@/types/filemanager";
+import { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2, FolderLock, Loader2, Play, RotateCcw, Server, Trash2 } from "lucide-react";
+import { AgentSelector } from "@/components/agents/agent-selector";
+import { useAgentJob, useAgents, useSelectedAgentId } from "@/hooks/useAgents";
+import { useExecuteAgentCleanup, useSimulateAgentCleanup } from "@/hooks/useAgentCleanup";
+import { formatBytes } from "@/lib/utils";
 
-// ── Status log ────────────────────────────────────────────────────────────────
-function StatusLog({ messages }: { messages: StatusMessage[] }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  return (
-    <div className="h-[80px] overflow-y-auto font-mono text-[10px] bg-black/30 border border-musgo/20 rounded-[0.75rem] px-3 py-2 space-y-0.5">
-      {messages.length === 0 && (
-        <span className="text-crema/15">Esperando actividad…</span>
-      )}
-      {messages.map((m) => (
-        <div key={m.id} className={cn(
-          "flex gap-2 leading-relaxed",
-          m.kind === "error"   ? "text-red-400/80" :
-          m.kind === "success" ? "text-green-400/70" :
-          "text-crema/35"
-        )}>
-          <span className="text-crema/20 shrink-0">
-            {m.ts.toLocaleTimeString("es", { timeStyle: "medium" })}
-          </span>
-          <span>{m.text}</span>
-        </div>
-      ))}
-      <div ref={bottomRef} />
-    </div>
-  );
-}
+const TARGETS = ["Log", "LogSec", "LogsRadian", "Respuesta", "BD_log.txt"];
 
-// ── Operation queue ───────────────────────────────────────────────────────────
-function OperationQueue({ ops }: { ops: FMOperation[] }) {
-  if (!ops.length) return null;
+export default function CleanupPage() {
+  const agentsQuery = useAgents();
+  const agents = agentsQuery.data?.items ?? [];
+  const [agentId, setAgentId] = useSelectedAgentId(agents);
+  const selected = agents.find((item) => item.id === agentId) ?? null;
+  const simulate = useSimulateAgentCleanup();
+  const execute = useExecuteAgentCleanup();
+  const [simulationJobId, setSimulationJobId] = useState<string | null>(null);
+  const [executionJobId, setExecutionJobId] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const simulation = useAgentJob<Record<string, any>>(simulationJobId);
+  const execution = useAgentJob<Record<string, any>>(executionJobId);
+
+  useEffect(() => {
+    setSimulationJobId(null);
+    setExecutionJobId(null);
+    setConfirmed(false);
+  }, [agentId]);
+
+  const result = simulation.data?.status === "completed" ? simulation.data.result : null;
+  const completed = execution.data?.status === "completed";
+  const phase = executionJobId ? 3 : result ? (confirmed ? 2 : 1) : 0;
+  const error = simulation.data?.status === "failed" ? simulation.data.error : execution.data?.status === "failed" ? execution.data.error : null;
+
+  async function startSimulation() {
+    if (!agentId) return;
+    setExecutionJobId(null);
+    setConfirmed(false);
+    setSimulationJobId((await simulate.mutateAsync(agentId)).jobId);
+  }
+
+  async function startExecution() {
+    if (!simulationJobId || !confirmed) return;
+    setExecutionJobId((await execute.mutateAsync(simulationJobId)).jobId);
+  }
+
   return (
-    <div className="border border-musgo/20 rounded-[0.875rem] overflow-hidden shrink-0">
-      <div className="px-3 py-1.5 bg-musgo/10 border-b border-musgo/15">
-        <span className="font-mono text-[10px] text-crema/30 uppercase tracking-widest">Cola de operaciones</span>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div><p className="mb-1 text-xs uppercase tracking-[0.18em] text-arcilla">Servidores Core</p><h1 className="font-title text-4xl font-semibold text-crema">Limpieza<span className="text-arcilla">.</span></h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-crema/40">Una sola operación segura por agente: simular, revisar y vaciar los archivos autorizados. Las carpetas se conservan.</p></div>
+        <AgentSelector agents={agents} value={agentId} onChange={setAgentId} />
+      </header>
+
+      <div className="grid grid-cols-4 gap-2" aria-label="Fases de limpieza">
+        {["Simular", "Revisar", "Confirmar", "Resultado"].map((label, index) => <div key={label} className={index <= phase ? "rounded-[0.625rem] border border-arcilla/30 bg-arcilla/[0.08] px-3 py-2 text-center text-xs text-arcilla" : "rounded-[0.625rem] border border-musgo/20 px-3 py-2 text-center text-xs text-crema/25"}>{index < phase ? "✓ " : ""}{label}</div>)}
       </div>
-      <div className="divide-y divide-musgo/10 max-h-32 overflow-y-auto">
-        {[...ops].reverse().map((op) => (
-          <div key={op.id} className="flex items-center gap-3 px-3 py-2">
-            {op.status === "running" && <Loader2 size={11} className="text-arcilla/70 animate-spin shrink-0" />}
-            {op.status === "done"    && <CheckCircle2 size={11} className="text-green-400 shrink-0" />}
-            {op.status === "error"   && <XCircle size={11} className="text-red-400 shrink-0" />}
-            {op.status === "pending" && <Clock size={11} className="text-crema/25 shrink-0" />}
-            <span className="font-mono text-xs text-crema/60 flex-1 truncate">{op.label}</span>
-            {op.count !== undefined && op.status === "done" && (
-              <span className="font-mono text-[10px] text-crema/30">{op.count} elem.</span>
+
+      {!selected ? <EmptyState text="No hay agentes conectados. Los desconectados siguen visibles en Configuración, pero no pueden operar Limpieza." /> : !selected.configuration ? <EmptyState text="Este agente aún no tiene una raíz fija validada. Ve a Configuración → Agentes → Configurar raíz." /> : (
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="rounded-[1.1rem] border border-musgo/20 bg-musgo/[0.06] p-5">
+            <div className="flex items-start gap-3"><FolderLock size={18} className="mt-0.5 text-arcilla" /><div><p className="text-sm font-medium text-crema/75">Raíz autorizada e inmutable para esta operación</p><p className="mt-1 font-mono text-xs text-crema/45">{selected.configuration.root}</p></div></div>
+            <div className="mt-5 rounded-[0.875rem] border border-musgo/20 bg-carbon/40 p-4"><p className="text-xs text-crema/45">Por cada carpeta de propiedad:</p><p className="mt-2 font-mono text-sm text-crema/75">Propiedad\core\</p><div className="mt-3 flex flex-wrap gap-2">{TARGETS.map((target) => <span key={target} className="rounded-[0.5rem] border border-musgo/25 bg-musgo/10 px-2.5 py-1 text-[10px] text-crema/50">{target}</span>)}</div><p className="mt-3 text-[11px] leading-relaxed text-crema/35">Se eliminan todos los archivos internos elegibles. No se elimina ninguna carpeta, no se siguen enlaces y no se aceptan rutas manuales.</p></div>
+
+            {!simulationJobId ? <button type="button" onClick={startSimulation} disabled={simulate.isPending} className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-[0.625rem] bg-arcilla text-xs font-medium text-carbon disabled:opacity-40">{simulate.isPending ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Simular limpieza completa</button> : simulation.isLoading || !result ? <ProgressCard label={simulation.data?.phase ?? "Escaneando propiedades"} current={simulation.data?.processedUnits ?? 0} total={simulation.data?.totalUnits ?? 0} /> : (
+              <div className="mt-5 space-y-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Stat label="Propiedades" value={Number(result.propertiesAffected ?? 0)} /><Stat label="Archivos" value={Number(result.eligibleCount ?? 0)} accent /><Stat label="Espacio" value={formatBytes(Number(result.bytesEligible ?? 0))} accent /><Stat label="Protegidos" value={Number(result.protectedCount ?? 0)} /></div>
+                {result.truncated ? <p className="flex items-center gap-2 text-xs text-amber-300"><AlertTriangle size={13} /> La simulación alcanzó su límite de seguridad; no confirme hasta revisarlo.</p> : null}
+                {!executionJobId ? <label className="flex cursor-pointer items-start gap-3 rounded-[0.875rem] border border-red-500/25 bg-red-500/[0.04] p-4"><input type="checkbox" className="mt-0.5" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span><span className="block text-sm text-red-300">Confirmo la eliminación definitiva</span><span className="mt-1 block text-xs leading-relaxed text-crema/40">Se usarán exactamente el manifiesto y hash de esta simulación. Si algo cambió, el agente rechazará la ejecución.</span></span></label> : null}
+                {!executionJobId ? <div className="flex gap-3"><button type="button" onClick={() => setSimulationJobId(null)} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-[0.625rem] border border-musgo/25 text-xs text-crema/45"><RotateCcw size={13} /> Simular de nuevo</button><button type="button" onClick={startExecution} disabled={!confirmed || execute.isPending || Boolean(result.truncated)} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-[0.625rem] bg-red-500 text-xs font-medium text-white disabled:opacity-30"><Trash2 size={13} /> Vaciar archivos</button></div> : completed ? <div className="rounded-[0.875rem] border border-green-500/25 bg-green-500/[0.05] p-4"><p className="flex items-center gap-2 text-sm text-green-300"><CheckCircle2 size={15} /> Limpieza terminada</p><p className="mt-2 text-xs text-crema/40">{Number(execution.data?.result?.deletedCount ?? 0)} archivos eliminados · {formatBytes(Number(execution.data?.result?.bytesDeleted ?? 0))} liberados · {Number(execution.data?.result?.failedCount ?? 0)} errores.</p></div> : <ProgressCard label={execution.data?.phase ?? "Eliminando archivos autorizados"} current={execution.data?.processedUnits ?? 0} total={execution.data?.totalUnits ?? 0} />}
+              </div>
             )}
-            {op.error && (
-              <span className="font-mono text-[10px] text-red-400/60 truncate max-w-[200px]">{op.error}</span>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Connection bar ────────────────────────────────────────────────────────────
-const PROTOCOLS: { value: FMProtocol; label: string; defaultPort: number }[] = [
-  { value: "sftp",  label: "SFTP",  defaultPort: 22  },
-  { value: "ftp",   label: "FTP",   defaultPort: 21  },
-  { value: "ftps",  label: "FTPS",  defaultPort: 990 },
-];
-
-interface ConnectionBarProps {
-  onConnect:    (conn: FMConnection) => void;
-  onDisconnect: () => void;
-  connected:    boolean;
-  connecting:   boolean;
-  activeConn:   FMConnection | null;
-}
-
-function ConnectionBar({ onConnect, onDisconnect, connected, connecting, activeConn }: ConnectionBarProps) {
-  const { connections, addConnection, removeConnection, setActive } = useFMStore();
-  const [host,     setHost]     = useState("");
-  const [user,     setUser]     = useState("");
-  const [pass,     setPass]     = useState("");
-  const [port,     setPort]     = useState(22);
-  const [proto,    setProto]    = useState<FMProtocol>("sftp");
-  const [label,    setLabel]    = useState("");
-  const [showPw,   setShowPw]   = useState(false);
-  const [showSave, setShowSave] = useState(false);
-  const [showSaved, setShowSaved] = useState(false);
-  // Llave privada .pem (AWS EC2, solo SFTP) — solo en memoria, nunca se persiste
-  const [usePem,  setUsePem]  = useState(false);
-  const [pemKey,  setPemKey]  = useState("");
-  const [pemName, setPemName] = useState("");
-
-  function handleProto(p: FMProtocol) {
-    setProto(p);
-    setPort(PROTOCOLS.find((x) => x.value === p)?.defaultPort ?? 22);
-    if (p !== "sftp") setUsePem(false);   // la llave .pem solo aplica a SFTP
-  }
-
-  function onPemFile(file: File | null) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { setPemKey(String(reader.result ?? "")); setPemName(file.name); };
-    reader.readAsText(file);
-  }
-
-  function fill(c: FMConnection) {
-    setHost(c.host); setUser(c.username); setPass(c.password);
-    setPort(c.port); setProto(c.protocol); setLabel(c.label);
-    setUsePem(false); setPemKey(""); setPemName("");
-    setShowSaved(false);
-  }
-
-  function handleConnect() {
-    const privateKey = usePem ? pemKey : "";
-    const conn: FMConnection = {
-      id: crypto.randomUUID(), label: label || host,
-      host, port, protocol: proto, username: user, password: pass, privateKey,
-      createdAt: new Date().toISOString(),
-    };
-    if (showSave && label.trim()) {
-      addConnection({ label: label || host, host, port, protocol: proto, username: user, password: pass, privateKey });
-    }
-    onConnect(conn);
-  }
-
-  const INPUT = "h-8 bg-musgo/10 border border-musgo/25 rounded-[0.5rem] px-2.5 font-mono text-xs text-crema/75 placeholder:text-crema/20 focus:outline-none focus:border-arcilla/40 transition-colors";
-
-  return (
-    <div className="rounded-[1rem] border border-musgo/20 bg-carbon p-3 space-y-2 shrink-0">
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Saved connections dropdown */}
-        <div className="relative">
-          <button onClick={() => setShowSaved((v) => !v)}
-            className="h-8 px-3 flex items-center gap-1.5 bg-musgo/15 border border-musgo/25 rounded-[0.5rem] font-mono text-[10px] text-crema/50 hover:border-musgo/45 transition-colors">
-            <Server size={11} />
-            Guardadas
-            <ChevronDown size={10} className={cn("transition-transform", showSaved && "rotate-180")} />
-          </button>
-          {showSaved && (
-            <div className="absolute left-0 top-full mt-1 z-50 w-64 rounded-[0.75rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden">
-              {connections.length === 0 ? (
-                <p className="font-mono text-[10px] text-crema/25 px-4 py-3">Sin conexiones guardadas</p>
-              ) : (
-                <div className="py-1 max-h-48 overflow-y-auto">
-                  {connections.map((c) => (
-                    <div key={c.id} className="flex items-center gap-2 px-3 py-2 hover:bg-musgo/10 group">
-                      <button onClick={() => fill(c)} className="flex-1 text-left">
-                        <p className="font-mono text-xs text-crema/70">{c.label}</p>
-                        <p className="font-mono text-[9px] text-crema/30">{c.protocol.toUpperCase()} · {c.host}:{c.port}</p>
-                      </button>
-                      <button onClick={() => removeConnection(c.id)}
-                        className="opacity-0 group-hover:opacity-100 text-crema/20 hover:text-red-400 transition-all">
-                        <XCircle size={11} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Protocol selector */}
-        <div className="flex rounded-[0.5rem] border border-musgo/25 overflow-hidden">
-          {PROTOCOLS.map((p) => (
-            <button key={p.value} onClick={() => handleProto(p.value)}
-              className={cn("h-8 px-2.5 font-mono text-[10px] transition-colors",
-                proto === p.value ? "bg-arcilla/15 text-arcilla/80" : "text-crema/35 hover:text-crema/55")}>
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Host */}
-        <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="Host / IP"
-          className={cn(INPUT, "w-40")} />
-        {/* Port */}
-        <input value={port} onChange={(e) => setPort(+e.target.value)} type="number"
-          className={cn(INPUT, "w-16")} />
-        {/* User */}
-        <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Usuario"
-          className={cn(INPUT, "w-28")} />
-        {/* Password o llave .pem */}
-        {usePem ? (
-          <label className={cn(INPUT, "w-40 flex items-center gap-1.5 cursor-pointer hover:border-arcilla/40 overflow-hidden")}>
-            <KeyRound size={11} className="text-arcilla/60 shrink-0" />
-            <span className={cn("truncate", pemName ? "text-crema/75" : "text-crema/25")}>
-              {pemName || "Archivo .pem…"}
-            </span>
-            <input type="file" className="hidden" onChange={(e) => onPemFile(e.target.files?.[0] ?? null)} />
-          </label>
-        ) : (
-          <div className="relative">
-            <input value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Contraseña"
-              type={showPw ? "text" : "password"} className={cn(INPUT, "w-28 pr-7")} />
-            <button onClick={() => setShowPw((v) => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-crema/25 hover:text-crema/55 transition-colors">
-              {showPw ? <EyeOff size={11} /> : <Eye size={11} />}
-            </button>
-          </div>
-        )}
-        {proto === "sftp" && (
-          <button onClick={() => setUsePem((v) => !v)}
-            title={usePem ? "Usar contraseña" : "Usar llave privada .pem (AWS EC2)"}
-            className={cn("h-8 px-2.5 rounded-[0.5rem] border font-mono text-[10px] transition-colors flex items-center gap-1",
-              usePem ? "bg-arcilla/10 border-arcilla/30 text-arcilla/70" : "border-musgo/25 text-crema/30 hover:text-crema/55")}>
-            <KeyRound size={10} /> .pem
-          </button>
-        )}
-
-        {/* Label + save toggle */}
-        <button onClick={() => setShowSave((v) => !v)}
-          className={cn("h-8 px-2.5 rounded-[0.5rem] border font-mono text-[10px] transition-colors",
-            showSave ? "bg-arcilla/10 border-arcilla/30 text-arcilla/70" : "border-musgo/25 text-crema/30 hover:text-crema/55")}>
-          Guardar
-        </button>
-        {showSave && (
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Etiqueta"
-            className={cn(INPUT, "w-28")} />
-        )}
-
-        {/* Connect / Disconnect */}
-        {connected ? (
-          <button onClick={onDisconnect}
-            className="h-8 px-3 flex items-center gap-1.5 rounded-[0.5rem] bg-red-900/15 border border-red-800/25 font-mono text-[10px] text-red-400/70 hover:text-red-400 transition-colors">
-            <WifiOff size={11} /> Desconectar
-          </button>
-        ) : (
-          <button onClick={handleConnect} disabled={!host.trim() || connecting}
-            className="h-8 px-3 flex items-center gap-1.5 rounded-[0.5rem] bg-arcilla/10 border border-arcilla/30 font-mono text-[10px] text-arcilla/80 hover:bg-arcilla/15 disabled:opacity-40 transition-colors">
-            {connecting
-              ? <><Loader2 size={11} className="animate-spin" /> Conectando…</>
-              : <><Wifi size={11} /> Conectar</>
-            }
-          </button>
-        )}
-      </div>
-
-      {/* Connected badge */}
-      {connected && activeConn && (
-        <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
-          <span className="font-mono text-[10px] text-green-400/70">
-            Conectado a {activeConn.protocol.toUpperCase()} · {activeConn.host}:{activeConn.port} · {activeConn.username}
-          </span>
+            {error ? <p className="mt-4 rounded-[0.625rem] border border-red-500/25 bg-red-500/[0.05] px-3 py-2 text-xs text-red-400">{error}</p> : null}
+          </section>
+          <aside className="rounded-[1.1rem] border border-musgo/20 bg-musgo/[0.05] p-5"><div className="flex items-center gap-2"><Server size={15} className="text-arcilla" /><p className="text-sm font-medium text-crema/70">Cómo funciona</p></div><ol className="mt-4 space-y-4 text-xs leading-relaxed text-crema/40"><li><span className="mr-2 text-arcilla">1.</span>El backend toma la raíz validada; el navegador no envía otra ruta.</li><li><span className="mr-2 text-arcilla">2.</span>El agente recorre sólo Propiedad\core y crea un manifiesto con hash.</li><li><span className="mr-2 text-arcilla">3.</span>Usted revisa conteos y espacio antes de confirmar.</li><li><span className="mr-2 text-arcilla">4.</span>El agente revalida cada archivo y elimina únicamente lo aprobado.</li></ol></aside>
         </div>
       )}
     </div>
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
-export default function FileManagerPage() {
-  const { toPayload } = useFMStore();
-  const [activeConn,  setActiveConn]  = useState<FMConnection | null>(null);
-  const [connecting,  setConnecting]  = useState(false);
-  const [messages,    setMessages]    = useState<StatusMessage[]>([]);
-  const [operations,  setOperations]  = useState<FMOperation[]>([]);
-  const [remotePath,  setRemotePath]  = useState("/");
-
-  const addLog = useCallback((msg: Omit<StatusMessage, "id" | "ts">) => {
-    setMessages((prev) => [...prev.slice(-49), { ...msg, id: crypto.randomUUID(), ts: new Date() }]);
-  }, []);
-
-  const addOp = useCallback((op: Omit<FMOperation, "id" | "ts">) => {
-    const id = crypto.randomUUID();
-    setOperations((prev) => [...prev, { ...op, id, ts: new Date() }]);
-    return id;
-  }, []);
-
-  const updateOp = useCallback((id: string, result: Partial<FMOperation>) => {
-    setOperations((prev) => prev.map((o) => o.id === id ? { ...o, ...result } : o));
-  }, []);
-
-  // Queue proxy that returns the op id
-  function queueProxy(op: Omit<FMOperation, "id" | "ts">) { addOp(op); }
-
-  async function handleConnect(conn: FMConnection) {
-    setConnecting(true);
-    addLog({ text: `Conectando a ${conn.protocol.toUpperCase()} ${conn.host}:${conn.port}…`, kind: "info" });
-    try {
-      const payload = toPayload(conn);
-      const res = await fmService.test(payload);
-      if (res.connected) {
-        setActiveConn(conn);
-        addLog({ text: `Conexión establecida. Usuario: ${conn.username}`, kind: "success" });
-      } else {
-        addLog({ text: `Error de conexión: ${res.error ?? "sin detalles"}`, kind: "error" });
-      }
-    } catch (e: any) {
-      addLog({ text: `Error: ${e?.response?.data?.detail ?? e?.message}`, kind: "error" });
-    } finally {
-      setConnecting(false);
-    }
-  }
-
-  function handleDisconnect() {
-    addLog({ text: `Desconectado de ${activeConn?.host}`, kind: "info" });
-    setActiveConn(null);
-  }
-
-  const remotePayload = activeConn ? toPayload(activeConn) : null;
-
-  return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] gap-3 min-h-0">
-      {/* Page header */}
-      <div className="flex items-end justify-between shrink-0">
-        <div>
-          <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Módulo</p>
-          <h1 className="font-title text-4xl font-semibold text-crema">
-            Gestor de Archivos<span className="text-arcilla">.</span>
-          </h1>
-        </div>
-      </div>
-
-      {/* Connection bar */}
-      <ConnectionBar
-        onConnect={handleConnect}
-        onDisconnect={handleDisconnect}
-        connected={!!activeConn}
-        connecting={connecting}
-        activeConn={activeConn}
-      />
-
-      {/* Status log */}
-      <StatusLog messages={messages} />
-
-      {/* Main panels */}
-      <div className="flex-1 grid grid-cols-[1fr_1fr_220px] gap-3 min-h-0 overflow-hidden">
-        <FilePanel
-          side="local"
-          conn={null}
-          onLog={addLog}
-          onQueue={queueProxy}
-          onOpDone={updateOp}
-        />
-        <FilePanel
-          side="remote"
-          conn={remotePayload}
-          onLog={addLog}
-          onQueue={queueProxy}
-          onOpDone={updateOp}
-        />
-        <QuickCleanupPanel
-          conn={remotePayload}
-          basePath={remotePath}
-          onLog={addLog}
-          onQueue={queueProxy}
-          onOpDone={updateOp}
-        />
-      </div>
-
-      {/* Operation queue */}
-      <OperationQueue ops={operations} />
-    </div>
-  );
-}
+function EmptyState({ text }: { text: string }) { return <div className="rounded-[1.1rem] border border-musgo/20 bg-musgo/[0.05] p-12 text-center"><FolderLock size={22} className="mx-auto mb-3 text-crema/20" /><p className="text-sm text-crema/45">{text}</p></div>; }
+function Stat({ label, value, accent }: { label: string; value: number | string; accent?: boolean }) { return <div className="rounded-[0.75rem] border border-musgo/20 bg-carbon/40 p-3"><p className={accent ? "text-xl font-semibold tabular-nums text-arcilla" : "text-xl font-semibold tabular-nums text-crema/80"}>{value}</p><p className="mt-1 text-[9px] uppercase tracking-wider text-crema/30">{label}</p></div>; }
+function ProgressCard({ label, current, total }: { label: string; current: number; total: number }) { const percent = total ? Math.round(current / total * 100) : 8; return <div className="mt-5 rounded-[0.875rem] border border-musgo/20 p-4"><div className="flex items-center justify-between text-xs text-crema/45"><span className="flex items-center gap-2"><Loader2 size={13} className="animate-spin text-arcilla" /> {label}</span><span className="tabular-nums">{current}/{total || "?"}</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-musgo/20"><div className="h-full bg-arcilla transition-[width]" style={{ width: `${percent}%` }} /></div></div>; }

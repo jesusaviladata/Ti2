@@ -15,6 +15,16 @@ export const BACKUP_KEYS = {
   agentPlans: ["backups", "agent-plans"] as const,
 };
 
+export function backupNeedsPolling(value?: {
+  status?: string;
+  deliveryStatus?: string;
+} | null) {
+  if (!value) return true;
+  if (value.status === "pending" || value.status === "running") return true;
+  return value.status === "completed"
+    && ["pending", "processing"].includes(value.deliveryStatus ?? "pending");
+}
+
 export function useBackupList(skip = 0, limit = 50) {
   return useQuery({
     queryKey: BACKUP_KEYS.list(skip, limit),
@@ -72,8 +82,7 @@ export function useBackupStatus(backupId: string | null) {
     queryFn:  () => backupsService.getStatus(backupId!),
     enabled:  !!backupId,
     refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === "running" || status === "pending" ? 2000 : false;
+      return backupNeedsPolling(query.state.data) ? 2000 : false;
     },
   });
 }
@@ -92,8 +101,7 @@ export function useBackupStatuses(backupIds: string[]) {
       queryKey: BACKUP_KEYS.status(backupId),
       queryFn: () => backupsService.getStatus(backupId),
       refetchInterval: (query: any) => {
-        const status = query.state.data?.status;
-        return status === "running" || status === "pending" ? 1000 : false;
+        return backupNeedsPolling(query.state.data) ? 1000 : false;
       },
     })),
   });

@@ -37,9 +37,9 @@ function BackupRunRow({ initial }: { initial: BackupRecord }) {
       </div>
       {ready ? (
         <div className="mt-2 flex items-center gap-2 border-t border-musgo/15 pt-2 text-[10px]">
-          {delivery === "delivered" ? <PackageCheck size={12} className="text-green-400" /> : delivery === "failed" ? <XCircle size={12} className="text-amber-400" /> : <Send size={12} className="text-arcilla" />}
-          <span className={delivery === "failed" ? "text-amber-400" : delivery === "delivered" ? "text-green-400/80" : "text-crema/40"}>
-            {delivery === "delivered" ? "ZIP / envío completado" : delivery === "failed" ? `Backup listo · entrega fallida${status.deliveryErrorMessage ? `: ${status.deliveryErrorMessage}` : ""}` : status.deliveryPhase === "transferring" ? "Enviando en segundo plano…" : "Preparando ZIP en segundo plano…"}
+          {delivery === "delivered" || delivery === "local_ready" ? <PackageCheck size={12} className="text-green-400" /> : delivery === "failed" ? <XCircle size={12} className="text-amber-400" /> : <Send size={12} className="text-arcilla" />}
+          <span className={delivery === "failed" ? "text-amber-400" : delivery === "delivered" || delivery === "local_ready" ? "text-green-400/80" : "text-crema/40"}>
+            {delivery === "delivered" ? "Entregado y verificado" : delivery === "local_ready" ? "ZIP local listo" : delivery === "failed" ? `Backup listo · entrega fallida${status.deliveryErrorMessage ? `: ${status.deliveryErrorMessage}` : ""}` : status.deliveryPhase === "transferring" ? "Enviando en segundo plano…" : "Preparando ZIP en segundo plano…"}
           </span>
         </div>
       ) : null}

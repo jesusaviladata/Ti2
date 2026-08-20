@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Link2, ServerCog, Settings2, WifiOff } from "lucide-react";
+import { Copy, Link2, Network, ServerCog, Settings2, WifiOff } from "lucide-react";
 import { useAgents, usePairingCode } from "@/hooks/useAgents";
 import { AgentRootWizard } from "@/components/agents/agent-root-wizard";
 import type { AgentRecord } from "@/types/agent";
+import { ManagedProfilesPanel } from "@/components/agents/managed-profiles-panel";
 
 export function AgentsAdmin() {
   const agentsQuery = useAgents();
   const pairing = usePairingCode();
   const [editing, setEditing] = useState<AgentRecord | null>(null);
+  const [connections, setConnections] = useState<AgentRecord | null>(null);
 
   return (
     <div className="space-y-5">
@@ -34,10 +36,11 @@ export function AgentsAdmin() {
               <div className="flex flex-wrap items-center gap-2"><ServerCog size={14} className="text-arcilla/70" /><span className="text-sm font-medium text-crema/80">{agent.configuration?.name ?? agent.hostname}</span><span className={agent.online ? "font-mono text-[10px] text-green-400" : "font-mono text-[10px] text-red-400"}>● {agent.online ? "Conectado" : "Desconectado"}</span></div>
               <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 font-mono text-[10px] text-crema/35"><span>{agent.hostname} · v{agent.agentVersion}</span><span>{agent.configuration?.root ?? "Raíz pendiente"}</span><span>{agent.metadata.sqlInstances?.length ?? 0} perfiles SQL</span><span>Último contacto: {agent.lastSeenAt ? new Date(agent.lastSeenAt).toLocaleString("es", { dateStyle: "short", timeStyle: "short" }) : "nunca"}</span></div>
             </div>
-            <button type="button" disabled={!agent.online} title={agent.online ? undefined : "Conecte el agente para configurar la raíz"} onClick={() => setEditing(agent)} className="flex h-8 items-center justify-center gap-2 rounded-[0.5rem] border border-musgo/25 px-3 text-xs text-crema/55 hover:border-arcilla/30 hover:text-crema disabled:cursor-not-allowed disabled:opacity-30"><Settings2 size={12} /> {agent.configuration ? "Editar raíz" : "Configurar raíz"}</button>
+            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setConnections(agent)} className="flex h-8 items-center justify-center gap-2 rounded-[0.5rem] border border-musgo/25 px-3 text-xs text-crema/55 hover:border-arcilla/30 hover:text-crema"><Network size={12} /> Conexiones</button><button type="button" disabled={!agent.online} title={agent.online ? undefined : "Conecte el agente para configurar la raíz"} onClick={() => setEditing(agent)} className="flex h-8 items-center justify-center gap-2 rounded-[0.5rem] border border-musgo/25 px-3 text-xs text-crema/55 hover:border-arcilla/30 hover:text-crema disabled:cursor-not-allowed disabled:opacity-30"><Settings2 size={12} /> {agent.configuration ? "Editar raíz" : "Configurar raíz"}</button></div>
           </div>
         ))}
       </div>
+      {connections ? <ManagedProfilesPanel agent={connections} onClose={() => setConnections(null)} /> : null}
       {editing ? <AgentRootWizard agent={editing} onClose={() => setEditing(null)} /> : null}
     </div>
   );
