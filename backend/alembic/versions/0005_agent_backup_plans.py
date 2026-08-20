@@ -35,18 +35,6 @@ def upgrade() -> None:
             server_default=sa.text("'[]'::jsonb"),
             nullable=False,
         ),
-        sa.Column(
-            "full_days",
-            postgresql.JSONB(astext_type=sa.Text()),
-            server_default=sa.text("'[0, 2, 4]'::jsonb"),
-            nullable=False,
-        ),
-        sa.Column(
-            "differential_days",
-            postgresql.JSONB(astext_type=sa.Text()),
-            server_default=sa.text("'[1, 3]'::jsonb"),
-            nullable=False,
-        ),
         sa.Column("local_time", sa.String(5), server_default="02:00", nullable=False),
         sa.Column(
             "timezone_name",
