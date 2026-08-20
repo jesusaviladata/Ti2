@@ -164,3 +164,27 @@ def test_progress_forwards_backup_database_and_validated_artifact_details():
         },
     )
     client.close()
+
+
+def test_heartbeat_sends_versioned_health_and_volume_payload():
+    server_private_key = Ed25519PrivateKey.generate()
+    identity = AgentIdentity.generate()
+    identity.agent_id = str(uuid.uuid4())
+    identity.tenant_id = str(uuid.uuid4())
+
+    def handler(request):
+        body = json.loads(request.content)
+        assert body["agentVersion"] == "0.3.0"
+        assert body["health"]["status"] == "busy"
+        assert body["volumes"][0]["volumeKey"] == "D:"
+        return httpx.Response(200, json={"status": "ok"})
+
+    client = AgentClient(
+        _config(server_private_key), identity, transport=httpx.MockTransport(handler)
+    )
+    client.heartbeat(
+        {"hostname": "CORE-01"},
+        health={"status": "busy", "appliedConfigRevision": 0},
+        volumes=[{"volumeKey": "D:"}],
+    )
+    client.close()

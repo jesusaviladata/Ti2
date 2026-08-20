@@ -159,12 +159,62 @@ class BackupExecutor:
         connect: Callable[..., Any] | None = None,
         now: Callable[[], datetime] | None = None,
         cleanup_submit: Callable[[list[Path], Path], dict[str, Any]] | None = None,
+        disk_usage: Callable[[str | Path], Any] = shutil.disk_usage,
+        size_history: dict[str, int] | None = None,
     ):
         self.sql_profiles = sql_profiles
         self.destination_profiles = destination_profiles
         self._connect_override = connect
         self.now = now or datetime.now
         self._cleanup_submit = cleanup_submit
+        self.disk_usage = disk_usage
+        self.size_history = size_history or {}
+
+    def _allocated_database_bytes(
+        self, connection: Any, databases: list[str]
+    ) -> dict[str, int]:
+        literals = ",".join(_sql_unicode_literal(name) for name in databases)
+        rows = connection.execute(
+            "SELECT DB_NAME(database_id), SUM(CAST(size AS bigint)) * 8192 "
+            "FROM sys.master_files "
+            f"WHERE DB_NAME(database_id) IN ({literals}) GROUP BY database_id"
+        ).fetchall()
+        return {str(row[0]): max(0, int(row[1] or 0)) for row in rows}
+
+    def _preflight_space(
+        self,
+        connection: Any,
+        databases: list[str],
+        configured_root: Path,
+        payload: dict[str, Any],
+    ) -> dict[str, int]:
+        allocated = self._allocated_database_bytes(connection, databases)
+        estimates = [
+            max(int(self.size_history.get(name, 0)), int(allocated.get(name, 0)))
+            for name in databases
+        ]
+        estimated_backup_bytes = sum(estimates)
+        # The .bak files and the temporary ZIP coexist until integrity checks pass.
+        estimated_work_bytes = estimated_backup_bytes * 2
+        thresholds = payload.get("storageThresholds") or {}
+        critical_reserve = int(
+            thresholds.get("criticalFreeBytes") or 10 * 1024**3
+        )
+        usage = self.disk_usage(configured_root)
+        free_bytes = int(usage.free)
+        if free_bytes - estimated_work_bytes < critical_reserve:
+            raise BackupError(
+                "BACKUP_SPACE_INSUFFICIENT",
+                "Espacio insuficiente antes de iniciar SQL Server "
+                f"(libre={free_bytes}, estimado={estimated_work_bytes}, "
+                f"reserva={critical_reserve}, volumen={configured_root.anchor or configured_root})",
+            )
+        return {
+            "freeBytes": free_bytes,
+            "estimatedBackupBytes": estimated_backup_bytes,
+            "estimatedWorkBytes": estimated_work_bytes,
+            "criticalReserveBytes": critical_reserve,
+        }
 
     def _connect(self, profile: dict[str, Any]):
         if self._connect_override is not None:
@@ -215,6 +265,18 @@ class BackupExecutor:
         configured_root = Path(str(profile.get("backupRoot") or "D:\\"))
         if not configured_root.is_absolute():
             raise BackupError("BACKUP_ROOT_INVALID", "La raiz de backup debe ser absoluta")
+        try:
+            with self._connect(profile) as connection:
+                preflight = self._preflight_space(
+                    connection, databases, configured_root, payload
+                )
+        except BackupError:
+            raise
+        except Exception as exc:
+            raise BackupError(
+                "BACKUP_SPACE_CHECK_FAILED",
+                "No fue posible estimar el espacio requerido para el backup",
+            ) from exc
         self._resume_pending_cleanups(configured_root)
         date_text = self.now().strftime("%Y-%m-%d")
         dated_dir = configured_root / date_text
@@ -384,6 +446,7 @@ class BackupExecutor:
             "databases": database_results,
             "transfer": transfer_result,
             "localSourceCleanup": cleanup_result,
+            "storagePreflight": preflight,
         }
         if progress:
             progress(

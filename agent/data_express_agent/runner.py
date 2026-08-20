@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 import logging
-import platform
-import random
 import threading
-import time
 from typing import Any
 
 from .backup import BackupError, BackupExecutor
 from .client import AgentClient, AgentClientError
 from .cleanup import CleanupError, StructuralCleanupExecutor
 from .explorer import ExplorerError, WindowsExplorer
+from .health import AgentHealthSupervisor
 from .journal import ExecutionJournal
+from .runner_utils import retry_delay
+from .storage import StorageCollector
 
 
 logger = logging.getLogger("data_express_agent")
@@ -28,12 +28,6 @@ DESTRUCTIVE_COMMANDS = frozenset(
 )
 
 
-def retry_delay(attempt: int, *, random_value: float | None = None) -> float:
-    base = min(60.0, 2.0 ** max(0, attempt))
-    jitter = random.random() if random_value is None else random_value
-    return base * (0.75 + 0.5 * jitter)
-
-
 class AgentRunner:
     def __init__(
         self,
@@ -43,6 +37,7 @@ class AgentRunner:
         explorer: WindowsExplorer | None = None,
         backup_executor: BackupExecutor | None = None,
         cleanup_executor: StructuralCleanupExecutor | None = None,
+        health_supervisor: AgentHealthSupervisor | None = None,
     ):
         self.client = client
         self.journal = journal
@@ -53,6 +48,19 @@ class AgentRunner:
             destination_profiles=getattr(config, "backup_destinations", ()),
         )
         self.cleanup = cleanup_executor or StructuralCleanupExecutor(journal.path.parent)
+        if health_supervisor is not None:
+            self.health = health_supervisor
+        else:
+            storage = StorageCollector.from_profiles(
+                getattr(config, "sql_instances", ()),
+                getattr(config, "backup_destinations", ()),
+                getattr(config, "cleanup_roots", ()),
+            )
+            self.health = AgentHealthSupervisor(
+                client,
+                interval_seconds=float(getattr(config, "heartbeat_interval_seconds", 30)),
+                volume_collector=storage.collect,
+            )
         self.handlers = {
             "browse_drives": self._browse_drives,
             "browse_directory": self._browse_directory,
@@ -110,6 +118,7 @@ class AgentRunner:
             self.flush_reports()
             return True
         self.journal.record_started(command)
+        self.health.begin_operation(str(command.get("type") or "command"))
         try:
             result = self._execute(command)
             self.journal.record_completed(command_id, result)
@@ -117,6 +126,8 @@ class AgentRunner:
             code = getattr(exc, "code", "COMMAND_FAILED")
             logger.exception("Command %s failed: %s", command_id, code)
             self.journal.record_failed(command_id, code, str(exc))
+        finally:
+            self.health.end_operation()
         self.flush_reports()
         return True
 
@@ -124,35 +135,29 @@ class AgentRunner:
         stop = stop_event or threading.Event()
         self.recover_interrupted()
         attempt = 0
-        last_heartbeat = 0.0
-        while not stop.is_set():
-            try:
-                now = time.monotonic()
-                if now - last_heartbeat >= 60:
-                    public_metadata = getattr(self.client.config, "public_metadata", lambda: {})
-                    self.client.heartbeat(
-                        {
-                            "hostname": platform.node(),
-                            "os": platform.platform(),
-                            **public_metadata(),
-                        }
-                    )
-                    last_heartbeat = now
-                self.run_once()
-                attempt = 0
-            except AgentClientError as exc:
-                if not exc.recoverable:
-                    logger.error("Agent request stopped: %s", exc.code)
-                    raise
-                delay = retry_delay(attempt)
-                attempt += 1
-                logger.warning("Railway unavailable; retrying in %.1fs", delay)
-                stop.wait(delay)
-            except Exception:
-                logger.exception("Unexpected agent failure")
-                stop.wait(retry_delay(attempt))
-                attempt += 1
-        self.client.close()
+        self.health.start(stop)
+        try:
+            while not stop.is_set():
+                try:
+                    self.run_once()
+                    attempt = 0
+                except AgentClientError as exc:
+                    if not exc.recoverable:
+                        logger.error("Agent request stopped: %s", exc.code)
+                        raise
+                    delay = retry_delay(attempt)
+                    attempt += 1
+                    logger.warning("Railway unavailable; retrying in %.1fs", delay)
+                    stop.wait(delay)
+                except Exception:
+                    logger.exception("Unexpected agent failure")
+                    stop.wait(retry_delay(attempt))
+                    attempt += 1
+            if self.health.fatal_error is not None:
+                raise self.health.fatal_error
+        finally:
+            self.health.stop()
+            self.client.close()
 
     def _execute(self, command: dict[str, Any]) -> dict[str, Any]:
         command_type = command["type"]

@@ -29,9 +29,41 @@ class _SuccessfulConnection:
     def __init__(self):
         self.calls = []
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
     def execute(self, sql):
         self.calls.append(sql)
+        if sql.startswith("SELECT DB_NAME"):
+            return type("Rows", (), {"fetchall": lambda self: [("Ipsofactu", 100)]})()
         return _Cursor()
+
+
+def test_preflight_rejects_backup_before_sql_when_critical_reserve_would_be_invaded(tmp_path: Path):
+    connection = _SuccessfulConnection()
+    executor = BackupExecutor(
+        sql_profiles=(
+            {"id": "sql-main", "label": "SQL", "backupRoot": str(tmp_path)},
+        ),
+        connect=lambda _profile: connection,
+        disk_usage=lambda _root: type("Usage", (), {"free": 150})(),
+    )
+
+    with pytest.raises(BackupError) as rejected:
+        executor.run_batch(
+            {
+                "sqlProfileId": "sql-main",
+                "databaseNames": ["Ipsofactu"],
+                "backupType": "full",
+                "storageThresholds": {"criticalFreeBytes": 10},
+            }
+        )
+
+    assert rejected.value.code == "BACKUP_SPACE_INSUFFICIENT"
+    assert not any(call.startswith("BACKUP DATABASE") for call in connection.calls)
 
 
 def test_backup_validation_permission_failure_is_not_accepted(tmp_path: Path):

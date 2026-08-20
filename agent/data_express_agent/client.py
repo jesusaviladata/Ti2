@@ -95,14 +95,25 @@ class AgentClient:
                 "ENROLLMENT_RESPONSE_INVALID", "Railway devolvió una respuesta inválida"
             ) from exc
 
-    def heartbeat(self, metadata: dict[str, Any]) -> None:
+    def heartbeat(
+        self,
+        metadata: dict[str, Any],
+        *,
+        health: dict[str, Any] | None = None,
+        volumes: list[dict[str, Any]] | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "agentVersion": self.config.agent_version,
+            "metadata": metadata,
+        }
+        if health is not None:
+            payload["health"] = health
+        if volumes is not None:
+            payload["volumes"] = volumes
         self._request(
             "POST",
             "/agent/v1/heartbeat",
-            {
-                "agentVersion": self.config.agent_version,
-                "metadata": metadata,
-            },
+            payload,
         )
 
     def next_command(self) -> dict[str, Any] | None:

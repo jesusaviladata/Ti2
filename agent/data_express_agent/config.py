@@ -27,9 +27,11 @@ class AgentConfig:
     agent_version: str = "0.3.0"
     poll_wait_seconds: int = 25
     request_timeout_seconds: int = 40
+    heartbeat_interval_seconds: int = 30
     verify_tls: bool = True
     sql_instances: tuple[dict, ...] = ()
     backup_destinations: tuple[dict, ...] = ()
+    cleanup_roots: tuple[str, ...] = ()
 
     @classmethod
     def from_file(cls, path: Path) -> "AgentConfig":
@@ -48,9 +50,11 @@ class AgentConfig:
                 agent_version=str(raw.get("agentVersion", "0.3.0")),
                 poll_wait_seconds=int(raw.get("pollWaitSeconds", 25)),
                 request_timeout_seconds=int(raw.get("requestTimeoutSeconds", 40)),
+                heartbeat_interval_seconds=int(raw.get("heartbeatIntervalSeconds", 30)),
                 verify_tls=bool(raw.get("verifyTls", True)),
                 sql_instances=tuple(raw.get("sqlInstances") or ()),
                 backup_destinations=tuple(raw.get("backupDestinations") or ()),
+                cleanup_roots=tuple(str(item) for item in (raw.get("cleanupRoots") or ())),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise AgentConfigError("La configuración del agente está incompleta") from exc
@@ -69,8 +73,12 @@ class AgentConfig:
             raise AgentConfigError("pollWaitSeconds debe estar entre 0 y 25")
         if self.request_timeout_seconds < self.poll_wait_seconds + 5:
             raise AgentConfigError("requestTimeoutSeconds es demasiado corto")
+        if not 10 <= self.heartbeat_interval_seconds <= 120:
+            raise AgentConfigError("heartbeatIntervalSeconds debe estar entre 10 y 120")
         self._validate_profiles(self.sql_instances, "sqlInstances")
         self._validate_profiles(self.backup_destinations, "backupDestinations")
+        if any(not item.strip() or len(item) > 2048 for item in self.cleanup_roots):
+            raise AgentConfigError("cleanupRoots contiene una ruta invalida")
 
     @staticmethod
     def _validate_profiles(profiles: tuple[dict, ...], field_name: str) -> None:
