@@ -1,3 +1,7 @@
+from pathlib import Path
+
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -6,7 +10,20 @@ from app.core.config import settings
 from app.core.database import engine
 
 
-EXPECTED_ALEMBIC_REVISION = "0005"
+
+def _expected_alembic_revision() -> str:
+    backend_root = Path(__file__).resolve().parents[2]
+    config = Config(str(backend_root / "alembic.ini"))
+    config.set_main_option("script_location", str(backend_root / "alembic"))
+    heads = ScriptDirectory.from_config(config).get_heads()
+    if len(heads) != 1:
+        raise RuntimeError(
+            f"Se esperaba un unico head de Alembic y se encontraron {len(heads)}"
+        )
+    return heads[0]
+
+
+EXPECTED_ALEMBIC_REVISION = _expected_alembic_revision()
 router = APIRouter(tags=["health"])
 
 
