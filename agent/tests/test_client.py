@@ -174,7 +174,7 @@ def test_heartbeat_sends_versioned_health_and_volume_payload():
 
     def handler(request):
         body = json.loads(request.content)
-        assert body["agentVersion"] == "0.3.0"
+        assert body["agentVersion"] == "0.4.0"
         assert body["health"]["status"] == "busy"
         assert body["volumes"][0]["volumeKey"] == "D:"
         return httpx.Response(200, json={"status": "ok"})

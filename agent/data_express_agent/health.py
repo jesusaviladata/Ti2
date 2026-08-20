@@ -99,6 +99,7 @@ class AgentHealthSupervisor:
 
     def _run(self) -> None:
         attempt = 0
+        confirmed = False
         while not self._stopped():
             try:
                 self.client.heartbeat(
@@ -106,6 +107,12 @@ class AgentHealthSupervisor:
                     health=self.snapshot(),
                     volumes=self.volume_collector(),
                 )
+                if not confirmed:
+                    logger.info(
+                        "Heartbeat confirmado con backend para agente %s",
+                        getattr(self.client.config, "agent_version", "desconocida"),
+                    )
+                    confirmed = True
                 attempt = 0
                 self._wait(self.interval_seconds)
             except AgentClientError as exc:

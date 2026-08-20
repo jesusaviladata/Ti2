@@ -15,7 +15,7 @@ Antes de instalar necesita:
 2. Clave publica de firma de ordenes.
 3. Identificador de esa clave.
 4. Codigo de vinculacion vigente generado en el panel.
-5. Archivo agent-profiles.json adaptado desde agent-profiles.example.json.
+5. Opcional: agent-profiles.json para migrar perfiles locales anteriores.
 
 Instalacion:
 1. Extraiga TODO el archivo ZIP.
@@ -29,8 +29,11 @@ Instalacion:
      -ServerUrl "https://ti2.up.railway.app" `
      -CommandSigningPublicKey "CLAVE_PUBLICA" `
      -CommandSigningKeyId "railway-2026-01" `
-     -PairingCode "CODIGO_DEL_PANEL" `
-     -ProfilesFile ".\agent-profiles.json"
+     -PairingCode "CODIGO_DEL_PANEL"
+
+Si necesita migrar perfiles locales, agregue:
+
+   -ProfilesFile ".\agent-profiles.json"
 
 5. Compruebe:
 
@@ -49,8 +52,13 @@ sale a la red como la cuenta del servidor) debe tener acceso al recurso comparti
 Para SFTP se recomienda una llave privada local con permisos exclusivos para la cuenta
 del servicio. Nunca agregue password o connectionString al archivo de perfiles.
 
-FUNCIONES DE LA VERSION 0.3.0
+FUNCIONES DE LA VERSION 0.4.0
 
+- Mantiene heartbeat cada 30 segundos aunque SQL Server tarde varios minutos.
+- Reporta capacidad de los discos y bloquea el inicio si invadiria la reserva critica.
+- Guarda Full en Fecha\FULL\Backup_Fecha.zip y diferencial en Fecha\DIFERENCIAL\Backup_Fecha.zip.
+- Nombra los archivos Base_Fecha.bak y Base_Fecha_DIF.bak.
+- Permite administrar perfiles SQL y destinos desde el dashboard con secretos cifrados para este agente.
 - Usa una carpeta temporal por lote y elimina los .bak despues de validar y transferir el ZIP.
 - Si la compresion o transferencia falla, conserva los .bak temporales para recuperacion.
 - Usa compresion ZIP rapida para reducir el tiempo de CPU.
@@ -70,12 +78,10 @@ Abra PowerShell como administrador dentro de la carpeta installer y ejecute:
   .\Update-DataExpressAgent.ps1
 
 El actualizador conserva agent.json, la identidad, las llaves SFTP y el emparejamiento.
-- Exploracion de discos y carpetas.
-- Simulacion de limpieza estructural.
-- Movimiento reversible a cuarentena, restauracion y purga.
-- Descubrimiento de bases por instancia SQL configurada.
-- Backups .bak/.trn en D:\AAAA-MM-DD y ZIP diario. Cuando SQL Server Express
-  no permite RESTORE VERIFYONLY sin privilegios amplios, valida tamano y SHA-256
-  del .bak antes de comprimir, y la integridad del ZIP despues de crearlo.
-- Transferencia opcional del ZIP por SFTP o SMB.
+Espera a que el servicio se detenga, instala la nueva version y exige un heartbeat
+confirmado por el backend. Si no lo recibe dentro de 90 segundos, restaura la version
+y la configuracion anteriores de forma automatica.
+
+La configuracion normal de conexiones se realiza desde Dashboard > Agentes > Conexiones.
+El archivo agent-profiles.json se conserva solo para compatibilidad durante la migracion.
 
