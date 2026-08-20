@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -173,13 +174,141 @@ class RemoteAgent(TenantRecord, Base):
     os_version: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     agent_version: Mapped[str] = mapped_column(String(50), nullable=False)
     public_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    encryption_public_key: Mapped[str | None] = mapped_column(String(128))
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    desired_config_revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    applied_config_revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    health_status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="unknown"
+    )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="SET NULL")
     )
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class AgentVolumeState(TenantRecord, Base):
+    __tablename__ = "agent_volume_states"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "agent_id",
+            "volume_key",
+            name="uq_agent_volume_state_agent_volume",
+        ),
+        Index(
+            "ix_agent_volume_states_tenant_agent_observed",
+            "tenant_id",
+            "agent_id",
+            "observed_at",
+        ),
+    )
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("remote_agents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    volume_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    mount_point: Mapped[str] = mapped_column(String(512), nullable=False)
+    total_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    free_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    used_percent: Mapped[float | None] = mapped_column(Float)
+    roles: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    observed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    error: Mapped[str | None] = mapped_column(String(512))
+
+
+class AgentStorageAlert(TenantRecord, Base):
+    __tablename__ = "agent_storage_alerts"
+    __table_args__ = (
+        Index(
+            "uq_agent_storage_alert_open",
+            "tenant_id",
+            "agent_id",
+            "volume_key",
+            unique=True,
+            postgresql_where=text("status = 'open'"),
+        ),
+        Index(
+            "ix_agent_storage_alerts_tenant_status",
+            "tenant_id",
+            "status",
+            "last_observed_at",
+        ),
+    )
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("remote_agents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    volume_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
+    free_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    total_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    free_percent: Mapped[float | None] = mapped_column(Float)
+    thresholds: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    last_observed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AgentConnectionProfile(TenantRecord, Base):
+    __tablename__ = "agent_connection_profiles"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "agent_id",
+            "profile_type",
+            "profile_key",
+            name="uq_agent_connection_profile_key",
+        ),
+        Index(
+            "ix_agent_connection_profiles_tenant_active",
+            "tenant_id",
+            "agent_id",
+            "is_active",
+        ),
+    )
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("remote_agents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    profile_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    profile_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    public_config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    secret_envelope: Mapped[str | None] = mapped_column(Text)
+    desired_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    applied_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sync_status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="pending"
+    )
+    last_test_status: Mapped[str | None] = mapped_column(String(30))
+    last_test_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
 class AgentBackupPlan(TenantRecord, Base):
