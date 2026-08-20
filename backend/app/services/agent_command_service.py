@@ -6,8 +6,11 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
+from sqlalchemy import select
+
 from app.core.errors import ConflictError, DomainError, NotFoundError
-from app.models.operations import AgentCommand, RemoteAgent
+from app.models.backup import Backup, BackupStatus
+from app.models.operations import AgentCommand, RemoteAgent, RemoteCleanupExecution
 from app.repositories.agent_repository import AgentRepository
 
 
@@ -21,6 +24,10 @@ ALLOWED_COMMAND_TYPES = frozenset(
         "restore_quarantine_item",
         "purge_quarantine_items",
         "cancel_job",
+        "list_sql_databases",
+        "run_backup_batch",
+        "retry_backup_delivery",
+        "execute_structural_direct",
     }
 )
 
@@ -112,6 +119,8 @@ class AgentCommandService:
         processed_units: int,
         total_units: int,
         found_count: int,
+        database: str | None = None,
+        details: dict[str, Any] | None = None,
     ) -> AgentCommand:
         command = await self._get(agent, command_id)
         if command.status in {"completed", "failed"}:
@@ -124,6 +133,21 @@ class AgentCommandService:
                 job.processed_units = max(0, processed_units)
                 job.total_units = max(0, total_units)
                 job.found_count = max(0, found_count)
+                if database or details:
+                    current = dict(job.result or {})
+                    current["progress"] = {
+                        "database": database,
+                        "details": details or {},
+                    }
+                    job.result = current
+        await self._project_backup_progress(
+            command,
+            phase=phase,
+            database=database,
+            details=details or {},
+            processed_units=processed_units,
+            total_units=total_units,
+        )
         await self.db.flush()
         return command
 
@@ -152,6 +176,8 @@ class AgentCommandService:
                 job.phase = "completed"
                 job.result = result
                 job.finished_at = now
+        await self._project_backup_complete(command, result, now)
+        await self._project_cleanup_complete(command, result, now)
         await self.db.flush()
         return command
 
@@ -182,6 +208,8 @@ class AgentCommandService:
                 job.phase = "failed"
                 job.error = command.error_message
                 job.finished_at = now
+        await self._project_backup_failure(command, command.error_message, now)
+        await self._project_cleanup_failure(command, command.error_message, now)
         await self.db.flush()
         return command
 
@@ -203,3 +231,155 @@ class AgentCommandService:
                 code="AGENT_COMMAND_STATE_INVALID",
             )
 
+    async def _backups_for_command(self, command: AgentCommand) -> list[Backup]:
+        if command.command_type not in {"run_backup_batch", "retry_backup_delivery"}:
+            return []
+        run_id = str(command.payload.get("runId") or "")
+        if not run_id:
+            return []
+        result = await self.db.execute(
+            select(Backup).where(
+                Backup.tenant_id == command.tenant_id,
+                Backup.run_id == run_id,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def _project_backup_progress(
+        self,
+        command: AgentCommand,
+        *,
+        phase: str,
+        database: str | None,
+        details: dict[str, Any],
+        processed_units: int,
+        total_units: int,
+    ) -> None:
+        backups = await self._backups_for_command(command)
+        if not backups:
+            return
+        by_name = {item.database_name: item for item in backups}
+        item = by_name.get(database or "")
+        if item is not None and phase in {"creating_bak", "validating_bak", "backup_ready"}:
+            item.status = BackupStatus.running
+            item.phase = phase
+            item.started_at = item.started_at or self.now()
+            item.progress_percent = {
+                "creating_bak": 45,
+                "validating_bak": 90,
+                "backup_ready": 100,
+            }[phase]
+            if phase == "backup_ready":
+                item.status = BackupStatus.completed
+                item.validation_method = str(details.get("verificationMethod") or "restore_verifyonly")
+                item.file_path = str(details.get("fileName") or "") or None
+                item.file_size_bytes = int(details.get("fileSizeBytes") or 0) or None
+                item.sha256_hash = str(details.get("fileSha256") or "") or None
+                item.finished_at = self.now()
+                item.delivery_status = "processing"
+        elif phase in {"compressing", "archive_ready", "transferring"}:
+            percent = {"compressing": 35, "archive_ready": 60, "transferring": 80}[phase]
+            for backup in backups:
+                if backup.status == BackupStatus.completed:
+                    backup.delivery_status = "processing"
+                    backup.delivery_phase = phase
+                    backup.delivery_progress = percent
+                    if phase == "archive_ready":
+                        backup.archive_path = str(details.get("zipPath") or "") or None
+                        backup.archive_size_bytes = int(details.get("zipSizeBytes") or 0) or None
+                        backup.archive_sha256 = str(details.get("zipSha256") or "") or None
+
+    async def _project_backup_complete(
+        self, command: AgentCommand, result: dict[str, Any], now: datetime
+    ) -> None:
+        backups = await self._backups_for_command(command)
+        if not backups:
+            return
+        results = {
+            str(item.get("databaseName")): item
+            for item in result.get("databases", [])
+            if isinstance(item, dict)
+        }
+        transfer = result.get("transfer") if isinstance(result.get("transfer"), dict) else {}
+        for backup in backups:
+            data = results.get(backup.database_name)
+            if data:
+                backup.status = BackupStatus.completed
+                backup.phase = "backup_ready"
+                backup.progress_percent = 100
+                backup.validation_method = str(data.get("verificationMethod") or "restore_verifyonly")
+                backup.file_path = str(data.get("fileName") or "") or backup.file_path
+                backup.file_size_bytes = int(data.get("fileSizeBytes") or 0) or backup.file_size_bytes
+                backup.sha256_hash = str(data.get("fileSha256") or "") or backup.sha256_hash
+                backup.finished_at = backup.finished_at or now
+                backup.delivery_status = "delivered"
+                backup.delivery_phase = "delivered"
+                backup.delivery_progress = 100
+                backup.archive_path = str(transfer.get("path") or result.get("zipPath") or "") or None
+                backup.archive_size_bytes = int(result.get("zipSizeBytes") or 0) or None
+                backup.archive_sha256 = str(result.get("zipSha256") or "") or None
+            elif command.command_type == "retry_backup_delivery":
+                backup.delivery_status = "delivered"
+                backup.delivery_phase = "delivered"
+                backup.delivery_progress = 100
+                backup.delivery_error_message = None
+                backup.archive_path = str(transfer.get("path") or result.get("zipPath") or backup.archive_path or "") or None
+                backup.archive_size_bytes = int(result.get("zipSizeBytes") or 0) or backup.archive_size_bytes
+                backup.archive_sha256 = str(result.get("zipSha256") or backup.archive_sha256 or "") or None
+
+    async def _project_backup_failure(
+        self, command: AgentCommand, message: str, now: datetime
+    ) -> None:
+        backups = await self._backups_for_command(command)
+        if not backups:
+            return
+        for backup in backups:
+            if backup.status == BackupStatus.completed:
+                backup.delivery_status = "failed"
+                backup.delivery_phase = "failed"
+                backup.delivery_error_message = message
+                continue
+            if backup.status != BackupStatus.completed:
+                backup.status = BackupStatus.failed
+                backup.phase = "failed"
+                backup.error_message = message
+                backup.finished_at = now
+
+    async def _project_cleanup_complete(
+        self, command: AgentCommand, result: dict[str, Any], now: datetime
+    ) -> None:
+        if command.command_type != "execute_structural_direct" or not command.job_id:
+            return
+        job = await self.repo.get_background_job(command.job_id)
+        if job is None or job.resource_id is None:
+            return
+        execution = (
+            await self.db.execute(
+                select(RemoteCleanupExecution).where(RemoteCleanupExecution.id == job.resource_id)
+            )
+        ).scalar_one_or_none()
+        if execution is None:
+            return
+        failed = int(result.get("failedCount") or 0)
+        execution.status = "completed_with_warnings" if failed else "completed"
+        execution.summary = {**dict(execution.summary or {}), **result}
+        execution.finished_at = now
+
+    async def _project_cleanup_failure(
+        self, command: AgentCommand, message: str, now: datetime
+    ) -> None:
+        if command.command_type != "execute_structural_direct" or not command.job_id:
+            return
+        job = await self.repo.get_background_job(command.job_id)
+        if job is None or job.resource_id is None:
+            return
+        execution = (
+            await self.db.execute(
+                select(RemoteCleanupExecution).where(RemoteCleanupExecution.id == job.resource_id)
+            )
+        ).scalar_one_or_none()
+        if execution is None:
+            return
+        execution.status = "failed"
+        execution.summary = {**dict(execution.summary or {}), "error": message}
+        execution.finished_at = now

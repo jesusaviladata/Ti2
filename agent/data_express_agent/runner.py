@@ -7,7 +7,9 @@ import threading
 import time
 from typing import Any
 
+from .backup import BackupError, BackupExecutor
 from .client import AgentClient, AgentClientError
+from .cleanup import CleanupError, StructuralCleanupExecutor
 from .explorer import ExplorerError, WindowsExplorer
 from .journal import ExecutionJournal
 
@@ -17,8 +19,11 @@ logger = logging.getLogger("data_express_agent")
 DESTRUCTIVE_COMMANDS = frozenset(
     {
         "execute_structural_quarantine",
+        "execute_structural_direct",
         "restore_quarantine_item",
         "purge_quarantine_items",
+        "run_backup_batch",
+        "retry_backup_delivery",
     }
 )
 
@@ -36,14 +41,30 @@ class AgentRunner:
         journal: ExecutionJournal,
         *,
         explorer: WindowsExplorer | None = None,
+        backup_executor: BackupExecutor | None = None,
+        cleanup_executor: StructuralCleanupExecutor | None = None,
     ):
         self.client = client
         self.journal = journal
         self.explorer = explorer or WindowsExplorer()
+        config = getattr(client, "config", None)
+        self.backups = backup_executor or BackupExecutor(
+            sql_profiles=getattr(config, "sql_instances", ()),
+            destination_profiles=getattr(config, "backup_destinations", ()),
+        )
+        self.cleanup = cleanup_executor or StructuralCleanupExecutor(journal.path.parent)
         self.handlers = {
             "browse_drives": self._browse_drives,
             "browse_directory": self._browse_directory,
             "validate_structure": self._validate_structure,
+            "list_sql_databases": self._list_sql_databases,
+            "run_backup_batch": self._run_backup_batch,
+            "retry_backup_delivery": self._retry_backup_delivery,
+            "simulate_structural_cleanup": self._simulate_structural_cleanup,
+            "execute_structural_quarantine": self._execute_structural_quarantine,
+            "execute_structural_direct": self._execute_structural_direct,
+            "restore_quarantine_item": self._restore_quarantine_item,
+            "purge_quarantine_items": self._purge_quarantine_items,
         }
 
     def recover_interrupted(self) -> None:
@@ -60,7 +81,7 @@ class AgentRunner:
             try:
                 result = self._execute(command)
                 self.journal.record_completed(command_id, result)
-            except (ExplorerError, ValueError, KeyError) as exc:
+            except (ExplorerError, BackupError, CleanupError, ValueError, KeyError) as exc:
                 code = getattr(exc, "code", "COMMAND_FAILED")
                 self.journal.record_failed(command_id, code, str(exc))
 
@@ -92,8 +113,9 @@ class AgentRunner:
         try:
             result = self._execute(command)
             self.journal.record_completed(command_id, result)
-        except (ExplorerError, ValueError, KeyError) as exc:
+        except (ExplorerError, BackupError, CleanupError, ValueError, KeyError) as exc:
             code = getattr(exc, "code", "COMMAND_FAILED")
+            logger.exception("Command %s failed: %s", command_id, code)
             self.journal.record_failed(command_id, code, str(exc))
         self.flush_reports()
         return True
@@ -107,10 +129,12 @@ class AgentRunner:
             try:
                 now = time.monotonic()
                 if now - last_heartbeat >= 60:
+                    public_metadata = getattr(self.client.config, "public_metadata", lambda: {})
                     self.client.heartbeat(
                         {
                             "hostname": platform.node(),
                             "os": platform.platform(),
+                            **public_metadata(),
                         }
                     )
                     last_heartbeat = now
@@ -164,4 +188,43 @@ class AgentRunner:
             target_files=list(payload.get("targetFiles", [])),
             progress=progress,
         )
+
+    def _list_sql_databases(self, payload: dict[str, Any], _command_id: str):
+        return self.backups.list_databases(str(payload["sqlProfileId"]))
+
+    def _run_backup_batch(self, payload: dict[str, Any], command_id: str):
+        return self.backups.run_batch(
+            payload,
+            progress=lambda value: self.client.progress(command_id, value),
+        )
+
+    def _retry_backup_delivery(self, payload: dict[str, Any], command_id: str):
+        return self.backups.retry_delivery(
+            payload,
+            progress=lambda value: self.client.progress(command_id, value),
+        )
+
+    def _simulate_structural_cleanup(self, payload: dict[str, Any], command_id: str):
+        return self.cleanup.simulate(
+            payload,
+            progress=lambda value: self.client.progress(command_id, value),
+        )
+
+    def _execute_structural_quarantine(self, payload: dict[str, Any], command_id: str):
+        return self.cleanup.execute_quarantine(
+            payload,
+            progress=lambda value: self.client.progress(command_id, value),
+        )
+
+    def _execute_structural_direct(self, payload: dict[str, Any], command_id: str):
+        return self.cleanup.execute_direct(
+            payload,
+            progress=lambda value: self.client.progress(command_id, value),
+        )
+
+    def _restore_quarantine_item(self, payload: dict[str, Any], _command_id: str):
+        return self.cleanup.restore(payload)
+
+    def _purge_quarantine_items(self, payload: dict[str, Any], _command_id: str):
+        return self.cleanup.purge(payload)
 

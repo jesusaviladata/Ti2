@@ -4,10 +4,11 @@ import { useState } from "react";
 import { Database, CheckCircle2, XCircle, Clock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BackupList } from "@/components/backups/backup-list";
-import { TriggerBackupModal } from "@/components/backups/trigger-backup-modal";
-import { SqlConnectionModal } from "@/components/backups/sql-connection-modal";
-import { ConnectionDropdown } from "@/components/backups/connection-dropdown";
+import { AgentTriggerBackupModal } from "@/components/backups/agent-trigger-backup-modal";
+import { AgentSelector } from "@/components/agents/agent-selector";
+import { WeeklyBackupScheduler } from "@/components/backups/weekly-backup-scheduler";
 import { useBackupList } from "@/hooks/useBackups";
+import { useAgents, useSelectedAgentId } from "@/hooks/useAgents";
 
 function BackupStats() {
   const { data } = useBackupList(0, 100);
@@ -36,7 +37,7 @@ function BackupStats() {
           <div className={`w-8 h-8 rounded-[0.65rem] ${bg} flex items-center justify-center mb-3`}>
             <Icon size={15} className={color} />
           </div>
-          <p className="font-display text-3xl italic font-light text-crema/90">{value}</p>
+          <p className="text-3xl font-semibold tabular-nums text-crema/90">{value}</p>
           <p className="font-mono text-[11px] text-crema/35 mt-0.5">{label}</p>
         </div>
       ))}
@@ -45,8 +46,10 @@ function BackupStats() {
 }
 
 export default function BackupsPage() {
-  const [backupModalOpen,     setBackupModalOpen]     = useState(false);
-  const [connectionModalOpen, setConnectionModalOpen] = useState(false);
+  const [backupModalOpen, setBackupModalOpen] = useState(false);
+  const agentsQuery = useAgents();
+  const agents = agentsQuery.data?.items ?? [];
+  const [agentId, setAgentId] = useSelectedAgentId(agents);
 
   return (
     <div className="space-y-7">
@@ -60,11 +63,10 @@ export default function BackupsPage() {
         </div>
 
         <div className="flex items-center gap-2 mt-1 flex-wrap justify-end">
-          {/* Connection selector dropdown */}
-          <ConnectionDropdown onNewConnection={() => setConnectionModalOpen(true)} />
+          <AgentSelector agents={agents} value={agentId} onChange={setAgentId} />
 
           {/* Trigger backup */}
-          <Button onClick={() => setBackupModalOpen(true)} className="gap-2">
+          <Button onClick={() => setBackupModalOpen(true)} disabled={!agentId} className="gap-2">
             <Plus size={14} />
             Nuevo Backup
           </Button>
@@ -74,14 +76,15 @@ export default function BackupsPage() {
       {/* Stats */}
       <BackupStats />
 
+      <WeeklyBackupScheduler agentId={agentId} />
+
       {/* Historial */}
       <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 overflow-hidden">
         <BackupList />
       </div>
 
       {/* Modals */}
-      <TriggerBackupModal open={backupModalOpen}     onClose={() => setBackupModalOpen(false)} />
-      <SqlConnectionModal open={connectionModalOpen} onClose={() => setConnectionModalOpen(false)} />
+      <AgentTriggerBackupModal open={backupModalOpen} onClose={() => setBackupModalOpen(false)} agentId={agentId} />
     </div>
   );
 }

@@ -127,8 +127,22 @@ class AgentClient:
             ) from exc
 
     def progress(self, command_id: str, progress: dict[str, Any]) -> None:
+        # Only the typed progress contract is forwarded. Database and details
+        # let Railway persist the validated .bak before ZIP/delivery finishes.
+        payload = {
+            key: progress[key]
+            for key in (
+                "phase",
+                "processedUnits",
+                "totalUnits",
+                "foundCount",
+                "database",
+                "details",
+            )
+            if key in progress
+        }
         self._request(
-            "POST", f"/agent/v1/commands/{command_id}/progress", progress
+            "POST", f"/agent/v1/commands/{command_id}/progress", payload
         )
 
     def complete(self, command_id: str, result: dict[str, Any]) -> None:

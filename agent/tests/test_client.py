@@ -135,3 +135,32 @@ def test_enrollment_sends_public_identity_and_accepts_only_expected_key_id():
     assert identity.tenant_id == tenant_id
     client.close()
 
+
+def test_progress_forwards_backup_database_and_validated_artifact_details():
+    server_private_key = Ed25519PrivateKey.generate()
+    identity = AgentIdentity.generate()
+    identity.agent_id = str(uuid.uuid4())
+    identity.tenant_id = str(uuid.uuid4())
+    command_id = str(uuid.uuid4())
+
+    def handler(request):
+        body = json.loads(request.content)
+        assert body["phase"] == "backup_ready"
+        assert body["database"] == "Ipsofactu"
+        assert body["details"]["verificationMethod"] == "restore_verifyonly"
+        return httpx.Response(200, json={"status": "claimed"})
+
+    client = AgentClient(_config(server_private_key), identity, transport=httpx.MockTransport(handler))
+    client.progress(
+        command_id,
+        {
+            "phase": "backup_ready",
+            "processedUnits": 1,
+            "totalUnits": 1,
+            "foundCount": 1,
+            "database": "Ipsofactu",
+            "details": {"verificationMethod": "restore_verifyonly"},
+            "ignored": "not allowed",
+        },
+    )
+    client.close()

@@ -47,3 +47,18 @@ class AgentAdminRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_server_for_agent(
+        self, tenant_id: str, agent_id: str
+    ) -> RemoteServer | None:
+        try:
+            parsed_id = uuid.UUID(agent_id)
+        except ValueError:
+            return None
+        result = await self.db.execute(
+            select(RemoteServer).where(
+                RemoteServer.agent_id == parsed_id,
+                RemoteServer.tenant_id == tenant_uuid(tenant_id),
+                RemoteServer.transport == "agent",
+            )
+        )
+        return result.scalar_one_or_none()

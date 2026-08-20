@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, Enum as SAEnum, ForeignKey, String
+from sqlalchemy import BigInteger, DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +43,22 @@ class Backup(Base):
     file_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     sha256_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     error_message: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="SET NULL"), nullable=True
+    )
+    run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    phase: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    progress_percent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    validation_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    trigger_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    delivery_status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
+    delivery_phase: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    delivery_progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    delivery_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivery_profile_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    archive_path: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    archive_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    archive_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

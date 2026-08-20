@@ -9,6 +9,7 @@ export const BACKUP_KEYS = {
   list:      (skip = 0, limit = 50) => ["backups", "list", skip, limit] as const,
   status:    (id: string) => ["backups", "status", id] as const,
   databases: (connId?: string) => ["backups", "databases", connId ?? "env"] as const,
+  plans: ["backups", "plans"] as const,
 };
 
 export function useBackupList(skip = 0, limit = 50) {
@@ -47,5 +48,41 @@ export function useTriggerBackup() {
   return useMutation({
     mutationFn: backupsService.triggerBackup,
     onSuccess:  () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.all }),
+  });
+}
+
+export function useTriggerAgentBackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: backupsService.triggerAgentBackup,
+    onSuccess: () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.all }),
+  });
+}
+
+export function useAgentBackupPlans() {
+  return useQuery({ queryKey: BACKUP_KEYS.plans, queryFn: backupsService.listAgentPlans });
+}
+
+export function useCreateAgentBackupPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: backupsService.createAgentPlan,
+    onSuccess: () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.plans }),
+  });
+}
+
+export function useDeleteAgentBackupPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: backupsService.deleteAgentPlan,
+    onSuccess: () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.plans }),
+  });
+}
+
+export function useRetryBackupDelivery() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: backupsService.retryDelivery,
+    onSuccess: () => qc.invalidateQueries({ queryKey: BACKUP_KEYS.all }),
   });
 }

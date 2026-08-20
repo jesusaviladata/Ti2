@@ -22,6 +22,8 @@ class AgentProgressRequest(BaseModel):
     processed_units: int = Field(0, alias="processedUnits", ge=0, le=2_000_000_000)
     total_units: int = Field(0, alias="totalUnits", ge=0, le=2_000_000_000)
     found_count: int = Field(0, alias="foundCount", ge=0, le=2_000_000_000)
+    database: str | None = Field(None, max_length=255)
+    details: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -44,4 +46,3 @@ class AgentHeartbeatRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
-

@@ -16,11 +16,15 @@ from app.services.agent_admin_service import (
     AgentAdminService,
     server_payload,
 )
+from app.repositories.agent_admin_repository import AgentAdminRepository
 from app.services.agent_enrollment_service import AgentEnrollmentService
+from app.services.agent_operation_service import AgentOperationService, _is_online
 
 
 router = APIRouter()
 manage_config = require_capabilities(Capability.CONFIG_MANAGE)
+read_operations = require_capabilities(Capability.OPERATION_READ)
+run_backups = require_capabilities(Capability.BACKUP_RUN)
 
 
 class BrowseRequest(BaseModel):
@@ -47,6 +51,12 @@ class ConfigurationRequest(ValidateRequest):
     server_id: str | None = Field(None, alias="serverId")
 
 
+class DatabaseCatalogRequest(BaseModel):
+    sql_profile_id: str = Field(alias="sqlProfileId", min_length=1, max_length=128)
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
 def _require_enabled() -> None:
     if not settings.AGENT_MODULE_ENABLED:
         raise DomainError(
@@ -64,17 +74,53 @@ def _serialize(agent: RemoteAgent) -> dict:
         "lastSeenAt": agent.last_seen_at.isoformat() if agent.last_seen_at else None,
         "revokedAt": agent.revoked_at.isoformat() if agent.revoked_at else None,
         "createdAt": agent.created_at.isoformat() if agent.created_at else None,
+        "online": _is_online(agent),
+        "metadata": agent.metadata_json or {},
     }
 
 
 @router.get("")
 async def list_agents(
-    current_user: User = Depends(manage_config),
+    current_user: User = Depends(read_operations),
     db: AsyncSession = Depends(get_db),
 ):
     _require_enabled()
     items = await AgentEnrollmentService(db).list_agents(str(current_user.tenant_id))
-    return {"items": [_serialize(item) for item in items], "total": len(items)}
+    admin_repo = AgentAdminRepository(db)
+    payloads = []
+    for item in items:
+        payload = _serialize(item)
+        server = await admin_repo.get_server_for_agent(
+            str(current_user.tenant_id), str(item.id)
+        )
+        payload["configuration"] = server_payload(server) if server else None
+        payloads.append(payload)
+    return {"items": payloads, "total": len(payloads)}
+
+
+@router.get("/{agent_id}/profiles")
+async def agent_profiles(
+    agent_id: str,
+    current_user: User = Depends(read_operations),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    return await AgentOperationService(db).profiles(str(current_user.tenant_id), agent_id)
+
+
+@router.post("/{agent_id}/database-catalogs", status_code=status.HTTP_202_ACCEPTED)
+async def create_database_catalog(
+    agent_id: str,
+    body: DatabaseCatalogRequest,
+    current_user: User = Depends(run_backups),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    job = await AgentOperationService(db).start_database_catalog(
+        str(current_user.tenant_id), agent_id, body.sql_profile_id
+    )
+    await db.commit()
+    return {"jobId": str(job.id)}
 
 
 @router.post("/pairing-codes", status_code=status.HTTP_201_CREATED)
@@ -179,7 +225,7 @@ async def save_agent_configuration(
 @router.get("/jobs/{job_id}")
 async def get_agent_job(
     job_id: str,
-    current_user: User = Depends(manage_config),
+    current_user: User = Depends(read_operations),
     db: AsyncSession = Depends(get_db),
 ):
     _require_enabled()

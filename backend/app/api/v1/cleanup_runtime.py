@@ -10,6 +10,7 @@ from app.core.capabilities import Capability, require_capabilities
 from app.core.database import get_db
 from app.models.user import User
 from app.services.cleanup_service import CleanupService
+from app.services.agent_operation_service import AgentOperationService
 
 
 router = APIRouter()
@@ -56,6 +57,18 @@ class ExecuteBody(BaseModel):
     file_paths: list[str] = Field(default_factory=list)
     rule_id: str | None = None
     simulation_id: str | None = None
+
+
+class AgentCleanupSimulationBody(BaseModel):
+    agent_id: str = Field(alias="agentId")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class AgentCleanupExecutionBody(BaseModel):
+    simulation_job_id: str = Field(alias="simulationJobId")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
 
 
 class ScheduleBody(BaseModel):
@@ -173,6 +186,32 @@ async def execute(
         body.file_paths,
         body.simulation_id,
     )
+
+
+@router.post("/agent/simulations", status_code=status.HTTP_202_ACCEPTED)
+async def create_agent_cleanup_simulation(
+    body: AgentCleanupSimulationBody,
+    current_user: User = Depends(simulate_cleanup),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await AgentOperationService(db).start_cleanup_simulation(
+        str(current_user.tenant_id), body.agent_id
+    )
+    await db.commit()
+    return {"jobId": str(job.id)}
+
+
+@router.post("/agent/executions", status_code=status.HTTP_202_ACCEPTED)
+async def create_agent_cleanup_execution(
+    body: AgentCleanupExecutionBody,
+    current_user: User = Depends(execute_cleanup),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await AgentOperationService(db).start_cleanup_execution(
+        str(current_user.tenant_id), body.simulation_job_id, str(current_user.id)
+    )
+    await db.commit()
+    return {"jobId": str(job.id)}
 
 
 @router.get("/trash")

@@ -131,6 +131,8 @@ async def command_progress(
         processed_units=body.processed_units,
         total_units=body.total_units,
         found_count=body.found_count,
+        database=body.database,
+        details=body.details,
     )
     await db.commit()
     return _command_ack(command)
@@ -177,4 +179,3 @@ async def heartbeat(
         "serverTime": datetime.now(timezone.utc).isoformat(),
         "minimumAgentVersion": settings.AGENT_MIN_VERSION,
     }
-

@@ -6,11 +6,11 @@ import {
   Building2,
   LogOut,
   Mail,
-  Server,
+  ServerCog,
   User,
   UsersRound,
 } from "lucide-react";
-import { CleanupServersAdmin } from "@/components/cleanup/server-admin";
+import { AgentsAdmin } from "@/components/agents/agents-admin";
 import { UsersAdmin } from "@/components/users/users-admin";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/auth.store";
@@ -42,7 +42,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-type TabId = "perfil" | "usuarios" | "servidores";
+type TabId = "perfil" | "usuarios" | "agentes";
 
 export default function SettingsPage() {
   const user = useAuthStore((state) => state.user);
@@ -53,7 +53,7 @@ export default function SettingsPage() {
   const tabs: { id: TabId; label: string; icon: React.ElementType; adminOnly?: boolean }[] = [
     { id: "perfil", label: "Perfil", icon: User },
     { id: "usuarios", label: "Usuarios", icon: UsersRound, adminOnly: true },
-    { id: "servidores", label: "Servidores", icon: Server, adminOnly: true },
+    { id: "agentes", label: "Agentes", icon: ServerCog, adminOnly: true },
   ];
   const visibleTabs = tabs.filter((item) => !item.adminOnly || isAdmin);
 
@@ -111,16 +111,7 @@ export default function SettingsPage() {
 
       {tab === "usuarios" && isAdmin ? <UsersAdmin /> : null}
 
-      {tab === "servidores" && isAdmin ? (
-        <div className="space-y-3">
-          <p className="max-w-3xl font-mono text-[11px] leading-relaxed text-crema/40">
-            Da de alta los servidores Core y sus <span className="text-arcilla/80">rutas autorizadas</span>.
-            Estos servidores aparecen luego en <span className="text-crema/70">Limpieza</span> para operar.
-            La contraseña o llave .pem se introduce al conectar; nunca se guarda aquí.
-          </p>
-          <CleanupServersAdmin />
-        </div>
-      ) : null}
+      {tab === "agentes" && isAdmin ? <AgentsAdmin /> : null}
     </div>
   );
 }

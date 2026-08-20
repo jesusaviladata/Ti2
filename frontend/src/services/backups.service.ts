@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { BackupRecord, BackupListResponse, DatabasesResponse } from "@/types/backup";
+import type { AgentBackupPlan, BackupRecord, BackupListResponse, DatabasesResponse } from "@/types/backup";
 import type { ConnectionPayload } from "@/types/connection";
 
 export const backupsService = {
@@ -34,6 +34,44 @@ export const backupsService = {
     connection?:    ConnectionPayload;
   }): Promise<{ backups: BackupRecord[] }> {
     const { data } = await api.post("/api/v1/backups/manual", payload);
+    return data;
+  },
+
+  async triggerAgentBackup(payload: {
+    agentId: string;
+    sqlProfileId: string;
+    databaseNames: string[];
+    backupType: "full" | "differential" | "log";
+    destinationProfileId?: string;
+  }): Promise<{ jobId: string; backups: BackupRecord[] }> {
+    const { data } = await api.post("/api/v1/backups/runs", payload);
+    return data;
+  },
+
+  async listAgentPlans(): Promise<{ items: AgentBackupPlan[]; total: number }> {
+    const { data } = await api.get("/api/v1/backups/plans");
+    return data;
+  },
+
+  async createAgentPlan(payload: {
+    agentId: string;
+    sqlProfileId: string;
+    destinationProfileId?: string;
+    databaseNames: string[];
+    fullDays: number[];
+    differentialDays: number[];
+    hourUtc: number;
+  }): Promise<AgentBackupPlan> {
+    const { data } = await api.post("/api/v1/backups/plans", payload);
+    return data;
+  },
+
+  async deleteAgentPlan(planId: string): Promise<void> {
+    await api.delete(`/api/v1/backups/plans/${planId}`);
+  },
+
+  async retryDelivery(backupId: string): Promise<{ jobId: string }> {
+    const { data } = await api.post(`/api/v1/backups/${backupId}/delivery/retry`);
     return data;
   },
 

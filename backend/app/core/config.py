@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     AGENT_COMMAND_TTL_SEC: int = Field(120, ge=30, le=600)
     AGENT_MAX_CLOCK_SKEW_SEC: int = Field(120, ge=30, le=300)
     AGENT_MAX_BODY_BYTES: int = Field(262144, ge=1024, le=1048576)
-    AGENT_MIN_VERSION: str = "0.1.0"
+    AGENT_MIN_VERSION: str = "0.3.0"
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://infra_user:infra_pass@db:5432/infra_platform"

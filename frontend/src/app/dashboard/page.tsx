@@ -77,7 +77,7 @@ function MetricCard({ label, value, sub, icon: Icon, color, bg, href }: {
       <div className={cn("w-9 h-9 rounded-[0.75rem] flex items-center justify-center mb-4", bg)}>
         <Icon size={17} className={color} />
       </div>
-      <p className="font-display text-4xl italic font-light text-crema/90 mb-0.5">{value}</p>
+      <p className="mb-0.5 text-4xl font-semibold tabular-nums text-crema/90">{value}</p>
       <p className="font-sans text-sm text-crema/60 group-hover:text-crema/80 transition-colors">{label}</p>
       <p className="font-mono text-[10px] text-crema/25 mt-2">{sub}</p>
     </Link>
@@ -230,12 +230,12 @@ export default function DashboardPage() {
                 <XAxis
                   dataKey="date"
                   tickFormatter={shortDate}
-                  tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "rgba(242,240,233,0.25)" }}
+                  tick={{ fontFamily: "Inter, Segoe UI, Arial, sans-serif", fontSize: 9, fill: "rgba(242,240,233,0.25)" }}
                   axisLine={false} tickLine={false}
                 />
                 <YAxis
                   allowDecimals={false}
-                  tick={{ fontFamily: "var(--font-mono)", fontSize: 9, fill: "rgba(242,240,233,0.20)" }}
+                  tick={{ fontFamily: "Inter, Segoe UI, Arial, sans-serif", fontSize: 9, fill: "rgba(242,240,233,0.20)" }}
                   axisLine={false} tickLine={false} width={20}
                 />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(46,64,54,0.3)" }} />
