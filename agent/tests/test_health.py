@@ -59,7 +59,7 @@ def test_file_engine_advertises_capability_and_catalog_revision_only_when_enable
         catalog_revision_factory=lambda: 7,
     )._default_metadata()
 
-    assert "capabilities" not in legacy
+    assert legacy["capabilities"] == ["sql_backup_direct_smb_v1"]
     assert "fileCatalogRevision" not in legacy
-    assert enabled["capabilities"] == ["file_backup_v1"]
+    assert enabled["capabilities"] == ["sql_backup_direct_smb_v1", "file_backup_v1"]
     assert enabled["fileCatalogRevision"] == 7

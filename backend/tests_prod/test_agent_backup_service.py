@@ -118,3 +118,38 @@ async def test_origin_snapshot_does_not_change_when_agent_is_renamed_after_queue
     agent.hostname = "CORE-RENOMBRADO"
 
     assert records[0].origin_snapshot["agent"]["hostname"] == "CORE-ORIGINAL"
+
+
+@pytest.mark.asyncio
+async def test_direct_smb_destination_marks_command_as_direct_delivery():
+    agent = RemoteAgent(
+        id=uuid.uuid4(),
+        tenant_id=uuid.uuid4(),
+        installation_id=str(uuid.uuid4()),
+        hostname="DX-SQL-GRANDE",
+        agent_version="0.5.0",
+        public_key="x" * 43,
+        status="connected",
+        metadata_json={
+            "capabilities": ["sql_backup_direct_smb_v1"],
+            "sqlInstances": [{"id": "local", "label": "SQL local"}],
+            "backupDestinations": [
+                {"id": "directo", "label": "Respaldo directo", "type": "smb_direct"}
+            ],
+        },
+    )
+    db = FakeDb()
+    commands = FakeCommands()
+    service = AgentBackupService(db, agent_repo=FakeAgentRepo(agent), command_service=commands)
+
+    _job, records = await service.start_backup(
+        str(agent.tenant_id),
+        str(agent.id),
+        sql_profile_id="local",
+        database_names=["ERP"],
+        backup_type="full",
+        destination_profile_id="directo",
+    )
+
+    assert commands.calls[0]["payload"]["deliveryMode"] == "direct"
+    assert records[0].origin_snapshot["destinationProfile"]["type"] == "smb_direct"

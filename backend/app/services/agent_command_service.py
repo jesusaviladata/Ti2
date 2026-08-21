@@ -485,6 +485,7 @@ class AgentCommandService:
             if isinstance(item, dict)
         }
         transfer = result.get("transfer") if isinstance(result.get("transfer"), dict) else {}
+        direct = result.get("deliveryMode") == "direct" or transfer.get("type") == "smb_direct"
         for backup in backups:
             data = results.get(backup.database_name)
             if data:
@@ -492,17 +493,24 @@ class AgentCommandService:
                 backup.phase = "backup_ready"
                 backup.progress_percent = 100
                 backup.validation_method = str(data.get("verificationMethod") or "restore_verifyonly")
-                backup.file_path = str(data.get("fileName") or "") or backup.file_path
+                backup.file_path = str(
+                    data.get("filePath") or data.get("fileName") or ""
+                ) or backup.file_path
                 backup.file_size_bytes = int(data.get("fileSizeBytes") or 0) or backup.file_size_bytes
                 backup.sha256_hash = str(data.get("fileSha256") or "") or backup.sha256_hash
                 backup.finished_at = backup.finished_at or now
                 local_only = transfer.get("type") == "local"
                 backup.delivery_status = "local_ready" if local_only else "delivered"
-                backup.delivery_phase = "local_ready" if local_only else "delivered"
+                backup.delivery_phase = (
+                    "direct_ready" if direct else "local_ready" if local_only else "delivered"
+                )
                 backup.delivery_progress = 100
-                backup.archive_path = str(transfer.get("path") or result.get("zipPath") or "") or None
-                backup.archive_size_bytes = int(result.get("zipSizeBytes") or 0) or None
-                backup.archive_sha256 = str(result.get("zipSha256") or "") or None
+                if not direct:
+                    backup.archive_path = str(
+                        transfer.get("path") or result.get("zipPath") or ""
+                    ) or None
+                    backup.archive_size_bytes = int(result.get("zipSizeBytes") or 0) or None
+                    backup.archive_sha256 = str(result.get("zipSha256") or "") or None
             elif command.command_type == "retry_backup_delivery":
                 backup.delivery_status = "delivered"
                 backup.delivery_phase = "delivered"

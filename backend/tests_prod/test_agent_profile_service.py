@@ -88,3 +88,11 @@ async def test_non_migrable_profile_is_saved_as_requires_secret_without_queueing
     assert item.secret_envelope is None
     assert commands.created == []
     assert serialize_managed_profile(item)["requiresSecret"] is True
+
+
+def test_direct_smb_destination_is_an_allowed_public_profile():
+    AgentProfileService._validate(
+        "destination",
+        {"type": "smb_direct", "path": r"\\backup-core\RespaldosTI"},
+        None,
+    )

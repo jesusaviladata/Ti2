@@ -60,7 +60,7 @@ export function BackupList() {
         <span>Origen</span>
         <span>Tipo</span>
         <span>Estado</span>
-        <span>ZIP / envío</span>
+        <span>Entrega</span>
         <span>Tamaño</span>
         <span>Inicio</span>
         <span>Duración</span>
@@ -89,7 +89,7 @@ export function BackupList() {
             </div>
             <span className="font-mono text-xs text-crema/40 capitalize">{b.backupType}</span>
             <BackupStatusBadge status={b.status} />
-            <DeliveryStatus status={b.deliveryStatus} phase={b.deliveryPhase} error={b.deliveryErrorMessage} onRetry={b.deliveryStatus === "failed" ? () => retryDelivery.mutate(b.id) : undefined} />
+            <DeliveryStatus status={b.deliveryStatus} phase={b.deliveryPhase} direct={b.origin?.destinationProfile?.type === "smb_direct"} error={b.deliveryErrorMessage} onRetry={b.deliveryStatus === "failed" ? () => retryDelivery.mutate(b.id) : undefined} />
             <span className="text-xs tabular-nums text-crema/40">
               {b.fileSizeBytes ? formatBytes(b.fileSizeBytes) : "—"}
             </span>
@@ -142,8 +142,8 @@ export function BackupList() {
   );
 }
 
-function DeliveryStatus({ status, phase, error, onRetry }: { status?: string; phase?: string | null; error?: string | null; onRetry?: () => void }) {
-  if (status === "delivered") return <span className="text-xs text-green-400/80">Entregado</span>;
+function DeliveryStatus({ status, phase, direct, error, onRetry }: { status?: string; phase?: string | null; direct?: boolean; error?: string | null; onRetry?: () => void }) {
+  if (status === "delivered") return <span className="text-xs text-green-400/80">{direct || phase === "direct_ready" ? "Directo validado" : "Entregado"}</span>;
   if (status === "local_ready") return <span className="text-xs text-green-400/80">ZIP local listo</span>;
   if (status === "failed") return <button type="button" title={error ?? "Reintentar entrega"} onClick={(event) => { event.stopPropagation(); onRetry?.(); }} className="truncate text-left text-xs text-amber-400 underline decoration-amber-400/30 underline-offset-2">Reintentar</button>;
   if (status === "processing") return <span className="text-xs text-arcilla">{phase === "transferring" ? "Enviando…" : "Comprimiendo…"}</span>;

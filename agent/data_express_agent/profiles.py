@@ -259,7 +259,7 @@ class ManagedProfileStore:
         for profile in destinations:
             if profile["id"] != profile_id:
                 continue
-            if str(profile.get("type") or "").lower() == "smb":
+            if str(profile.get("type") or "").lower() in {"smb", "smb_direct"}:
                 root = Path(str(profile.get("path") or ""))
                 probe = root / f".dataexpress-probe-{uuid.uuid4().hex}"
                 renamed = probe.with_suffix(".verified")

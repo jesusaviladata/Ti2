@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 from .client import AgentClient, AgentClientError
 from .runner_utils import retry_delay
-from .protocol import FILE_BACKUP_CAPABILITY
+from .protocol import DIRECT_BACKUP_CAPABILITY, FILE_BACKUP_CAPABILITY
 
 
 logger = logging.getLogger("data_express_agent")
@@ -46,8 +46,9 @@ class AgentHealthSupervisor:
             "os": platform.platform(),
             **public_metadata(),
         }
+        metadata["capabilities"] = [DIRECT_BACKUP_CAPABILITY]
         if self.file_backup_enabled:
-            metadata["capabilities"] = [FILE_BACKUP_CAPABILITY]
+            metadata["capabilities"].append(FILE_BACKUP_CAPABILITY)
             revision = (
                 self.catalog_revision_factory()
                 if self.catalog_revision_factory is not None

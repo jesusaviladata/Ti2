@@ -89,8 +89,15 @@ class AgentProfileService:
             )
         if profile_type == "destination":
             destination_type = str(public_config.get("type") or "").lower()
-            if destination_type not in {"smb", "sftp"} or not str(public_config.get("path") or "").strip():
+            path = str(public_config.get("path") or "").strip()
+            if destination_type not in {"smb", "smb_direct", "sftp"} or not path:
                 raise DomainError("AGENT_PROFILE_CONFIG_INVALID", "Indique tipo y ruta del destino", 422)
+            if destination_type == "smb_direct" and not path.startswith(("\\\\", "//")):
+                raise DomainError(
+                    "AGENT_PROFILE_CONFIG_INVALID",
+                    "El respaldo directo requiere una ruta UNC",
+                    422,
+                )
 
     @staticmethod
     def _seal(agent: RemoteAgent, profile_id: uuid.UUID, secret: dict | None) -> str | None:
