@@ -11,6 +11,7 @@ import type { User as AuthUser } from "@/types";
 import { useAuthStore } from "@/store/auth.store";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/components/providers/theme-provider";
+import { StorageHealthIndicator } from "@/components/layout/storage-health-indicator";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -417,9 +418,9 @@ export function Topbar() {
     : "??";
 
   return (
-    <header className="flex items-center justify-between h-16 px-6 border-b border-musgo/20 shrink-0">
+    <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b border-musgo/20 px-6">
       {/* ── Search ─────────────────────────────────────────────────────────── */}
-      <div ref={searchRef} className="relative flex items-center w-full max-w-sm">
+      <div ref={searchRef} className="relative flex min-w-0 w-full max-w-sm items-center">
         <Search size={14} className="absolute left-3 text-crema/30 z-10 pointer-events-none" />
         <input
           type="text"
@@ -457,8 +458,11 @@ export function Topbar() {
         )}
       </div>
 
+      {/* ── Agent storage ─────────────────────────────────────────────────── */}
+      <StorageHealthIndicator />
+
       {/* ── Right actions ──────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 ml-4 shrink-0">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
