@@ -96,7 +96,7 @@ El heartbeat continuará en su hilo independiente durante exploraciones, copias,
 
 ### 4.1 Experiencia de instalación
 
-El paquete oficial contendrá la URL de producción, la confianza inicial para firmas de comandos y los valores seguros de funcionamiento. En PowerShell elevado se ejecutará:
+El paquete oficial contendrá un dominio estable de control —no una URL temporal del proveedor de hosting—, la confianza inicial para firmas de comandos y los valores seguros de funcionamiento. En PowerShell elevado se ejecutará:
 
 ```powershell
 .\Install-DataExpressAgent.ps1
@@ -137,6 +137,31 @@ Los secretos se capturarán una vez, se cifrarán para la clave X25519 del agent
 - El dashboard mostrará `Requiere secreto` cuando una credencial no pueda migrarse con seguridad.
 - Los backups SQL continuarán funcionando durante la migración.
 - El backend seguirá aceptando agentes 0.4.2, pero ocultará el módulo de archivos hasta que el agente reporte la capacidad `file_backup_v1`.
+
+### 4.5 Identidad estable y cambios de infraestructura
+
+El agente se identificará mediante su identidad criptográfica e `installation_id`, nunca mediante IP, hostname o URL de Railway. Un cambio de IP, nombre del host o interfaz de red en la misma instalación sólo actualizará metadatos del heartbeat; no creará otro servidor ni perderá tareas.
+
+El instalador usará un dominio estable administrado por Data Express. Si el proveedor de backend cambia, el dominio conservará el mismo nombre y apuntará al nuevo servicio. Una migración excepcional de dominio o confianza se entregará como actualización firmada; no exigirá editar `agent.json`.
+
+### 4.6 Reemplazo administrado de un servidor
+
+Cuando cambie la máquina física, un administrador con capacidad de configuración utilizará `Reemplazar servidor`:
+
+1. el backend creará una sesión de reemplazo y mostrará un código de un solo uso con diez minutos de vigencia;
+2. el instalador universal se ejecutará en el servidor nuevo e introducirá ese código;
+3. el agente nuevo se registrará como candidato y reportará hostname, versión, volúmenes, SQL detectado y huella de instalación;
+4. el servidor anterior seguirá activo mientras el candidato completa heartbeat y preflight;
+5. el dashboard comparará anterior y candidato, e indicará perfiles que requieren volver a capturar un secreto;
+6. un administrador confirmará explícitamente el cambio;
+7. una transacción reasignará configuración pública, tareas activas y programaciones al candidato, conservará la línea histórica y revocará al agente anterior;
+8. el agente anterior dejará de recibir comandos aunque vuelva a conectarse.
+
+Las ejecuciones en curso no se moverán entre máquinas. El administrador deberá terminarlas o cancelarlas antes de confirmar. Los historiales y artefactos anteriores conservarán la identidad física que los produjo, pero se mostrarán dentro de la misma línea lógica del servidor.
+
+Los secretos cifrados para la clave del agente anterior no se copiarán al nuevo. Los perfiles afectados quedarán como `Requiere secreto` y no podrán ejecutar tareas hasta que un administrador capture y pruebe la credencial nuevamente. Rutas, horarios, filtros y demás configuración no sensible sí se transferirán.
+
+Se descartan dos alternativas: crear siempre un agente independiente porque fragmenta historial y operación, y revocar automáticamente al servidor anterior al consumir el código porque un candidato defectuoso podría detener backups. Se adopta el reemplazo confirmado en dos fases.
 
 ## 5. Modelo de tarea
 
@@ -386,6 +411,19 @@ PATCH  /api/v1/file-backup/artifacts/{artifactId}
 
 Las colecciones estarán paginadas y filtradas por tenant. Los errores usarán el formato estándar del proyecto con código estable, mensaje sanitizado y detalles operativos no sensibles.
 
+Ciclo de vida del agente:
+
+```text
+POST   /api/v1/agents/{agentId}/replacements
+GET    /api/v1/agents/{agentId}/replacements/{replacementId}
+POST   /api/v1/agents/{agentId}/replacements/{replacementId}/confirmations
+POST   /api/v1/agents/{agentId}/replacements/{replacementId}/cancellations
+```
+
+Crear la sesión devuelve el código temporal una sola vez. Confirmar exige que el candidato esté saludable, no existan ejecuciones activas y la revisión observada coincida con la sesión. Confirmación y cancelación aceptarán clave de idempotencia. Respuestas `409` distinguirán candidato no saludable, ejecución activa, revisión obsoleta y sesión terminal.
+
+El endpoint existente `POST /api/v1/agents/{agentId}/replace` permanecerá temporalmente como alias compatible para crear la sesión; dejará de revocar al agente anterior durante el enrolamiento y devolverá aviso de deprecación.
+
 Comandos agente:
 
 - `simulate_file_backup`;
@@ -503,6 +541,14 @@ Firma visual: una secuencia compacta `Copiado → Verificado → Entregado` para
 4. Editar un perfil offline y aplicarlo al reconectar.
 5. Confirmar que secretos no aparecen en API, logs o manifiestos.
 6. Actualizar 0.4.2 a 0.5.0 conservando backups SQL.
+7. Cambiar IP y hostname en la misma instalación sin perder identidad ni tareas.
+8. Crear reemplazo y comprobar que el agente anterior sigue operativo mientras el nuevo es candidato.
+9. Rechazar confirmación si el candidato no está saludable o existen ejecuciones activas.
+10. Confirmar reemplazo y transferir perfiles públicos, tareas y programaciones en una transacción.
+11. Conservar historial anterior con marca de máquina de origen.
+12. Revocar al agente anterior y rechazar sus comandos posteriores.
+13. Marcar secretos no transferibles como `Requiere secreto`.
+14. Cancelar o dejar expirar la sesión sin modificar al agente anterior.
 
 ### Backup
 
@@ -552,8 +598,10 @@ Firma visual: una secuencia compacta `Copiado → Verificado → Entregado` para
 8. Restaurar una muestra y comparar hashes.
 9. Validar retención.
 10. Probar SFTP.
-11. Observar una semana de ejecuciones.
-12. Habilitar el módulo para los demás agentes.
+11. Ejecutar un reemplazo controlado del agente piloto.
+12. Confirmar continuidad de tareas, perfiles públicos e historial.
+13. Observar una semana de ejecuciones.
+14. Habilitar el módulo para los demás agentes.
 
 ## 20. Decisiones finales
 
@@ -566,6 +614,10 @@ Firma visual: una secuencia compacta `Copiado → Verificado → Entregado` para
 - Retención: cuatro cadenas por defecto y protección explícita.
 - No habrá espejo destructivo ni eventos de comandos en la primera versión.
 - El instalador pedirá únicamente un código temporal.
+- El paquete usará un dominio estable de control y no dependerá de una URL temporal de Railway.
 - `agent.json` dejará de ser configuración operativa editable.
+- IP y hostname serán metadatos; la identidad real será criptográfica.
+- Reemplazar una máquina será un proceso confirmado en dos fases.
+- La configuración no sensible y la historia continuarán; los secretos ligados al agente deberán capturarse nuevamente.
 - La interfaz aprobada será una lista intuitiva con asistente lateral de cuatro pasos.
 - El agente 0.5.0 será requisito para `file_backup_v1`.

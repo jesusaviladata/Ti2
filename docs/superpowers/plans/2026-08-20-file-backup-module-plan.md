@@ -193,6 +193,8 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 5. Una rotación de claves sólo se aplica si el conjunto está firmado por confianza existente.
 6. El enrolamiento elimina el código temporal después de consumirlo.
 7. Datos de bootstrap nunca sobrescriben identidad o secretos locales.
+8. Cambiar IP o hostname conserva identidad, tareas y configuración aplicada.
+9. El endpoint de control se obtiene de un dominio estable incluido en el paquete, no de una URL temporal de hosting.
 
 **Commit:** `feat: separate agent bootstrap from managed config`
 
@@ -242,11 +244,59 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: migrate legacy agent profiles safely`
 
+### Tarea 8. Implementar reemplazo confirmado de servidores
+
+**Archivos:**
+
+- Modificar `backend/app/models/operations.py`.
+- Crear `backend/alembic/versions/0012_agent_replacement_sessions.py`.
+- Modificar `backend/app/repositories/agent_repository.py`.
+- Modificar `backend/app/schemas/agent.py`.
+- Crear `backend/app/services/agent_replacement_service.py`.
+- Modificar `backend/app/services/agent_enrollment_service.py`.
+- Modificar `backend/app/api/v1/agents.py`.
+- Modificar `frontend/src/services/agents.service.ts`.
+- Modificar `frontend/src/hooks/useAgents.ts`.
+- Crear `frontend/src/components/agents/agent-replacement-dialog.tsx`.
+- Modificar `frontend/src/components/agents/agents-admin.tsx`.
+- Crear `backend/tests_prod/test_agent_replacement_migration.py`.
+- Crear `backend/tests_prod/test_agent_replacement_service.py`.
+- Crear `backend/tests_prod/test_agent_replacement_api.py`.
+
+**Pruebas primero:**
+
+1. Crear reemplazo requiere tenant y capacidad de configuración; el código expira, se usa una vez y sólo se guarda como hash.
+2. El enrolamiento con código de reemplazo crea un candidato `replacement_pending` sin revocar al agente anterior.
+3. El candidato no recibe tareas operativas antes de la confirmación.
+4. La comparación muestra hostname, versión, volúmenes, SQL y perfiles que requieren secreto.
+5. Confirmar falla con `409` si el candidato no está saludable, la revisión cambió o existen ejecuciones activas.
+6. Confirmar reasigna perfiles públicos, planes SQL, tareas de archivos y configuración en una transacción.
+7. Historial y artefactos conservan el agente físico de origen y se consultan por la misma línea de reemplazo.
+8. Secretos cifrados para el agente anterior no se copian; el perfil nuevo queda `requires_secret`.
+9. Tras confirmar, el agente anterior queda revocado y no puede reclamar comandos.
+10. Cancelar o expirar conserva intacto al agente anterior y revoca al candidato incompleto.
+11. Confirmación y cancelación son idempotentes y auditadas.
+12. La interfaz obliga a comparar y confirmar; nunca ejecuta el corte al consumir el código.
+13. `POST /agents/{agentId}/replace` conserva compatibilidad como alias de creación y ya no provoca revocación inmediata.
+
+**Verificación:**
+
+```powershell
+backend\.venv\Scripts\python.exe -m pytest -q backend\tests_prod\test_agent_replacement_migration.py backend\tests_prod\test_agent_replacement_service.py backend\tests_prod\test_agent_replacement_api.py
+backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
+
+cd frontend
+npm run type-check
+npm run build
+```
+
+**Commit:** `feat: replace agents with confirmed handover`
+
 ---
 
 ## Entrega 3 — Fundaciones locales del motor
 
-### Tarea 8. Crear catálogo SQLite versionado
+### Tarea 9. Crear catálogo SQLite versionado
 
 **Archivos:**
 
@@ -267,7 +317,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: add durable file backup catalog`
 
-### Tarea 9. Implementar validación de rutas y filtros
+### Tarea 10. Implementar validación de rutas y filtros
 
 **Archivos:**
 
@@ -289,7 +339,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: validate file backup paths and filters`
 
-### Tarea 10. Construir escáner streaming y simulación
+### Tarea 11. Construir escáner streaming y simulación
 
 **Archivos:**
 
@@ -311,7 +361,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: scan and simulate file backup changes`
 
-### Tarea 11. Añadir coordinador de recursos y preflight
+### Tarea 12. Añadir coordinador de recursos y preflight
 
 **Archivos:**
 
@@ -333,7 +383,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: coordinate backup disk resources`
 
-### Tarea 12. Integrar VSS mediante adaptador aislado
+### Tarea 13. Integrar VSS mediante adaptador aislado
 
 **Archivos:**
 
@@ -364,7 +414,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 ## Entrega 4 — Copia, destinos, cadenas y retención
 
-### Tarea 13. Crear adaptadores de destino
+### Tarea 14. Crear adaptadores de destino
 
 **Archivos:**
 
@@ -397,7 +447,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: add file backup destination adapters`
 
-### Tarea 14. Implementar copia verificada y checkpoints
+### Tarea 15. Implementar copia verificada y checkpoints
 
 **Archivos:**
 
@@ -421,7 +471,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: copy and verify files with checkpoints`
 
-### Tarea 15. Construir manifiestos y cadenas
+### Tarea 16. Construir manifiestos y cadenas
 
 **Archivos:**
 
@@ -442,7 +492,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: track file backup manifests and chains`
 
-### Tarea 16. Añadir ZIP64 opcional con límites
+### Tarea 17. Añadir ZIP64 opcional con límites
 
 **Archivos:**
 
@@ -461,7 +511,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: support bounded zip64 file backups`
 
-### Tarea 17. Implementar retención por cadenas
+### Tarea 18. Implementar retención por cadenas
 
 **Archivos:**
 
@@ -481,7 +531,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: retain complete file backup chains safely`
 
-### Tarea 18. Programar y reconciliar ejecuciones
+### Tarea 19. Programar y reconciliar ejecuciones
 
 **Archivos:**
 
@@ -507,7 +557,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 ## Entrega 5 — Restauración segura
 
-### Tarea 19. Simular restauraciones y resolver cadenas
+### Tarea 20. Simular restauraciones y resolver cadenas
 
 **Archivos:**
 
@@ -529,7 +579,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 **Commit:** `feat: simulate file restores safely`
 
-### Tarea 20. Ejecutar y verificar restauraciones
+### Tarea 21. Ejecutar y verificar restauraciones
 
 **Archivos:**
 
@@ -556,7 +606,7 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 ## Entrega 6 — Interfaz intuitiva aprobada
 
-### Tarea 21. Crear capa de datos frontend
+### Tarea 22. Crear capa de datos frontend
 
 **Archivos:**
 
@@ -584,7 +634,7 @@ npm run build
 
 **Commit:** `feat: add file backup frontend data layer`
 
-### Tarea 22. Construir pantalla principal intuitiva
+### Tarea 23. Construir pantalla principal intuitiva
 
 **Archivos:**
 
@@ -619,7 +669,7 @@ Spacing: base 4 px; radio pequeño de 4–7 px.
 
 **Commit:** `feat: add intuitive file backup workspace`
 
-### Tarea 23. Implementar asistente lateral de cuatro pasos
+### Tarea 24. Implementar asistente lateral de cuatro pasos
 
 **Archivos:**
 
@@ -641,7 +691,7 @@ Spacing: base 4 px; radio pequeño de 4–7 px.
 
 **Commit:** `feat: guide file backup task creation`
 
-### Tarea 24. Construir historial y restauración
+### Tarea 25. Construir historial y restauración
 
 **Archivos:**
 
@@ -666,7 +716,7 @@ Spacing: base 4 px; radio pequeño de 4–7 px.
 
 ## Entrega 7 — Empaquetado, compatibilidad y piloto
 
-### Tarea 25. Versionar y empaquetar agente 0.5.0
+### Tarea 26. Versionar y empaquetar agente 0.5.0
 
 **Archivos:**
 
@@ -696,7 +746,7 @@ powershell -ExecutionPolicy Bypass -File agent\package.ps1 -Version 0.5.0
 
 **Commit:** `release: package Data Express Agent 0.5.0`
 
-### Tarea 26. Ejecutar verificación integral automatizada
+### Tarea 27. Ejecutar verificación integral automatizada
 
 ```powershell
 backend\.venv\Scripts\python.exe -m pytest -q backend\tests backend\tests_prod agent\tests
@@ -721,7 +771,7 @@ powershell -ExecutionPolicy Bypass -File agent\package.ps1 -Version 0.5.0
 
 **Commit:** `test: verify file backup release contracts`
 
-### Tarea 27. Validar servidor piloto
+### Tarea 28. Validar servidor piloto
 
 **Preparación:**
 
@@ -745,6 +795,10 @@ powershell -ExecutionPolicy Bypass -File agent\package.ps1 -Version 0.5.0
 12. Restaurar muestra y comparar todos los hashes.
 13. Probar SFTP con huella fija.
 14. Observar heartbeat, CPU, memoria, disco y red.
+15. Cambiar IP y hostname de la instalación piloto sin perder identidad ni tareas.
+16. Enrolar un candidato de reemplazo, comprobar que el anterior sigue activo y cancelar la primera sesión.
+17. Crear otra sesión, completar preflight y confirmar el traspaso sin ejecuciones activas.
+18. Verificar continuidad de historial/configuración pública, revocación del anterior y recaptura de secretos requeridos.
 
 **Bloqueos de despliegue:**
 
@@ -757,19 +811,21 @@ powershell -ExecutionPolicy Bypass -File agent\package.ps1 -Version 0.5.0
 - retención que elimina una copia protegida o el único Full;
 - imposibilidad de reanudar después de reinicio;
 - más de un head Alembic;
+- reemplazo que revoque al agente anterior antes de confirmarse;
+- pérdida de tareas, perfiles públicos o historial durante el traspaso;
 - rollback 0.5.0 → 0.4.2 fallido.
 
 **Resultado:** documento de piloto con hashes, tiempos, incidencias y decisión de habilitación.
 
 **Commit:** `docs: record file backup pilot results`
 
-### Tarea 28. Desplegar de forma escalonada
+### Tarea 29. Desplegar de forma escalonada
 
 1. Push de rama y revisión de CI.
 2. Desplegar backend compatible y esperar `/health/ready` correcto.
 3. Desplegar frontend con feature gate cerrado.
 4. Actualizar únicamente el agente piloto.
-5. Completar Tarea 27 y observar siete días.
+5. Completar Tarea 28 y observar siete días.
 6. Habilitar módulo al tenant piloto.
 7. Actualizar los demás agentes por lotes.
 8. Abrir feature gate sólo para agentes 0.5.0 saludables.
@@ -788,6 +844,7 @@ feat: add file backup agent protocol
 feat: separate agent bootstrap from managed config
 feat: install agent with pairing code only
 feat: migrate legacy agent profiles safely
+feat: replace agents with confirmed handover
 feat: add durable file backup catalog
 feat: validate file backup paths and filters
 feat: scan and simulate file backup changes
@@ -813,4 +870,4 @@ release: enable managed file backups
 
 ## Resultado esperado
 
-Al completar las 28 tareas, un administrador instalará el agente introduciendo un único código, configurará conexiones y tareas desde el dashboard, ejecutará respaldos Full/incrementales/diferenciales verificables, reanudará interrupciones, conservará cadenas seguras y restaurará archivos después de revisar una simulación. Los backups SQL existentes continuarán disponibles durante toda la migración.
+Al completar las 29 tareas, un administrador instalará el agente introduciendo un único código, reemplazará máquinas mediante un traspaso confirmado, configurará conexiones y tareas desde el dashboard, ejecutará respaldos Full/incrementales/diferenciales verificables, reanudará interrupciones, conservará cadenas seguras y restaurará archivos después de revisar una simulación. Los backups SQL existentes continuarán disponibles durante toda la migración.
