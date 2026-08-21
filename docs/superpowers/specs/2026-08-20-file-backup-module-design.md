@@ -1,7 +1,7 @@
 # Diseño del módulo Respaldo de archivos
 
 **Fecha:** 2026-08-20  
-**Estado:** aprobado para revisión escrita  
+**Estado:** aprobado por el usuario
 **Versión objetivo del agente:** 0.5.0  
 **Alcance:** agente Windows, backend, frontend, instalador y migraciones
 
