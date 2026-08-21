@@ -170,3 +170,42 @@ class AgentHeartbeatRequest(BaseModel):
         if _metadata_contains_secret(value):
             raise ValueError("metadata solo admite información pública")
         return value
+
+
+class AgentReplacementMachine(BaseModel):
+    id: uuid.UUID
+    hostname: str
+    agent_version: str = Field(alias="agentVersion")
+    status: str
+    health_status: str = Field(alias="healthStatus")
+    last_heartbeat_at: datetime | None = Field(None, alias="lastHeartbeatAt")
+    volumes: list[dict[str, Any]] = Field(default_factory=list)
+    sql_candidates: list[dict[str, Any]] = Field(
+        default_factory=list, alias="sqlCandidates"
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class AgentReplacementResponse(BaseModel):
+    id: uuid.UUID
+    status: Literal[
+        "awaiting_candidate",
+        "awaiting_confirmation",
+        "completed",
+        "cancelled",
+        "expired",
+    ]
+    expires_at: datetime = Field(alias="expiresAt")
+    old_agent: AgentReplacementMachine = Field(alias="oldAgent")
+    candidate_agent: AgentReplacementMachine | None = Field(
+        None, alias="candidateAgent"
+    )
+    profiles_requiring_secret: list[dict[str, Any]] = Field(
+        default_factory=list, alias="profilesRequiringSecret"
+    )
+    can_confirm: bool = Field(False, alias="canConfirm")
+    blockers: list[str] = Field(default_factory=list)
+    code: str | None = None
+
+    model_config = {"populate_by_name": True}

@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app.agent_protocol import public_key_to_base64
 from app.core.errors import ConflictError, DomainError
-from app.models.operations import AgentPairingToken, RemoteAgent
+from app.models.operations import AgentPairingToken, AgentReplacementSession, RemoteAgent
 from app.services.agent_enrollment_service import AgentEnrollmentService
 
 
@@ -42,6 +42,9 @@ class FakeRepo:
         agent = self.by_id.get(agent_id)
         if agent and str(agent.tenant_id) == tenant_id:
             return agent
+        return None
+
+    async def get_replacement_session(self, tenant_id, session_id, *, for_update=False):
         return None
 
 
@@ -137,7 +140,7 @@ async def test_enrollment_accepts_optional_x25519_public_key_without_breaking_03
 
 
 @pytest.mark.asyncio
-async def test_replacement_revokes_old_identity_and_links_new_agent():
+async def test_replacement_enrolls_candidate_without_revoking_old_identity():
     db = FakeDb()
     repo = FakeRepo()
     service = AgentEnrollmentService(db, repo=repo)
@@ -171,9 +174,16 @@ async def test_replacement_revokes_old_identity_and_links_new_agent():
         public_key=_public_key(),
     )
 
-    assert old.status == "revoked"
-    assert old.revoked_at is not None
-    assert old.replaced_by_id == new.id
+    assert old.status == "connected"
+    assert old.revoked_at is None
+    assert old.replaced_by_id is None
+    assert new.status == "replacement_pending"
+    session = next(
+        item for item in db.added if isinstance(item, AgentReplacementSession)
+    )
+    assert session.old_agent_id == old.id
+    assert session.candidate_agent_id == new.id
+    assert session.status == "awaiting_confirmation"
 
 
 @pytest.mark.asyncio

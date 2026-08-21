@@ -773,7 +773,7 @@ powershell -ExecutionPolicy Bypass -File agent\package.ps1 -Version 0.5.0
 
 **Criterios:**
 
-- Un head Alembic `0011`.
+- Un head Alembic `0012`.
 - Ninguna regresión SQL, limpieza, heartbeat, perfiles o almacenamiento.
 - Ningún secreto en logs, fixtures, respuestas o artefactos de prueba.
 - Build reproducible del paquete.

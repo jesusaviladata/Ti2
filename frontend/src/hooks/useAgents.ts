@@ -9,6 +9,7 @@ export const AGENT_KEYS = {
   all: ["agents"] as const,
   profiles: (agentId: string) => ["agents", agentId, "profiles"] as const,
   job: (jobId: string) => ["agent-jobs", jobId] as const,
+  replacement: (sessionId: string) => ["agent-replacement", sessionId] as const,
 };
 
 export function useAgents() {
@@ -37,6 +38,44 @@ export function useAgentJob<T = Record<string, unknown>>(jobId: string | null) {
 
 export function usePairingCode() {
   return useMutation({ mutationFn: agentsService.pairingCode });
+}
+
+export function useCreateAgentReplacement() {
+  return useMutation({ mutationFn: agentsService.createReplacement });
+}
+
+export function useAgentReplacement(sessionId: string | null) {
+  return useQuery({
+    queryKey: AGENT_KEYS.replacement(sessionId ?? "none"),
+    queryFn: () => agentsService.replacement(sessionId!),
+    enabled: Boolean(sessionId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && ["completed", "cancelled", "expired"].includes(status) ? false : 3_000;
+    },
+  });
+}
+
+export function useConfirmAgentReplacement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: agentsService.confirmReplacement,
+    onSuccess: (result) => {
+      queryClient.setQueryData(AGENT_KEYS.replacement(result.id), result);
+      queryClient.invalidateQueries({ queryKey: AGENT_KEYS.all });
+    },
+  });
+}
+
+export function useCancelAgentReplacement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: agentsService.cancelReplacement,
+    onSuccess: (result) => {
+      queryClient.setQueryData(AGENT_KEYS.replacement(result.id), result);
+      queryClient.invalidateQueries({ queryKey: AGENT_KEYS.all });
+    },
+  });
 }
 
 export function useValidateAgentRoot() {

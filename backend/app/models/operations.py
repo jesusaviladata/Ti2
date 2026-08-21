@@ -192,6 +192,9 @@ class RemoteAgent(TenantRecord, Base):
         UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="SET NULL")
     )
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    lineage_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
 
 
 class AgentVolumeState(TenantRecord, Base):
@@ -381,6 +384,52 @@ class AgentPairingToken(TenantRecord, Base):
     replace_agent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("remote_agents.id", ondelete="SET NULL")
     )
+    replacement_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("agent_replacement_sessions.id", ondelete="SET NULL"),
+    )
+
+
+class AgentReplacementSession(TenantRecord, Base):
+    __tablename__ = "agent_replacement_sessions"
+    __table_args__ = (
+        Index(
+            "ix_agent_replacement_tenant_status_expiry",
+            "tenant_id",
+            "status",
+            "expires_at",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "candidate_agent_id",
+            name="uq_agent_replacement_candidate",
+        ),
+    )
+
+    old_agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("remote_agents.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    candidate_agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("remote_agents.id", ondelete="SET NULL"),
+    )
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="awaiting_candidate"
+    )
+    expected_old_revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    audit_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
 class AgentRequestNonce(TenantRecord, Base):

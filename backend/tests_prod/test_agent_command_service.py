@@ -111,6 +111,25 @@ def test_managed_file_commands_are_explicitly_allowlisted():
 
 
 @pytest.mark.asyncio
+async def test_replacement_candidate_cannot_receive_or_claim_operational_commands():
+    agent, _db, repo, service = _fixture()
+    agent.status = "replacement_pending"
+
+    with pytest.raises(ConflictError) as blocked:
+        await service.create_command(
+            tenant_id=str(agent.tenant_id),
+            agent_id=str(agent.id),
+            command_type="browse_drives",
+            payload={},
+            idempotency_key="candidate-command",
+        )
+
+    assert blocked.value.code == "AGENT_REPLACEMENT_PENDING"
+    assert await service.claim_next(agent) is None
+    assert repo.commands == []
+
+
+@pytest.mark.asyncio
 async def test_create_command_is_idempotent_and_claim_is_single_delivery():
     agent, db, repo, service = _fixture()
 

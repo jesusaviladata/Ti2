@@ -4,6 +4,7 @@ import type {
   AgentJob,
   AgentProfiles,
   AgentRecord,
+  AgentReplacement,
 } from "@/types/agent";
 
 export const agentsService = {
@@ -15,6 +16,18 @@ export const agentsService = {
 
   pairingCode: () =>
     api.post<{ code: string; expiresAt: string }>("/api/v1/agents/pairing-codes").then((response) => response.data),
+
+  createReplacement: (agentId: string) =>
+    api.post<AgentReplacement>(`/api/v1/agents/${agentId}/replacement-sessions`).then((response) => response.data),
+
+  replacement: (sessionId: string) =>
+    api.get<AgentReplacement>(`/api/v1/agents/replacement-sessions/${sessionId}`).then((response) => response.data),
+
+  confirmReplacement: (sessionId: string) =>
+    api.post<AgentReplacement>(`/api/v1/agents/replacement-sessions/${sessionId}/confirm`).then((response) => response.data),
+
+  cancelReplacement: (sessionId: string) =>
+    api.post<AgentReplacement>(`/api/v1/agents/replacement-sessions/${sessionId}/cancel`).then((response) => response.data),
 
   createDatabaseCatalog: (agentId: string, sqlProfileId: string) =>
     api.post<{ jobId: string }>(`/api/v1/agents/${agentId}/database-catalogs`, { sqlProfileId }).then((response) => response.data),

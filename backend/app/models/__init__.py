@@ -11,7 +11,7 @@ from app.models.file_backup import (
     FileBackupSource, FileBackupTask, FileRestoreConfirmation, FileRestoreJob,
 )
 from app.models.operations import (
-    AgentBackupPlan, AgentCommand, AgentConnectionProfile, AgentPairingToken,
+    AgentBackupPlan, AgentCommand, AgentConnectionProfile, AgentPairingToken, AgentReplacementSession,
     AgentRequestNonce, AgentStorageAlert, AgentStorageThreshold, AgentVolumeState, BackgroundJob,
     CleanupExecution, CleanupFolder, CleanupRule, CleanupSchedule, CleanupSimulation,
     CleanupTrashItem, Notification, RemoteAgent, RemoteCleanupExecution,
@@ -24,7 +24,7 @@ __all__ = [
     "AuthSession", "AuthRefreshHistory", "AuthLoginLimit",
     "FileBackupArtifact", "FileBackupChain", "FileBackupFilter", "FileBackupRun",
     "FileBackupSource", "FileBackupTask", "FileRestoreConfirmation", "FileRestoreJob",
-    "AgentBackupPlan", "AgentCommand", "AgentConnectionProfile", "AgentPairingToken",
+    "AgentBackupPlan", "AgentCommand", "AgentConnectionProfile", "AgentPairingToken", "AgentReplacementSession",
     "AgentRequestNonce", "AgentStorageAlert", "AgentStorageThreshold", "AgentVolumeState", "BackupSchedule",
     "BackgroundJob", "CleanupExecution", "CleanupFolder", "CleanupRule",
     "CleanupSchedule", "CleanupSimulation", "CleanupTrashItem", "Notification",

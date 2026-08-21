@@ -91,6 +91,11 @@ class AgentCommandService:
             raise ConflictError(
                 "El agente está revocado", code="AGENT_REVOKED"
             )
+        if agent.status == "replacement_pending":
+            raise ConflictError(
+                "El agente candidato espera confirmación",
+                code="AGENT_REPLACEMENT_PENDING",
+            )
         existing = await self.repo.find_command_by_idempotency(
             agent.id, normalized_key
         )
@@ -115,6 +120,8 @@ class AgentCommandService:
         return command
 
     async def claim_next(self, agent: RemoteAgent) -> AgentCommand | None:
+        if agent.status == "replacement_pending":
+            return None
         command = await self.repo.claim_next_command(agent.id, self.now())
         if command is not None and command.job_id:
             job = await self.repo.get_background_job(command.job_id)
