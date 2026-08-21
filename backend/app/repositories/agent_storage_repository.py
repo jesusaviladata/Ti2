@@ -63,3 +63,36 @@ class AgentStorageRepository:
         )
         result = await self.db.execute(statement)
         return result.scalar_one()
+
+    async def volume_exists(self, tenant_id: str, agent_id: str, volume_key: str) -> bool:
+        result = await self.db.execute(
+            select(AgentVolumeState.id).where(
+                AgentVolumeState.tenant_id == tenant_uuid(tenant_id),
+                AgentVolumeState.agent_id == uuid.UUID(agent_id),
+                AgentVolumeState.volume_key == volume_key,
+            )
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def upsert_preference(
+        self, tenant_id: str, agent_id: str | None, volume_key: str | None
+    ):
+        values = {
+            "preferred_agent_id": uuid.UUID(agent_id) if agent_id else None,
+            "preferred_volume_key": volume_key,
+        }
+        statement = (
+            insert(AgentStorageThreshold)
+            .values(
+                id=uuid.uuid4(),
+                tenant_id=tenant_uuid(tenant_id),
+                **values,
+            )
+            .on_conflict_do_update(
+                constraint="uq_agent_storage_threshold_tenant",
+                set_=values,
+            )
+            .returning(AgentStorageThreshold)
+        )
+        result = await self.db.execute(statement)
+        return result.scalar_one()

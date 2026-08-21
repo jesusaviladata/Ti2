@@ -11,6 +11,7 @@ def test_admin_and_agent_routes_are_versioned_and_separated():
     assert "/api/v1/agent-storage" in paths
     assert "/api/v1/agent-storage/alerts" in paths
     assert "/api/v1/agent-storage/thresholds" in paths
+    assert "/api/v1/agent-storage/preference" in paths
     assert "/api/v1/agents/{agent_id}/managed-profiles" in paths
     assert "/api/v1/agents/{agent_id}/managed-profiles/discover" in paths
     assert "/api/v1/agents/{agent_id}/managed-profiles/{profile_id}/test" in paths

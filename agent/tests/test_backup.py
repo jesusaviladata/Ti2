@@ -104,9 +104,9 @@ def test_backup_is_ready_only_after_restore_verifyonly(tmp_path: Path):
 
 
 def test_retry_delivery_uses_existing_verified_zip_without_repeating_sql(tmp_path: Path):
-    dated = tmp_path / "2026-08-20" / "FULL"
+    dated = tmp_path / "2026-08-20"
     dated.mkdir(parents=True)
-    zip_path = dated / "Backup_run-1.zip"
+    zip_path = dated / "Backup_2026-08-20.zip"
     with zipfile.ZipFile(zip_path, "w") as archive:
         archive.writestr("Ipsofactu_FULL.bak", b"validated backup")
     digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
@@ -117,7 +117,7 @@ def test_retry_delivery_uses_existing_verified_zip_without_repeating_sql(tmp_pat
         cleanup_submit=lambda _files, _work_dir: {"scheduled": True},
     )
     executor._transfer = lambda path, _destination, date, type_folder: {
-        "type": "smb", "path": f"remote/{date}/{type_folder}/{path.name}", "verified": True
+        "type": "smb", "path": f"remote/{date}/{path.name}", "verified": True
     }
 
     result = executor.retry_delivery(
@@ -142,11 +142,45 @@ def test_daily_visible_names_do_not_include_run_id(tmp_path: Path):
         "Ipsofactu_2026-08-20_DIF.bak"
     )
     assert daily_archive_path(tmp_path, "2026-08-20", "full") == (
-        tmp_path / "2026-08-20" / "FULL" / "Backup_2026-08-20.zip"
+        tmp_path / "2026-08-20" / "Backup_2026-08-20.zip"
     )
     assert daily_archive_path(tmp_path, "2026-08-20", "differential") == (
         tmp_path / "2026-08-20" / "DIFERENCIAL" / "Backup_2026-08-20.zip"
     )
+
+
+def test_retry_delivery_accepts_legacy_full_folder(tmp_path: Path):
+    dated = tmp_path / "2026-08-20" / "FULL"
+    dated.mkdir(parents=True)
+    zip_path = dated / "Backup_2026-08-20.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("Ipsofactu_2026-08-20.bak", b"validated backup")
+        archive.writestr("manifest.json", "{}")
+    digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+    executor = BackupExecutor(
+        sql_profiles=({"id": "sql-main", "label": "SQL", "backupRoot": str(tmp_path)},),
+        destination_profiles=({"id": "remote", "label": "Remoto", "type": "smb"},),
+        cleanup_submit=lambda _files, _work_dir: {"scheduled": True},
+    )
+    seen = {}
+
+    def transfer(path, _destination, date, type_folder):
+        seen.update(path=path, date=date, type_folder=type_folder)
+        return {"type": "smb", "path": "remote", "verified": True}
+
+    executor._transfer = transfer
+    executor.retry_delivery(
+        {
+            "runId": "run-legacy",
+            "sqlProfileId": "sql-main",
+            "destinationProfileId": "remote",
+            "zipPath": str(zip_path),
+            "zipSha256": digest,
+        }
+    )
+
+    assert seen["date"] == "2026-08-20"
+    assert seen["type_folder"] == "FULL"
 
 
 def test_atomic_archive_keeps_previous_daily_zip_if_replacement_fails(tmp_path: Path):

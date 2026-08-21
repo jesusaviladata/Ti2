@@ -5,27 +5,37 @@ import Link from "next/link";
 import { useBackupAgentJob, useBackupStatuses } from "@/hooks/useBackups";
 import { cn } from "@/lib/utils";
 import { useBackupProgressStore } from "@/store/backup-progress.store";
+import type { BackupRecord } from "@/types/backup";
 
 function getAgentProgress(job?: {
   status: string;
   phase: string;
   processedUnits: number;
   totalUnits: number;
-}) {
+}, backups: BackupRecord[] = []) {
   if (!job) return { percent: 6, label: "Conectando…", done: false, failed: false };
   const total = Math.max(1, job.totalUnits);
   if (job.status === "completed") return { percent: 100, label: "Backup completado", done: true, failed: false };
   if (job.status === "failed" || job.status === "cancelled") {
-    return { percent: 100, label: "Backup fallido", done: true, failed: true };
+    const bakReady = backups.length > 0 && backups.every((backup) => backup.status === "completed");
+    return { percent: 100, label: bakReady ? "Entrega fallida" : "Backup fallido", done: true, failed: true };
   }
-  if (job.phase === "compressing") return { percent: 88, label: "Creando ZIP…", done: false, failed: false };
-  if (job.phase === "transferring") return { percent: 95, label: "Transfiriendo…", done: false, failed: false };
-  if (job.phase === "cleaning_up") return { percent: 100, label: "Backup listo", done: false, failed: false };
-  if (job.phase === "backing_up") {
+  if (job.phase === "compressing") return { percent: 86, label: "Creando ZIP…", done: false, failed: false };
+  if (job.phase === "archive_ready") return { percent: 91, label: "ZIP validado…", done: false, failed: false };
+  if (job.phase === "transferring") return { percent: 96, label: "Enviando al destino…", done: false, failed: false };
+  if (job.phase === "cleaning_up") return { percent: 99, label: "Liberando temporales…", done: false, failed: false };
+  if (["backing_up", "creating_bak", "validating_bak", "backup_ready"].includes(job.phase)) {
     const completed = Math.min(job.processedUnits, total);
+    const phaseFraction = job.phase === "validating_bak" ? 0.75 : job.phase === "backup_ready" ? 1 : 0.25;
+    const activeBase = Math.min(completed + 1, total);
+    const label = job.phase === "validating_bak"
+      ? `Validando base ${activeBase} de ${total}`
+      : job.phase === "backup_ready"
+        ? `${completed} de ${total} .BAK validados`
+        : `Creando .BAK ${activeBase} de ${total}`;
     return {
-      percent: Math.max(10, Math.round(10 + (completed / total) * 70)),
-      label: `Base ${Math.min(completed + 1, total)} de ${total}`,
+      percent: Math.min(80, Math.max(10, Math.round(10 + ((completed + phaseFraction) / total) * 70))),
+      label,
       done: false,
       failed: false,
     };
@@ -49,7 +59,7 @@ export function BackupBackgroundIndicator({ collapsed }: { collapsed: boolean })
   const progress = batch.submissionError
     ? { percent: 100, label: "No se pudo iniciar", done: true, failed: true }
     : batch.jobId
-      ? getAgentProgress(job)
+      ? getAgentProgress(job, backups)
       : batch.backupIds.length === 0
         ? { percent: 6, label: "Preparando…", done: false, failed: false }
         : {

@@ -30,6 +30,13 @@ class StorageThresholdRequest(BaseModel):
         return self
 
 
+class StoragePreferenceRequest(BaseModel):
+    agent_id: str = Field(alias="agentId", min_length=1, max_length=64)
+    volume_key: str = Field(alias="volumeKey", min_length=1, max_length=128)
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
 @router.get("")
 async def storage_inventory(
     current_user: User = Depends(read_storage),
@@ -61,6 +68,31 @@ async def update_storage_thresholds(
             "critical_free_percent": body.critical_free_percent,
             "critical_free_bytes": body.critical_free_bytes,
         },
+    )
+    await db.commit()
+    return result
+
+
+@router.put("/preference")
+async def update_storage_preference(
+    body: StoragePreferenceRequest,
+    current_user: User = Depends(manage_storage),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await AgentStorageService(db).update_preference(
+        str(current_user.tenant_id), body.agent_id, body.volume_key
+    )
+    await db.commit()
+    return result
+
+
+@router.delete("/preference")
+async def clear_storage_preference(
+    current_user: User = Depends(manage_storage),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await AgentStorageService(db).clear_preference(
+        str(current_user.tenant_id)
     )
     await db.commit()
     return result

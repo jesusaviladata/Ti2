@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { agentStorageService } from "@/services/agent-storage.service";
 
 
@@ -24,5 +24,22 @@ export function useAgentStorageAlerts() {
     queryFn: () => agentStorageService.alerts("open"),
     refetchInterval: 30_000,
     staleTime: 15_000,
+  });
+}
+
+export function useUpdateAgentStoragePreference() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, volumeKey }: { agentId: string; volumeKey: string }) =>
+      agentStorageService.updatePreference(agentId, volumeKey),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: AGENT_STORAGE_KEYS.inventory }),
+  });
+}
+
+export function useClearAgentStoragePreference() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: agentStorageService.clearPreference,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: AGENT_STORAGE_KEYS.inventory }),
   });
 }

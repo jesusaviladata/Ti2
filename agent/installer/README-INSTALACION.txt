@@ -52,11 +52,11 @@ sale a la red como la cuenta del servidor) debe tener acceso al recurso comparti
 Para SFTP se recomienda una llave privada local con permisos exclusivos para la cuenta
 del servicio. Nunca agregue password o connectionString al archivo de perfiles.
 
-FUNCIONES DE LA VERSION 0.4.1
+FUNCIONES DE LA VERSION 0.4.2
 
 - Mantiene heartbeat cada 30 segundos aunque SQL Server tarde varios minutos.
 - Reporta capacidad de los discos y bloquea el inicio si invadiria la reserva critica.
-- Guarda Full en Fecha\FULL\Backup_Fecha.zip y diferencial en Fecha\DIFERENCIAL\Backup_Fecha.zip.
+- Guarda Full directamente en Fecha\Backup_Fecha.zip y diferencial en Fecha\DIFERENCIAL\Backup_Fecha.zip.
 - Nombra los archivos Base_Fecha.bak y Base_Fecha_DIF.bak.
 - Permite administrar perfiles SQL y destinos desde el dashboard con secretos cifrados para este agente.
 - Negocia heartbeat compatible con backend 0.3 durante una actualizacion escalonada.

@@ -59,16 +59,13 @@ function ageText(value: string) {
   return `hace ${Math.floor(seconds / 3600)} h`;
 }
 
-function CompactVolume({ item, secondary = false }: { item: AgentVolumeState; secondary?: boolean }) {
+function CompactVolume({ item }: { item: AgentVolumeState }) {
   const styles = stateStyles[item.state];
   const used = item.freePercent == null ? 0 : Math.max(0, Math.min(100, 100 - item.freePercent));
 
   return (
     <span
-      className={cn(
-        "min-w-0 flex-1 items-center gap-2 px-2.5",
-        secondary ? "hidden xl:flex border-l border-musgo/20" : "flex",
-      )}
+      className="flex min-w-0 flex-1 items-center gap-2 px-2.5"
     >
       <HardDrive size={14} className={cn("shrink-0", styles.text)} />
       <span className="min-w-0 flex-1 text-left">
@@ -141,7 +138,7 @@ export function StorageHealthIndicator() {
   const { data, isLoading, isError, refetch, isFetching } = useAgentStorage();
   const [expanded, setExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const summary = data?.summary;
+  const summary = data?.featured ?? data?.summary;
 
   useEffect(() => {
     if (!expanded) return;
@@ -190,8 +187,6 @@ export function StorageHealthIndicator() {
   }
 
   const styles = stateStyles[summary.state];
-  const visibleItems = data.items.slice(0, 2);
-
   return (
     <div ref={containerRef} className="relative min-w-0 shrink-0 lg:w-full lg:max-w-[15rem] lg:flex-1 xl:max-w-[30rem]">
       <button
@@ -213,13 +208,7 @@ export function StorageHealthIndicator() {
         </span>
 
         <span className="hidden min-w-0 flex-1 lg:flex">
-          {visibleItems.map((item, index) => (
-            <CompactVolume
-              key={`${item.agentId}:${item.volumeKey}`}
-              item={item}
-              secondary={index === 1}
-            />
-          ))}
+          <CompactVolume item={summary} />
         </span>
 
         <span className="hidden shrink-0 items-center gap-1 border-l border-musgo/20 px-2 text-crema/30 lg:flex">
@@ -250,6 +239,11 @@ export function StorageHealthIndicator() {
               <RefreshCw size={12} className={isFetching ? "animate-spin" : ""} />
             </button>
           </div>
+          {data.preference.mode === "configured" && !data.preference.available ? (
+            <div className="flex items-center gap-2 border-b border-amber-400/20 bg-amber-400/[0.05] px-4 py-2 text-[10px] text-amber-200/65">
+              <TriangleAlert size={12} /> Unidad principal sin telemetría; se muestra la de mayor riesgo.
+            </div>
+          ) : null}
           <div className="max-h-[min(60vh,28rem)] overflow-y-auto">
             {data.items.map((item) => (
               <VolumeDetail key={`${item.agentId}:${item.volumeKey}`} item={item} />

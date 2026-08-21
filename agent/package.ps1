@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$WinSWPath,
-    [string]$Version = "0.4.1"
+    [string]$Version = "0.4.2"
 )
 
 $ErrorActionPreference = "Stop"

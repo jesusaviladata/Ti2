@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   BadgeCheck,
   Building2,
+  HardDrive,
   LogOut,
   Mail,
   ServerCog,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { AgentsAdmin } from "@/components/agents/agents-admin";
 import { UsersAdmin } from "@/components/users/users-admin";
+import { StoragePreferenceSettings } from "@/components/settings/storage-preference-settings";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/auth.store";
 import { cn } from "@/lib/utils";
@@ -42,7 +44,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-type TabId = "perfil" | "usuarios" | "agentes";
+type TabId = "perfil" | "usuarios" | "agentes" | "almacenamiento";
 
 export default function SettingsPage() {
   const user = useAuthStore((state) => state.user);
@@ -54,6 +56,7 @@ export default function SettingsPage() {
     { id: "perfil", label: "Perfil", icon: User },
     { id: "usuarios", label: "Usuarios", icon: UsersRound, adminOnly: true },
     { id: "agentes", label: "Agentes", icon: ServerCog, adminOnly: true },
+    { id: "almacenamiento", label: "Almacenamiento", icon: HardDrive, adminOnly: true },
   ];
   const visibleTabs = tabs.filter((item) => !item.adminOnly || isAdmin);
 
@@ -112,6 +115,8 @@ export default function SettingsPage() {
       {tab === "usuarios" && isAdmin ? <UsersAdmin /> : null}
 
       {tab === "agentes" && isAdmin ? <AgentsAdmin /> : null}
+
+      {tab === "almacenamiento" && isAdmin ? <StoragePreferenceSettings /> : null}
     </div>
   );
 }

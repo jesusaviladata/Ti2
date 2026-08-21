@@ -72,7 +72,37 @@ def daily_archive_path(root: Path, date_text: str, backup_type: str) -> Path:
         folder = _BACKUP_TYPE_FOLDERS[backup_type]
     except KeyError as exc:
         raise BackupError("BACKUP_TYPE_INVALID", "El tipo de backup no es valido") from exc
-    return root / date_text / folder / f"Backup_{date_text}.zip"
+    dated_root = root / date_text
+    if backup_type == "full":
+        return dated_root / f"Backup_{date_text}.zip"
+    return dated_root / folder / f"Backup_{date_text}.zip"
+
+
+def _transfer_type_folder(backup_type: str) -> str | None:
+    if backup_type == "full":
+        return None
+    try:
+        return _BACKUP_TYPE_FOLDERS[backup_type]
+    except KeyError as exc:
+        raise BackupError("BACKUP_TYPE_INVALID", "El tipo de backup no es valido") from exc
+
+
+def _delivery_location(zip_path: Path) -> tuple[str, str | None]:
+    """Return the dated destination and optional type folder.
+
+    Legacy 0.4.1 Full archives under Fecha/FULL remain deliverable. New Full
+    archives live directly under Fecha while other types retain their folder.
+    """
+    parent_name = zip_path.parent.name
+    if parent_name in set(_BACKUP_TYPE_FOLDERS.values()):
+        date_text = zip_path.parent.parent.name
+        type_folder: str | None = parent_name
+    else:
+        date_text = parent_name
+        type_folder = None
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_text):
+        raise BackupError("DELIVERY_SOURCE_INVALID", "La ruta diaria del ZIP no es valida")
+    return date_text, type_folder
 
 
 def _sql_unicode_literal(value: str) -> str:
@@ -509,7 +539,7 @@ class BackupExecutor:
                 zip_path,
                 destination,
                 date_text,
-                _BACKUP_TYPE_FOLDERS[backup_type],
+                _transfer_type_folder(backup_type),
             )
 
         cleanup_result = self._schedule_cleanup(files, work_dir)
@@ -570,12 +600,10 @@ class BackupExecutor:
             raise BackupError("ZIP_INTEGRITY_FAILED", "El ZIP no superó la validación") from exc
         if progress:
             progress({"phase": "transferring", "processedUnits": 0, "totalUnits": 1, "foundCount": 0})
-        type_folder = zip_path.parent.name
-        date_text = zip_path.parent.parent.name
-        if type_folder not in set(_BACKUP_TYPE_FOLDERS.values()):
-            raise BackupError("DELIVERY_SOURCE_INVALID", "La ruta diaria del ZIP no es válida")
+        date_text, type_folder = _delivery_location(zip_path)
         transfer = self._transfer(zip_path, destination, date_text, type_folder)
-        work_dir = zip_path.parent.parent / ".work" / run_id
+        dated_dir = zip_path.parent.parent if type_folder else zip_path.parent
+        work_dir = dated_dir / ".work" / run_id
         files = [work_dir / name for name in member_names if Path(name).name == name]
         cleanup = self._schedule_cleanup(files, work_dir) if files else {"scheduled": False, "status": "no_sources"}
         return {
@@ -689,7 +717,7 @@ class BackupExecutor:
         zip_path: Path,
         destination: dict[str, Any],
         date_text: str,
-        type_folder: str,
+        type_folder: str | None,
     ) -> dict[str, Any]:
         destination_type = str(destination.get("type") or "").lower()
         if destination_type == "smb":
@@ -703,12 +731,14 @@ class BackupExecutor:
         zip_path: Path,
         destination: dict[str, Any],
         date_text: str,
-        type_folder: str,
+        type_folder: str | None,
     ) -> dict[str, Any]:
         root = Path(str(destination.get("path") or ""))
         if not str(root).startswith(("\\\\", "//")):
             raise BackupError("SMB_PATH_INVALID", "El destino SMB debe ser una ruta UNC")
-        target_dir = root / date_text / type_folder
+        target_dir = root / date_text
+        if type_folder:
+            target_dir /= type_folder
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / zip_path.name
         partial = target.with_suffix(target.suffix + ".part")
@@ -731,7 +761,7 @@ class BackupExecutor:
         zip_path: Path,
         destination: dict[str, Any],
         date_text: str,
-        type_folder: str,
+        type_folder: str | None,
     ) -> dict[str, Any]:
         try:
             import paramiko
@@ -803,9 +833,9 @@ class BackupExecutor:
             if expected_fingerprint and fingerprint != expected_fingerprint:
                 raise BackupError("SFTP_HOST_KEY_MISMATCH", "La identidad del servidor SFTP no coincide")
             sftp = client.open_sftp()
-            remote_dir = posixpath.join(
-                remote_root.rstrip("/"), date_text, type_folder
-            )
+            remote_dir = posixpath.join(remote_root.rstrip("/"), date_text)
+            if type_folder:
+                remote_dir = posixpath.join(remote_dir, type_folder)
             current = ""
             for part in remote_dir.split("/"):
                 if not part:

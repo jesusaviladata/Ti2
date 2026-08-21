@@ -12,4 +12,12 @@ export const agentStorageService = {
         params: { status },
       })
       .then((response) => response.data),
+
+  updatePreference: (agentId: string, volumeKey: string) =>
+    api
+      .put("/api/v1/agent-storage/preference", { agentId, volumeKey })
+      .then((response) => response.data),
+
+  clearPreference: () =>
+    api.delete("/api/v1/agent-storage/preference").then((response) => response.data),
 };

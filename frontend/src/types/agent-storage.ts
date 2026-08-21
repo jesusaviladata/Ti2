@@ -23,10 +23,19 @@ export interface StorageThresholds {
   criticalFreeBytes: number;
 }
 
+export interface StoragePreference {
+  mode: "automatic" | "configured";
+  agentId: string | null;
+  volumeKey: string | null;
+  available: boolean;
+}
+
 export interface AgentStorageInventory {
   items: AgentVolumeState[];
   total: number;
   summary: AgentVolumeState | null;
+  featured: AgentVolumeState | null;
+  preference: StoragePreference;
   thresholds: StorageThresholds;
 }
 

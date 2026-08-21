@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckCircle2, Database, Loader2, PackageCheck, Search, Send, X, XCircle } from "lucide-react";
 import { useAgentJob, useAgentProfiles } from "@/hooks/useAgents";
-import { useBackupStatus, useTriggerAgentBackup } from "@/hooks/useBackups";
+import { useBackupAgentJob, useBackupStatuses, useTriggerAgentBackup } from "@/hooks/useBackups";
 import { agentsService } from "@/services/agents.service";
+import { useBackupProgressStore } from "@/store/backup-progress.store";
 import { formatBytes } from "@/lib/utils";
-import type { BackupRecord, BackupType } from "@/types/backup";
+import type { AgentJob, BackupRecord, BackupType } from "@/types/backup";
 
 interface Props { open: boolean; onClose: () => void; agentId: string | null }
 
@@ -16,8 +17,60 @@ function errorMessage(error: unknown) {
   return typeof detail === "string" ? detail : detail?.message ?? value.response?.data?.error?.message ?? "No fue posible iniciar el backup.";
 }
 
-function BackupRunRow({ initial }: { initial: BackupRecord }) {
-  const status = useBackupStatus(initial.id).data ?? initial;
+function BakBatchProgress({ records }: { records: BackupRecord[] }) {
+  const total = Math.max(1, records.length);
+  const ready = records.filter((item) => item.status === "completed").length;
+  const failed = records.filter((item) => item.status === "failed").length;
+  const percent = Math.round(
+    records.reduce(
+      (sum, item) => sum + (item.status === "failed" ? 100 : item.progressPercent ?? 0),
+      0,
+    ) / total,
+  );
+  const active = records.find((item) => item.status === "running") ?? records.find((item) => item.status === "pending");
+  const completed = ready === records.length && records.length > 0;
+  const label = failed
+    ? `${ready} validados · ${failed} fallidos`
+    : completed
+      ? ".BAK creados y validados"
+      : active?.phase === "validating_bak"
+        ? `Validando ${active.databaseName}`
+        : active
+          ? `Creando ${active.databaseName}`
+          : "Preparando el lote";
+
+  return (
+    <div className="rounded-[1rem] border border-arcilla/20 bg-arcilla/[0.05] p-4">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-crema/30">Progreso general</p>
+          <p className={failed ? "mt-1 text-sm text-red-400" : completed ? "mt-1 text-sm text-green-400" : "mt-1 text-sm text-crema/75"}>{label}</p>
+        </div>
+        <span className={failed ? "font-mono text-lg tabular-nums text-red-400" : completed ? "font-mono text-lg tabular-nums text-green-400" : "font-mono text-lg tabular-nums text-arcilla"}>{Math.min(100, Math.max(0, percent))}%</span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-musgo/20">
+        <div className={failed ? "h-full rounded-full bg-red-500 transition-[width] duration-700" : completed ? "h-full rounded-full bg-green-500 transition-[width] duration-700" : "h-full rounded-full bg-arcilla transition-[width] duration-700"} style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
+      </div>
+      <div className="mt-2 flex justify-between gap-3 font-mono text-[9px] text-crema/30">
+        <span>{ready} de {records.length} bases validadas</span>
+        <span>RESTORE VERIFYONLY</span>
+      </div>
+    </div>
+  );
+}
+
+function deliveryLabel(job: AgentJob | undefined, records: BackupRecord[]) {
+  if (job?.status === "failed" || job?.status === "cancelled") return "ZIP o entrega fallida";
+  if (job?.status === "completed") {
+    return records.some((item) => item.deliveryStatus === "failed") ? "Entrega fallida" : "Entrega verificada";
+  }
+  if (job?.phase === "transferring") return "Enviando ZIP";
+  if (job?.phase === "archive_ready") return "ZIP validado";
+  if (job?.phase === "compressing") return "Creando ZIP";
+  return records.every((item) => item.status === "completed") ? "Preparando ZIP en segundo plano" : "Comienza al validar los .BAK";
+}
+
+function BackupRunRow({ status }: { status: BackupRecord }) {
   const ready = status.status === "completed";
   const failed = status.status === "failed";
   const progress = failed ? 100 : status.progressPercent ?? 0;
@@ -58,7 +111,14 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [records, setRecords] = useState<BackupRecord[]>([]);
+  const [jobId, setJobId] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const showInBackground = useBackupProgressStore((state) => state.showInBackground);
+  const backgroundRequestedRef = useRef(false);
+  const submittedNamesRef = useRef<string[]>([]);
+  const backupQueries = useBackupStatuses(records.map((item) => item.id));
+  const liveRecords = records.map((record, index) => backupQueries[index]?.data ?? record);
+  const job = useBackupAgentJob(jobId || undefined).data;
 
   useEffect(() => {
     const first = profiles.data?.sqlInstances[0]?.id ?? "";
@@ -66,7 +126,7 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
   }, [profiles.data, sqlProfileId]);
 
   useEffect(() => {
-    setCatalogJobId(null); setSelected([]); setRecords([]); setLocalError(null);
+    setCatalogJobId(null); setSelected([]); setRecords([]); setJobId(""); setLocalError(null);
   }, [agentId, sqlProfileId]);
 
   const databases = catalog.data?.status === "completed" ? catalog.data.result?.databases ?? [] : [];
@@ -84,14 +144,76 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
   async function submit() {
     if (!agentId || !sqlProfileId || !selected.length) return;
     setLocalError(null);
+    const submittedNames = [...selected];
+    submittedNamesRef.current = submittedNames;
     try {
       const result = await trigger.mutateAsync({ agentId, sqlProfileId, databaseNames: selected, backupType, destinationProfileId: destinationProfileId || undefined });
+      if (backgroundRequestedRef.current) {
+        showInBackground({
+          jobId: result.jobId,
+          backupIds: result.backups.map((item) => item.id),
+          databaseNames: submittedNames,
+          startedAt: new Date().toISOString(),
+        });
+        backgroundRequestedRef.current = false;
+        submittedNamesRef.current = [];
+        trigger.reset();
+        return;
+      }
+      setJobId(result.jobId);
       setRecords(result.backups);
-    } catch (error) { setLocalError(errorMessage(error)); }
+    } catch (error) {
+      if (backgroundRequestedRef.current) {
+        showInBackground({
+          backupIds: [],
+          databaseNames: submittedNames,
+          startedAt: new Date().toISOString(),
+          submissionError: errorMessage(error),
+        });
+        backgroundRequestedRef.current = false;
+        submittedNamesRef.current = [];
+        trigger.reset();
+        return;
+      }
+      setLocalError(errorMessage(error));
+    }
+  }
+
+  function resetAndClose() {
+    setCatalogJobId(null); setSelected([]); setRecords([]); setJobId(""); setSearch(""); setLocalError(null); trigger.reset(); onClose();
+  }
+
+  function moveToBackground() {
+    const databaseNames = records.length
+      ? records.map((item) => item.databaseName)
+      : submittedNamesRef.current;
+    if (trigger.isPending && !jobId) {
+      backgroundRequestedRef.current = true;
+      showInBackground({
+        backupIds: [],
+        databaseNames,
+        startedAt: new Date().toISOString(),
+      });
+      setCatalogJobId(null); setSelected([]); setRecords([]); setJobId(""); setSearch(""); onClose();
+      return;
+    }
+    if (jobId || records.length) {
+      showInBackground({
+        jobId: jobId || undefined,
+        backupIds: records.map((item) => item.id),
+        databaseNames,
+        startedAt: new Date().toISOString(),
+      });
+    }
+    resetAndClose();
   }
 
   function close() {
-    setCatalogJobId(null); setSelected([]); setRecords([]); setSearch(""); trigger.reset(); onClose();
+    if (trigger.isPending || jobId || records.length) {
+      moveToBackground();
+      return;
+    }
+    resetAndClose();
   }
 
   return (
@@ -105,9 +227,15 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
         <div className="overflow-y-auto p-6">
           {records.length ? (
             <div className="space-y-3">
-              <div className="rounded-[0.75rem] border border-arcilla/20 bg-arcilla/[0.05] p-3 text-xs leading-relaxed text-crema/45">La barra principal termina al crear y validar el .BAK. El ZIP y el envío continúan como un estado separado.</div>
-              {records.map((record) => <BackupRunRow key={record.id} initial={record} />)}
-              <button type="button" onClick={close} className="mt-2 h-10 w-full rounded-[0.625rem] border border-musgo/25 text-xs text-crema/55">Cerrar · el proceso continúa en segundo plano</button>
+              <BakBatchProgress records={liveRecords} />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-[0.75rem] border border-green-500/20 bg-green-500/[0.04] px-3 py-2.5"><p className="font-mono text-[9px] uppercase tracking-wider text-green-300/60">1 · .BAK + validación</p><p className="mt-1 text-xs text-crema/55">Progreso principal</p></div>
+                <div className="rounded-[0.75rem] border border-musgo/20 bg-musgo/[0.04] px-3 py-2.5"><p className="font-mono text-[9px] uppercase tracking-wider text-crema/30">2 · ZIP + envío</p><p className="mt-1 truncate text-xs text-crema/55">{deliveryLabel(job, liveRecords)}</p></div>
+              </div>
+              <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                {liveRecords.map((record) => <BackupRunRow key={record.id} status={record} />)}
+              </div>
+              <button type="button" onClick={moveToBackground} className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-[0.625rem] border border-arcilla/30 text-xs text-arcilla hover:bg-arcilla/[0.06]"><Send size={13} /> Continuar en segundo plano</button>
             </div>
           ) : (
             <div className="space-y-5">

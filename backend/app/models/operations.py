@@ -289,6 +289,12 @@ class AgentStorageThreshold(TenantRecord, Base):
     critical_free_bytes: Mapped[int] = mapped_column(
         BigInteger, nullable=False, default=10 * 1024**3
     )
+    preferred_agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("remote_agents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    preferred_volume_key: Mapped[str | None] = mapped_column(String(128))
 
 
 class AgentConnectionProfile(TenantRecord, Base):
