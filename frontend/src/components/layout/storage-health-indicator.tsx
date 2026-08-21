@@ -167,7 +167,7 @@ export function StorageHealthIndicator() {
   if (isLoading) {
     return (
       <div
-        className="hidden h-10 w-full max-w-[30rem] animate-pulse rounded-[0.75rem] border border-musgo/15 bg-musgo/[0.06] md:block"
+        className="h-9 w-9 shrink-0 animate-pulse rounded-[0.75rem] border border-musgo/15 bg-musgo/[0.06] lg:h-10 lg:w-full lg:max-w-[15rem] xl:max-w-[30rem]"
         aria-label="Cargando capacidad de almacenamiento"
       />
     );
@@ -178,11 +178,11 @@ export function StorageHealthIndicator() {
       <button
         type="button"
         onClick={() => refetch()}
-        className="hidden h-9 items-center gap-2 rounded-[0.75rem] border border-musgo/20 px-3 text-crema/35 transition-colors hover:border-musgo/40 hover:text-crema/70 md:flex"
+        className="flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-[0.75rem] border border-musgo/20 text-crema/35 transition-colors hover:border-musgo/40 hover:text-crema/70 lg:w-auto lg:px-3"
         aria-label="Actualizar telemetría de almacenamiento"
       >
         <RefreshCw size={13} className={isFetching ? "animate-spin" : ""} />
-        <span className="hidden font-mono text-[9px] lg:inline">
+        <span className="hidden font-mono text-[9px] xl:inline">
           {isError ? "Espacio no disponible" : "Sin telemetría"}
         </span>
       </button>
@@ -193,12 +193,12 @@ export function StorageHealthIndicator() {
   const visibleItems = data.items.slice(0, 2);
 
   return (
-    <div ref={containerRef} className="relative min-w-0 shrink-0 md:w-full md:max-w-[30rem] md:flex-1">
+    <div ref={containerRef} className="relative min-w-0 shrink-0 lg:w-full lg:max-w-[15rem] lg:flex-1 xl:max-w-[30rem]">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
         className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-[0.75rem] border transition-colors md:h-10 md:w-full md:justify-start",
+          "flex h-9 w-9 items-center justify-center rounded-[0.75rem] border transition-colors lg:h-10 lg:w-full lg:justify-start",
           styles.border,
           styles.surface,
           "hover:border-musgo/50",
@@ -207,12 +207,12 @@ export function StorageHealthIndicator() {
         aria-haspopup="dialog"
         aria-expanded={expanded}
       >
-        <span className="relative md:hidden">
+        <span className="relative lg:hidden">
           <HardDrive size={15} className={styles.text} />
           <span className={cn("absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full", styles.bar)} />
         </span>
 
-        <span className="hidden min-w-0 flex-1 md:flex">
+        <span className="hidden min-w-0 flex-1 lg:flex">
           {visibleItems.map((item, index) => (
             <CompactVolume
               key={`${item.agentId}:${item.volumeKey}`}
@@ -222,7 +222,7 @@ export function StorageHealthIndicator() {
           ))}
         </span>
 
-        <span className="hidden shrink-0 items-center gap-1 border-l border-musgo/20 px-2 text-crema/30 md:flex">
+        <span className="hidden shrink-0 items-center gap-1 border-l border-musgo/20 px-2 text-crema/30 lg:flex">
           {summary.state === "critical" ? <TriangleAlert size={11} className="text-red-400" /> : null}
           <ChevronDown size={12} className={cn("transition-transform", expanded && "rotate-180")} />
         </span>
@@ -232,7 +232,7 @@ export function StorageHealthIndicator() {
         <div
           role="dialog"
           aria-label="Detalle de almacenamiento de agentes"
-          className="fixed left-3 right-3 top-[4.25rem] z-[70] overflow-hidden rounded-[1rem] border border-musgo/30 bg-carbon shadow-2xl md:absolute md:left-0 md:right-auto md:top-full md:mt-2 md:w-[min(40rem,calc(100vw-4rem))]"
+          className="fixed left-3 right-3 top-[4.25rem] z-[70] overflow-hidden rounded-[1rem] border border-musgo/30 bg-carbon shadow-2xl lg:absolute lg:left-0 lg:right-auto lg:top-full lg:mt-2 lg:w-[min(40rem,calc(100vw-4rem))]"
         >
           <div className="flex items-center justify-between border-b border-musgo/20 px-4 py-2.5">
             <div>
