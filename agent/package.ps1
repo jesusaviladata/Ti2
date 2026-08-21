@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$WinSWPath,
-    [string]$Version = "0.4.2"
+    [string]$Version = "0.5.0",
+    [Parameter(Mandatory = $true)][ValidatePattern('^https://')][string]$ControlPlaneUrl,
+    [Parameter(Mandatory = $true)][string]$CommandSigningPublicKey,
+    [Parameter(Mandatory = $true)][string]$CommandSigningKeyId
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +30,31 @@ Copy-Item -Recurse -Force $bundleSource (Join-Path $packageRoot "DataExpressAgen
 Copy-Item -Force -LiteralPath $WinSWPath (Join-Path $packageRoot "DataExpressAgent.Service.exe")
 Copy-Item -Force (Join-Path $agentRoot "installer\*") $installerTarget
 Set-Content -Encoding ASCII (Join-Path $packageRoot "VERSION.txt") $Version
+
+$bootstrap = [ordered]@{
+    schemaVersion = 1
+    controlPlaneUrl = $ControlPlaneUrl.TrimEnd('/')
+    agentVersion = $Version
+    commandTrust = [ordered]@{
+        activeKeyId = $CommandSigningKeyId
+        keys = @(
+            [ordered]@{
+                keyId = $CommandSigningKeyId
+                publicKey = $CommandSigningPublicKey
+            }
+        )
+    }
+    pollWaitSeconds = 25
+    requestTimeoutSeconds = 40
+    heartbeatIntervalSeconds = 30
+}
+$bootstrapJson = $bootstrap | ConvertTo-Json -Depth 8
+$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText(
+    (Join-Path $packageRoot "bootstrap.json"),
+    $bootstrapJson,
+    $utf8WithoutBom
+)
 
 $hashLines = Get-ChildItem -File -Recurse $packageRoot |
     Where-Object { $_.Name -ne "SHA256SUMS.txt" } |
