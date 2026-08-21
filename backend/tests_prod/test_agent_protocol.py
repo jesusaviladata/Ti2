@@ -64,6 +64,26 @@ def test_backend_and_agent_share_command_signature_contract():
     windows_protocol.verify_command(public_key, key_id, body, signature)
 
 
+def test_backend_and_agent_share_managed_file_command_contract():
+    from app import agent_protocol as backend_protocol
+    from agent.data_express_agent import protocol as windows_protocol
+
+    assert backend_protocol.FILE_BACKUP_CAPABILITY == "file_backup_v1"
+    assert backend_protocol.MANAGED_FILE_COMMAND_TYPES == windows_protocol.MANAGED_FILE_COMMAND_TYPES
+    assert backend_protocol.MANAGED_FILE_COMMAND_TYPES == frozenset(
+        {
+            "apply_file_backup_config",
+            "simulate_file_backup",
+            "run_file_backup",
+            "resume_file_backup",
+            "cancel_file_backup",
+            "simulate_file_restore",
+            "run_file_restore",
+            "test_file_destination",
+        }
+    )
+
+
 def test_request_rejects_modified_body_expired_timestamp_and_replayed_nonce():
     from app import agent_protocol
 
@@ -122,4 +142,3 @@ def test_key_serialization_round_trip_and_invalid_key_rejected():
     with pytest.raises(agent_protocol.AgentProtocolError) as invalid:
         agent_protocol.load_public_key("not-a-valid-key")
     assert invalid.value.code == "AGENT_KEY_INVALID"
-

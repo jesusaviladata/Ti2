@@ -15,6 +15,7 @@ from .runner_utils import retry_delay
 from .storage import StorageCollector
 from .profiles import ManagedProfileStore, ProfileApplyError
 from .discovery import discover_environment
+from .protocol import MANAGED_FILE_COMMAND_TYPES
 
 
 logger = logging.getLogger("data_express_agent")
@@ -27,6 +28,9 @@ DESTRUCTIVE_COMMANDS = frozenset(
         "purge_quarantine_items",
         "run_backup_batch",
         "retry_backup_delivery",
+        "run_file_backup",
+        "resume_file_backup",
+        "run_file_restore",
     }
 )
 
@@ -41,6 +45,7 @@ class AgentRunner:
         backup_executor: BackupExecutor | None = None,
         cleanup_executor: StructuralCleanupExecutor | None = None,
         health_supervisor: AgentHealthSupervisor | None = None,
+        file_backup_executor: Any | None = None,
     ):
         self.client = client
         self.journal = journal
@@ -51,6 +56,7 @@ class AgentRunner:
             destination_profiles=getattr(config, "backup_destinations", ()),
         )
         self.cleanup = cleanup_executor or StructuralCleanupExecutor(journal.path.parent)
+        self.file_backups = file_backup_executor
         identity = getattr(client, "identity", None)
         data_dir = getattr(config, "data_dir", None) or journal.path.parent
         self.profile_store = (
@@ -70,6 +76,12 @@ class AgentRunner:
                 client,
                 interval_seconds=float(getattr(config, "heartbeat_interval_seconds", 30)),
                 volume_collector=storage.collect,
+                file_backup_enabled=file_backup_executor is not None,
+                catalog_revision_factory=(
+                    (lambda: int(getattr(file_backup_executor, "catalog_revision", 0)))
+                    if file_backup_executor is not None
+                    else None
+                ),
             )
         self.handlers = {
             "browse_drives": self._browse_drives,
@@ -87,6 +99,13 @@ class AgentRunner:
             "test_connection_profile": self._test_connection_profile,
             "discover_agent_environment": self._discover_agent_environment,
         }
+        if self.file_backups is not None:
+            for command_type in MANAGED_FILE_COMMAND_TYPES:
+                self.handlers[command_type] = (
+                    lambda payload, command_id, managed_type=command_type: self._managed_file_command(
+                        managed_type, payload, command_id
+                    )
+                )
 
     def recover_interrupted(self) -> None:
         for command_id, entry in self.journal.interrupted():
@@ -212,6 +231,19 @@ class AgentRunner:
 
     def _run_backup_batch(self, payload: dict[str, Any], command_id: str):
         return self.backups.run_batch(
+            payload,
+            progress=lambda value: self.client.progress(command_id, value),
+        )
+
+    def _managed_file_command(
+        self, command_type: str, payload: dict[str, Any], command_id: str
+    ) -> dict[str, Any]:
+        if command_type not in MANAGED_FILE_COMMAND_TYPES or self.file_backups is None:
+            raise ExplorerError(
+                "COMMAND_TYPE_UNSUPPORTED", "El tipo de orden no está implementado"
+            )
+        return self.file_backups.execute(
+            command_type,
             payload,
             progress=lambda value: self.client.progress(command_id, value),
         )

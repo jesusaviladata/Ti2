@@ -23,12 +23,19 @@ class Capability(StrEnum):
     USER_MANAGE = "user:manage"
     PURGE = "purge"
     NOTIFICATION_TEST = "notification:test"
+    FILE_BACKUP_READ = "file-backup:read"
+    FILE_BACKUP_MANAGE = "file-backup:manage"
+    FILE_BACKUP_RUN = "file-backup:run"
+    FILE_BACKUP_CANCEL = "file-backup:cancel"
+    FILE_BACKUP_PROTECT = "file-backup:protect"
+    FILE_BACKUP_RESTORE = "file-backup:restore"
 
 
 _READ_ONLY = {
     Capability.DASHBOARD_READ,
     Capability.REPORT_READ,
     Capability.OPERATION_READ,
+    Capability.FILE_BACKUP_READ,
 }
 
 _OPERATOR = _READ_ONLY | {
@@ -39,6 +46,9 @@ _OPERATOR = _READ_ONLY | {
     Capability.ACCESS_OPERATE,
     Capability.FILE_MANAGE,
     Capability.JOB_CANCEL,
+    Capability.FILE_BACKUP_RUN,
+    Capability.FILE_BACKUP_CANCEL,
+    Capability.FILE_BACKUP_RESTORE,
 }
 
 ROLE_CAPABILITIES: dict[UserRole, frozenset[Capability]] = {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -138,6 +139,28 @@ class AgentHeartbeatRequest(BaseModel):
     @field_validator("metadata")
     @classmethod
     def validate_public_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        capabilities = value.get("capabilities")
+        if capabilities is not None:
+            valid = (
+                isinstance(capabilities, list)
+                and len(capabilities) <= 32
+                and len(set(capabilities)) == len(capabilities)
+                and all(
+                    isinstance(item, str)
+                    and re.fullmatch(r"[a-z][a-z0-9_.-]{0,63}", item)
+                    for item in capabilities
+                )
+            )
+            if not valid:
+                raise ValueError("metadata.capabilities no es válido")
+        catalog_revision = value.get("fileCatalogRevision")
+        if catalog_revision is not None and (
+            not isinstance(catalog_revision, int)
+            or isinstance(catalog_revision, bool)
+            or catalog_revision < 0
+            or catalog_revision > 2_000_000_000
+        ):
+            raise ValueError("metadata.fileCatalogRevision no es válido")
         try:
             serialized = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
         except (TypeError, ValueError) as exc:

@@ -34,8 +34,11 @@ cd "C:\Users\quech\OneDrive\Documentos\GESTOR PRIMEE\infra-platform"
 git status --short
 git switch -c feat/file-backup-module
 
-backend\.venv\Scripts\python.exe -m pytest -q backend\tests backend\tests_prod agent\tests
-backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
+backend\.venv\Scripts\python.exe -m pytest -q backend\tests backend\tests_prod
+backend\.venv\Scripts\python.exe -m pytest -q agent\tests
+Push-Location backend
+.venv\Scripts\alembic.exe -c alembic.ini heads
+Pop-Location
 
 cd frontend
 npm run type-check
@@ -80,7 +83,9 @@ Detenerse ante cualquier fallo no relacionado. Registrar el commit base y no inc
 
 ```powershell
 backend\.venv\Scripts\python.exe -m pytest -q backend\tests_prod\test_file_backup_migration.py backend\tests_prod\test_file_backup_models.py
-backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
+Push-Location backend
+.venv\Scripts\alembic.exe -c alembic.ini heads
+Pop-Location
 ```
 
 **Commit:** `feat: add file backup persistence schema`
@@ -283,7 +288,9 @@ backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
 
 ```powershell
 backend\.venv\Scripts\python.exe -m pytest -q backend\tests_prod\test_agent_replacement_migration.py backend\tests_prod\test_agent_replacement_service.py backend\tests_prod\test_agent_replacement_api.py
-backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
+Push-Location backend
+.venv\Scripts\alembic.exe -c alembic.ini heads
+Pop-Location
 
 cd frontend
 npm run type-check
@@ -749,8 +756,11 @@ powershell -ExecutionPolicy Bypass -File agent\package.ps1 -Version 0.5.0
 ### Tarea 27. Ejecutar verificación integral automatizada
 
 ```powershell
-backend\.venv\Scripts\python.exe -m pytest -q backend\tests backend\tests_prod agent\tests
-backend\.venv\Scripts\alembic.exe -c backend\alembic.ini heads
+backend\.venv\Scripts\python.exe -m pytest -q backend\tests backend\tests_prod
+backend\.venv\Scripts\python.exe -m pytest -q agent\tests
+Push-Location backend
+.venv\Scripts\alembic.exe -c alembic.ini heads
+Pop-Location
 
 cd frontend
 npm run type-check

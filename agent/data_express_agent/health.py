@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from .client import AgentClient, AgentClientError
 from .runner_utils import retry_delay
+from .protocol import FILE_BACKUP_CAPABILITY
 
 
 logger = logging.getLogger("data_express_agent")
@@ -20,11 +21,15 @@ class AgentHealthSupervisor:
         interval_seconds: float = 30.0,
         metadata_factory: Callable[[], dict[str, Any]] | None = None,
         volume_collector: Callable[[], list[dict[str, Any]]] | None = None,
+        file_backup_enabled: bool = False,
+        catalog_revision_factory: Callable[[], int] | None = None,
     ):
         self.client = client
         self.interval_seconds = interval_seconds
         self.metadata_factory = metadata_factory or self._default_metadata
         self.volume_collector = volume_collector or (lambda: [])
+        self.file_backup_enabled = file_backup_enabled
+        self.catalog_revision_factory = catalog_revision_factory
         self._lock = threading.Lock()
         self._status = "connected"
         self._current_operation: str | None = None
@@ -36,11 +41,20 @@ class AgentHealthSupervisor:
 
     def _default_metadata(self) -> dict[str, Any]:
         public_metadata = getattr(self.client.config, "public_metadata", lambda: {})
-        return {
+        metadata = {
             "hostname": platform.node(),
             "os": platform.platform(),
             **public_metadata(),
         }
+        if self.file_backup_enabled:
+            metadata["capabilities"] = [FILE_BACKUP_CAPABILITY]
+            revision = (
+                self.catalog_revision_factory()
+                if self.catalog_revision_factory is not None
+                else 0
+            )
+            metadata["fileCatalogRevision"] = max(0, int(revision))
+        return metadata
 
     def start(self, stop_event: threading.Event) -> None:
         if self._thread is not None and self._thread.is_alive():

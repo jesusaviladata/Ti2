@@ -18,6 +18,19 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 REQUEST_CONTEXT = b"DATAEXPRESS-AGENT-REQUEST-V1"
 COMMAND_CONTEXT = b"DATAEXPRESS-AGENT-COMMAND-V1"
 DEFAULT_MAX_CLOCK_SKEW_SECONDS = 120
+FILE_BACKUP_CAPABILITY = "file_backup_v1"
+MANAGED_FILE_COMMAND_TYPES = frozenset(
+    {
+        "apply_file_backup_config",
+        "simulate_file_backup",
+        "run_file_backup",
+        "resume_file_backup",
+        "cancel_file_backup",
+        "simulate_file_restore",
+        "run_file_restore",
+        "test_file_destination",
+    }
+)
 
 
 class AgentProtocolError(ValueError):

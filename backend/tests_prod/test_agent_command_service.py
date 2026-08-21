@@ -8,8 +8,9 @@ from unittest.mock import AsyncMock
 
 from app.core.errors import ConflictError
 from app.models.operations import AgentCommand, BackgroundJob, RemoteAgent
+from app.models.file_backup import FileBackupRun, FileBackupRunStatus, FileBackupStrategy
 from app.models.operations import Notification
-from app.services.agent_command_service import AgentCommandService
+from app.services.agent_command_service import ALLOWED_COMMAND_TYPES, AgentCommandService
 
 
 class FakeCommandDb:
@@ -33,6 +34,7 @@ class FakeCommandRepo:
         self.agent = agent
         self.commands: list[AgentCommand] = []
         self.jobs: dict[uuid.UUID, BackgroundJob] = {}
+        self.file_runs: dict[uuid.UUID, FileBackupRun] = {}
 
     async def get_agent(self, tenant_id: str, agent_id: str):
         if str(self.agent.tenant_id) == tenant_id and str(self.agent.id) == agent_id:
@@ -70,6 +72,15 @@ class FakeCommandRepo:
     async def get_background_job(self, job_id):
         return self.jobs.get(job_id)
 
+    async def get_file_backup_run(self, tenant_id, agent_id, run_id):
+        item = self.file_runs.get(run_id)
+        if item and item.tenant_id == tenant_id and item.agent_id == agent_id:
+            return item
+        return None
+
+    async def get_file_restore_job(self, tenant_id, agent_id, restore_id):
+        return None
+
 
 def _fixture():
     agent = RemoteAgent(
@@ -84,6 +95,19 @@ def _fixture():
     db = FakeCommandDb()
     repo = FakeCommandRepo(agent)
     return agent, db, repo, AgentCommandService(db, repo=repo)
+
+
+def test_managed_file_commands_are_explicitly_allowlisted():
+    assert {
+        "apply_file_backup_config",
+        "simulate_file_backup",
+        "run_file_backup",
+        "resume_file_backup",
+        "cancel_file_backup",
+        "simulate_file_restore",
+        "run_file_restore",
+        "test_file_destination",
+    } <= ALLOWED_COMMAND_TYPES
 
 
 @pytest.mark.asyncio
@@ -153,6 +177,70 @@ async def test_duplicate_completion_is_idempotent_but_conflicting_transition_is_
     assert repeated.result_summary == {"drives": ["C:\\\\", "D:\\\\"]}
     with pytest.raises(ConflictError):
         await service.fail(agent, str(command.id), "NETWORK_ERROR", "late failure")
+
+
+@pytest.mark.asyncio
+async def test_file_backup_progress_and_completion_project_aggregates_idempotently():
+    agent, _db, repo, service = _fixture()
+    run = FileBackupRun(
+        id=uuid.uuid4(),
+        tenant_id=agent.tenant_id,
+        task_id=uuid.uuid4(),
+        agent_id=agent.id,
+        config_revision=2,
+        strategy=FileBackupStrategy.full,
+        status=FileBackupRunStatus.queued,
+        phase="queued",
+        progress_percent=0,
+        files_processed=0,
+        bytes_processed=0,
+        summary={},
+    )
+    repo.file_runs[run.id] = run
+    command = AgentCommand(
+        id=uuid.uuid4(),
+        tenant_id=agent.tenant_id,
+        agent_id=agent.id,
+        command_type="run_file_backup",
+        payload={"fileRunId": str(run.id)},
+        payload_hash="5" * 64,
+        status="claimed",
+        idempotency_key="file-run-1",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
+    repo.commands.append(command)
+
+    await service.progress(
+        agent,
+        str(command.id),
+        phase="copying",
+        processed_units=25,
+        total_units=100,
+        found_count=100,
+        details={"bytesProcessed": 4096, "bytesTotal": 16384},
+    )
+
+    assert run.status == FileBackupRunStatus.running
+    assert run.phase == "copying"
+    assert run.progress_percent == 25
+    assert run.files_processed == 25
+    assert run.bytes_processed == 4096
+
+    first = await service.complete(
+        agent,
+        str(command.id),
+        {"status": "completed", "artifacts": 1},
+    )
+    repeated = await service.complete(
+        agent,
+        str(command.id),
+        {"status": "failed", "artifacts": 99},
+    )
+
+    assert repeated is first
+    assert run.status == FileBackupRunStatus.completed
+    assert run.progress_percent == 100
+    assert run.summary == {"status": "completed", "artifacts": 1}
 
 
 @pytest.mark.asyncio

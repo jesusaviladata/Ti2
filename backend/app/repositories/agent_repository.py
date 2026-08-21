@@ -14,6 +14,7 @@ from app.models.operations import (
     BackgroundJob,
     RemoteAgent,
 )
+from app.models.file_backup import FileBackupRun, FileRestoreJob
 from app.repositories.cleanup_repository import tenant_uuid
 
 
@@ -142,6 +143,36 @@ class AgentRepository:
     ) -> BackgroundJob | None:
         result = await self.db.execute(
             select(BackgroundJob).where(BackgroundJob.id == job_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_file_backup_run(
+        self,
+        tenant_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        run_id: uuid.UUID,
+    ) -> FileBackupRun | None:
+        result = await self.db.execute(
+            select(FileBackupRun).where(
+                FileBackupRun.id == run_id,
+                FileBackupRun.tenant_id == tenant_id,
+                FileBackupRun.agent_id == agent_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_file_restore_job(
+        self,
+        tenant_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        restore_id: uuid.UUID,
+    ) -> FileRestoreJob | None:
+        result = await self.db.execute(
+            select(FileRestoreJob).where(
+                FileRestoreJob.id == restore_id,
+                FileRestoreJob.tenant_id == tenant_id,
+                FileRestoreJob.agent_id == agent_id,
+            )
         )
         return result.scalar_one_or_none()
 
