@@ -28,7 +28,7 @@ from typing import Literal
 
 import bcrypt
 import jwt
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -1087,14 +1087,22 @@ def dashboard_summary(_=Depends(_current_user)):
     }
 
 @app.get("/api/v1/dashboard/backup-chart")
-def backup_chart(_=Depends(_current_user)):
-    from collections import defaultdict
-    days: dict[str, dict] = defaultdict(lambda: {"completed": 0, "failed": 0, "running": 0})
+def backup_chart(days: int = Query(default=84, ge=7, le=90), _=Depends(_current_user)):
+    today = datetime.now(_LOCAL_TZ).date()
+    by_day = {
+        (today - timedelta(days=offset)).isoformat(): {
+            "completed": 0,
+            "failed": 0,
+            "running": 0,
+        }
+        for offset in range(days - 1, -1, -1)
+    }
     for b in BACKUPS.values():
         day = (b.get("startedAt") or b.get("createdAt") or "")[:10]
-        if day:
-            days[day][b["status"] if b["status"] in ("completed", "failed") else "running"] += 1
-    result = [{"date": d, **v} for d, v in sorted(days.items())[-14:]]
+        if day in by_day:
+            status = b["status"] if b["status"] in ("completed", "failed") else "running"
+            by_day[day][status] += 1
+    result = [{"date": day, **counts} for day, counts in by_day.items()]
     return {"chart": result}
 
 @app.get("/api/v1/dashboard/activity")

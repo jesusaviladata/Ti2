@@ -32,12 +32,13 @@ async def summary(
 @dashboard_router.get("/backup-chart")
 @dashboard_router.get("/backup-history")
 async def backup_chart(
+    days: int = Query(default=84, ge=7, le=90),
     current_user: User = Depends(read_dashboard),
     db: AsyncSession = Depends(get_db),
 ):
     return {
         "chart": await InsightsService(db).backup_chart(
-            str(current_user.tenant_id)
+            str(current_user.tenant_id), days=days
         )
     }
 
