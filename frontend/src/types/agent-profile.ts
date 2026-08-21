@@ -1,5 +1,5 @@
 export type ManagedProfileType = "sql" | "destination";
-export type ProfileSyncStatus = "pending" | "applied" | "error";
+export type ProfileSyncStatus = "pending" | "applied" | "error" | "requires_secret";
 
 export interface ManagedAgentProfile {
   id: string;
@@ -15,6 +15,7 @@ export interface ManagedAgentProfile {
   lastTestAt?: string | null;
   lastError?: string | null;
   hasSecret: boolean;
+  requiresSecret: boolean;
   isActive: boolean;
 }
 
@@ -24,4 +25,5 @@ export interface ManagedProfileInput {
   label: string;
   publicConfig: Record<string, string | number | boolean>;
   secret?: Record<string, string>;
+  requiresSecret?: boolean;
 }

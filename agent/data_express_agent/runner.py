@@ -51,12 +51,6 @@ class AgentRunner:
         self.journal = journal
         self.explorer = explorer or WindowsExplorer()
         config = getattr(client, "config", None)
-        self.backups = backup_executor or BackupExecutor(
-            sql_profiles=getattr(config, "sql_instances", ()),
-            destination_profiles=getattr(config, "backup_destinations", ()),
-        )
-        self.cleanup = cleanup_executor or StructuralCleanupExecutor(journal.path.parent)
-        self.file_backups = file_backup_executor
         identity = getattr(client, "identity", None)
         data_dir = getattr(config, "data_dir", None) or journal.path.parent
         self.profile_store = (
@@ -64,6 +58,21 @@ class AgentRunner:
             if identity is not None
             else None
         )
+        if self.profile_store is not None:
+            self.profile_store.import_legacy_profiles(
+                getattr(config, "sql_instances", ()),
+                getattr(config, "backup_destinations", ()),
+            )
+            sql_profiles, destination_profiles = self.profile_store.runtime_profiles()
+        else:
+            sql_profiles = getattr(config, "sql_instances", ())
+            destination_profiles = getattr(config, "backup_destinations", ())
+        self.backups = backup_executor or BackupExecutor(
+            sql_profiles=sql_profiles,
+            destination_profiles=destination_profiles,
+        )
+        self.cleanup = cleanup_executor or StructuralCleanupExecutor(journal.path.parent)
+        self.file_backups = file_backup_executor
         if health_supervisor is not None:
             self.health = health_supervisor
         else:
@@ -82,6 +91,7 @@ class AgentRunner:
                     if file_backup_executor is not None
                     else None
                 ),
+                metadata_factory=self._public_metadata,
             )
         self.handlers = {
             "browse_drives": self._browse_drives,
@@ -106,6 +116,24 @@ class AgentRunner:
                         managed_type, payload, command_id
                     )
                 )
+
+    def _public_metadata(self) -> dict[str, Any]:
+        import platform
+
+        profiles = (
+            self.profile_store.public_profiles()
+            if self.profile_store is not None
+            else getattr(self.client.config, "public_metadata", lambda: {})()
+        )
+        metadata = {"hostname": platform.node(), "os": platform.platform(), **profiles}
+        if self.file_backups is not None:
+            from .protocol import FILE_BACKUP_CAPABILITY
+
+            metadata["capabilities"] = [FILE_BACKUP_CAPABILITY]
+            metadata["fileCatalogRevision"] = max(
+                0, int(getattr(self.file_backups, "catalog_revision", 0))
+            )
+        return metadata
 
     def recover_interrupted(self) -> None:
         for command_id, entry in self.journal.interrupted():
