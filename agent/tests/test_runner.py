@@ -95,6 +95,95 @@ def test_unknown_command_is_rejected_without_generic_shell_fallback(tmp_path):
     assert client.failed[0][1] == "COMMAND_TYPE_UNSUPPORTED"
 
 
+def test_file_backup_commands_are_rejected_until_engine_is_enabled(tmp_path):
+    command = _command("run_file_backup")
+    client = FakeClient([command])
+    runner = AgentRunner(
+        client, ExecutionJournal(tmp_path / "journal.json"), explorer=FakeExplorer()
+    )
+
+    runner.run_once()
+
+    assert client.failed[0][1] == "COMMAND_TYPE_UNSUPPORTED"
+
+
+def test_enabled_file_engine_receives_only_allowlisted_commands_and_aggregated_progress(tmp_path):
+    class FakeFileEngine:
+        catalog_revision = 4
+
+        def execute(self, command_type, payload, progress):
+            progress(
+                {
+                    "phase": "copying",
+                    "processedUnits": 2,
+                    "totalUnits": 5,
+                    "foundCount": 5,
+                    "details": {"bytesProcessed": 2048},
+                }
+            )
+            return {"status": "completed", "operation": command_type, "payload": payload}
+
+    command = _command("simulate_file_backup")
+    command["payload"] = {"taskId": str(uuid.uuid4())}
+    client = FakeClient([command])
+    runner = AgentRunner(
+        client,
+        ExecutionJournal(tmp_path / "journal.json"),
+        explorer=FakeExplorer(),
+        file_backup_executor=FakeFileEngine(),
+    )
+
+    runner.run_once()
+
+    assert client.completed[0][1]["operation"] == "simulate_file_backup"
+    assert client.progress_items[0][1]["phase"] == "copying"
+    assert len(client.progress_items) == 1
+
+
+def test_interrupted_file_restore_requires_manual_review(tmp_path):
+    command = _command("run_file_restore")
+    journal = ExecutionJournal(tmp_path / "journal.json")
+    journal.record_started(command)
+    client = FakeClient()
+
+    runner = AgentRunner(client, journal, explorer=FakeExplorer())
+    runner.recover_interrupted()
+    runner.flush_reports()
+
+    assert client.failed[0][1] == "MANUAL_REVIEW_REQUIRED"
+
+
+def test_interrupted_file_backup_resumes_from_verified_checkpoints(tmp_path):
+    class FakeFileEngine:
+        catalog_revision = 1
+
+        def __init__(self):
+            self.operations = []
+
+        def execute(self, command_type, payload, progress):
+            self.operations.append(command_type)
+            return {"status": "completed", "operation": command_type}
+
+    command = _command("run_file_backup")
+    journal = ExecutionJournal(tmp_path / "journal.json")
+    journal.record_started(command)
+    engine = FakeFileEngine()
+    client = FakeClient()
+
+    runner = AgentRunner(
+        client,
+        journal,
+        explorer=FakeExplorer(),
+        file_backup_executor=engine,
+    )
+    runner.recover_interrupted()
+    runner.flush_reports()
+
+    assert engine.operations == ["resume_file_backup"]
+    assert client.completed[0][1]["operation"] == "resume_file_backup"
+    assert not client.failed
+
+
 def test_retry_delay_is_exponential_bounded_and_jittered():
     assert retry_delay(0, random_value=0.5) == 1.0
     assert retry_delay(3, random_value=0.5) == 8.0

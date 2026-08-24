@@ -11,6 +11,7 @@ from app.repositories.agent_repository import AgentRepository
 from app.repositories.cleanup_repository import tenant_uuid
 from app.services.agent_command_service import AgentCommandService
 from app.services.backup_origin import create_backup_origin_snapshot
+from app.agent_protocol import DIRECT_BACKUP_CAPABILITY
 
 
 class AgentBackupService:
@@ -77,9 +78,26 @@ class AgentBackupService:
     ) -> tuple[BackgroundJob, list[Backup]]:
         agent = await self._active_agent(tenant_id, agent_id)
         self._require_profile(agent.metadata_json, "sqlInstances", sql_profile_id)
+        destination_profile = None
         if destination_profile_id:
-            self._require_profile(
+            destination_profile = self._require_profile(
                 agent.metadata_json, "backupDestinations", destination_profile_id
+            )
+        delivery_mode = (
+            "direct"
+            if str((destination_profile or {}).get("type") or "").lower() == "smb_direct"
+            else "archive"
+        )
+        capabilities = (agent.metadata_json or {}).get("capabilities") or []
+        direct_supported = (
+            bool(capabilities.get(DIRECT_BACKUP_CAPABILITY))
+            if isinstance(capabilities, dict)
+            else DIRECT_BACKUP_CAPABILITY in capabilities
+        )
+        if delivery_mode == "direct" and not direct_supported:
+            raise ConflictError(
+                "Actualice el agente antes de usar respaldo directo SMB",
+                code="AGENT_DIRECT_BACKUP_UNSUPPORTED",
             )
         names = list(dict.fromkeys(name.strip() for name in database_names if name.strip()))
         if not names:
@@ -140,6 +158,7 @@ class AgentBackupService:
                 "databaseNames": names,
                 "backupType": backup_type,
                 "destinationProfileId": destination_profile_id,
+                "deliveryMode": delivery_mode,
                 "backupRecordIds": [str(item.id) for item in records],
                 "origin": origin,
             },
@@ -158,10 +177,12 @@ class AgentBackupService:
         return agent
 
     @staticmethod
-    def _require_profile(metadata: dict, field: str, profile_id: str) -> None:
-        if not any(str(item.get("id")) == profile_id for item in (metadata or {}).get(field, [])):
-            raise DomainError(
-                "AGENT_PROFILE_NOT_FOUND",
-                "El perfil seleccionado no esta configurado en el agente",
-                422,
-            )
+    def _require_profile(metadata: dict, field: str, profile_id: str) -> dict:
+        for item in (metadata or {}).get(field, []):
+            if str(item.get("id")) == profile_id:
+                return item
+        raise DomainError(
+            "AGENT_PROFILE_NOT_FOUND",
+            "El perfil seleccionado no esta configurado en el agente",
+            422,
+        )

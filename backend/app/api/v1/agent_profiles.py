@@ -20,6 +20,7 @@ class ManagedProfileBody(BaseModel):
     label: str = Field(min_length=1, max_length=128)
     public_config: dict = Field(alias="publicConfig")
     secret: dict | None = None
+    requires_secret: bool = Field(False, alias="requiresSecret")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 

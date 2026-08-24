@@ -244,6 +244,8 @@ class BackupExecutor:
         databases: list[str],
         configured_root: Path,
         payload: dict[str, Any],
+        *,
+        work_multiplier: int = 2,
     ) -> dict[str, int]:
         allocated = self._allocated_database_bytes(connection, databases)
         missing_estimates = [
@@ -262,8 +264,7 @@ class BackupExecutor:
             for name in databases
         ]
         estimated_backup_bytes = sum(estimates)
-        # The .bak files and the temporary ZIP coexist until integrity checks pass.
-        estimated_work_bytes = estimated_backup_bytes * 2
+        estimated_work_bytes = estimated_backup_bytes * work_multiplier
         thresholds = payload.get("storageThresholds") or {}
         critical_reserve = int(
             thresholds.get("criticalFreeBytes") or 10 * 1024**3
@@ -359,6 +360,7 @@ class BackupExecutor:
         payload: dict[str, Any],
         *,
         progress: ProgressCallback | None = None,
+        allow_local_direct_path: bool = False,
     ) -> dict[str, Any]:
         sql_profile_id = str(payload["sqlProfileId"])
         profile = _profile(self.sql_profiles, sql_profile_id, "sql")
@@ -370,6 +372,32 @@ class BackupExecutor:
         backup_type = str(payload.get("backupType") or "full")
         if backup_type not in {"full", "differential", "log"}:
             raise BackupError("BACKUP_TYPE_INVALID", "El tipo de backup no es valido")
+
+        destination_profile_id = str(payload.get("destinationProfileId") or "").strip()
+        delivery_mode = str(payload.get("deliveryMode") or "archive").lower()
+        if delivery_mode == "direct":
+            if not destination_profile_id:
+                raise BackupError(
+                    "DIRECT_DESTINATION_REQUIRED",
+                    "Seleccione un destino SMB directo",
+                )
+            destination = _profile(
+                self.destination_profiles, destination_profile_id, "destination"
+            )
+            if str(destination.get("type") or "").lower() != "smb_direct":
+                raise BackupError(
+                    "DIRECT_DESTINATION_INVALID",
+                    "El destino seleccionado no admite respaldo directo",
+                )
+            return self._run_direct_batch(
+                payload,
+                profile=profile,
+                destination=destination,
+                databases=databases,
+                backup_type=backup_type,
+                progress=progress,
+                allow_local_path=allow_local_direct_path,
+            )
 
         configured_root = Path(str(profile.get("backupRoot") or "D:\\"))
         if not configured_root.is_absolute():
@@ -521,7 +549,6 @@ class BackupExecutor:
             )
 
         transfer_result = {"type": "local", "path": str(zip_path), "verified": True}
-        destination_profile_id = str(payload.get("destinationProfileId") or "").strip()
         if destination_profile_id:
             destination = _profile(
                 self.destination_profiles, destination_profile_id, "destination"
@@ -566,6 +593,183 @@ class BackupExecutor:
                     "processedUnits": len(databases),
                     "totalUnits": len(databases),
                     "foundCount": len(files),
+                }
+            )
+        return result
+
+    def _run_direct_batch(
+        self,
+        payload: dict[str, Any],
+        *,
+        profile: dict[str, Any],
+        destination: dict[str, Any],
+        databases: list[str],
+        backup_type: str,
+        progress: ProgressCallback | None,
+        allow_local_path: bool = False,
+    ) -> dict[str, Any]:
+        root_text = str(destination.get("path") or "").strip()
+        if not allow_local_path and not root_text.startswith(("\\\\", "//")):
+            raise BackupError(
+                "SMB_PATH_INVALID", "El respaldo directo requiere una ruta UNC"
+            )
+        root = Path(root_text)
+        run_id = str(payload.get("runId") or self.now().strftime("%Y%m%d%H%M%S"))
+        if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", run_id):
+            raise BackupError("RUN_ID_INVALID", "El identificador de ejecucion no es valido")
+        date_text = self.now().strftime("%Y-%m-%d")
+        dated_dir = root / date_text
+        if progress:
+            progress(
+                {
+                    "phase": "checking_destination",
+                    "processedUnits": 0,
+                    "totalUnits": len(databases),
+                    "foundCount": 0,
+                }
+            )
+        try:
+            dated_dir.mkdir(parents=True, exist_ok=True)
+            usage = self.disk_usage(root)
+        except OSError as exc:
+            raise BackupError(
+                "DIRECT_DESTINATION_UNAVAILABLE",
+                "No fue posible acceder al destino SMB directo",
+            ) from exc
+        try:
+            with self._connect(profile) as connection:
+                preflight = self._preflight_space(
+                    connection,
+                    databases,
+                    root,
+                    payload,
+                    work_multiplier=1,
+                )
+        except BackupError:
+            raise
+        except Exception as exc:
+            raise BackupError(
+                "BACKUP_SPACE_CHECK_FAILED",
+                "No fue posible estimar el espacio requerido en el destino",
+            ) from exc
+
+        database_results: list[dict[str, Any]] = []
+        with self._connect(profile) as connection:
+            for index, database in enumerate(databases, start=1):
+                final_path = dated_dir / backup_member_name(
+                    database, date_text, backup_type
+                )
+                if final_path.exists():
+                    raise BackupError(
+                        "DIRECT_BACKUP_CONFLICT",
+                        f"Ya existe un respaldo validado para {database} en {date_text}",
+                    )
+                partial_path = dated_dir / (
+                    f".{final_path.stem}.{run_id}.partial{final_path.suffix}"
+                )
+                if partial_path.exists():
+                    raise BackupError(
+                        "DIRECT_BACKUP_PARTIAL_CONFLICT",
+                        f"Existe un respaldo incompleto pendiente para {database}",
+                    )
+                if progress:
+                    progress(
+                        {
+                            "phase": "creating_bak",
+                            "processedUnits": index - 1,
+                            "totalUnits": len(databases),
+                            "foundCount": len(database_results),
+                            "database": database,
+                        }
+                    )
+                try:
+                    verification_method = self._backup_database(
+                        connection,
+                        database,
+                        backup_type,
+                        partial_path,
+                        compression=True,
+                        phase=(
+                            lambda current_phase, database=database, index=index: progress(
+                                {
+                                    "phase": current_phase,
+                                    "processedUnits": index - 1,
+                                    "totalUnits": len(databases),
+                                    "foundCount": len(database_results),
+                                    "database": database,
+                                }
+                            )
+                            if progress
+                            else None
+                        ),
+                    )
+                    if not _wait_for_backup_file(partial_path):
+                        raise BackupError(
+                            "BACKUP_FILE_MISSING",
+                            f"SQL Server no dejo un archivo valido para {database}",
+                        )
+                    size_bytes = partial_path.stat().st_size
+                    digest = _sha256(partial_path)
+                    if final_path.exists():
+                        raise BackupError(
+                            "DIRECT_BACKUP_CONFLICT",
+                            f"Ya existe un respaldo validado para {database} en {date_text}",
+                        )
+                    os.rename(partial_path, final_path)
+                except BackupError:
+                    raise
+                except OSError as exc:
+                    raise BackupError(
+                        "DIRECT_BACKUP_FINALIZE_FAILED",
+                        f"No fue posible publicar el respaldo de {database}",
+                    ) from exc
+                detail = {
+                    "databaseName": database,
+                    "fileName": final_path.name,
+                    "filePath": str(final_path),
+                    "fileSizeBytes": size_bytes,
+                    "fileSha256": digest,
+                    "verified": True,
+                    "verificationMethod": verification_method,
+                    "deliveryMode": "direct",
+                }
+                database_results.append(detail)
+                if progress:
+                    progress(
+                        {
+                            "phase": "backup_ready",
+                            "processedUnits": index,
+                            "totalUnits": len(databases),
+                            "foundCount": len(database_results),
+                            "database": database,
+                            "details": detail,
+                        }
+                    )
+
+        remaining = int(self.disk_usage(root).free)
+        result = {
+            "runId": run_id,
+            "sqlProfileId": str(payload["sqlProfileId"]),
+            "backupType": backup_type,
+            "deliveryMode": "direct",
+            "folder": str(dated_dir),
+            "databases": database_results,
+            "transfer": {
+                "type": "smb_direct",
+                "path": str(dated_dir),
+                "verified": True,
+            },
+            "localSourceCleanup": {"scheduled": False, "status": "not_required"},
+            "storagePreflight": {**preflight, "freeBytesAfter": remaining},
+            "origin": dict(payload.get("origin") or {}),
+        }
+        if progress:
+            progress(
+                {
+                    "phase": "completed",
+                    "processedUnits": len(databases),
+                    "totalUnits": len(databases),
+                    "foundCount": len(database_results),
                 }
             )
         return result
@@ -684,20 +888,37 @@ class BackupExecutor:
         backup_type: str,
         file_path: Path,
         *,
+        compression: bool = False,
         phase: Callable[[str], None] | None = None,
     ) -> str:
         verb = "BACKUP LOG" if backup_type == "log" else "BACKUP DATABASE"
         differential = "DIFFERENTIAL, " if backup_type == "differential" else ""
         quoted_database = database.replace("]", "]]" )
         disk_path = _sql_unicode_literal(str(file_path))
+        compression_option = "COMPRESSION, " if compression else ""
         sql = (
             f"{verb} [{quoted_database}] TO DISK = {disk_path} WITH "
-            f"{differential}FORMAT, INIT, CHECKSUM, STATS = 10"
+            f"{differential}{compression_option}FORMAT, INIT, CHECKSUM, STATS = 10"
         )
         # SQL Server Express does not support backup compression.  Using the
         # portable statement directly also avoids a failed first attempt on
         # editions where compression is disabled by policy.
-        cursor = connection.execute(sql)
+        try:
+            cursor = connection.execute(sql)
+        except Exception as exc:
+            detail = _diagnostic_error_message(exc).lower()
+            unsupported = compression and "compression" in detail and any(
+                marker in detail
+                for marker in ("not support", "not available", "no se admite", "no es compatible")
+            )
+            if not unsupported:
+                raise
+            file_path.unlink(missing_ok=True)
+            sql = (
+                f"{verb} [{quoted_database}] TO DISK = {disk_path} WITH "
+                f"{differential}FORMAT, INIT, CHECKSUM, STATS = 10"
+            )
+            cursor = connection.execute(sql)
         _consume_sql_results(cursor)
         if phase:
             phase("validating_bak")

@@ -10,7 +10,7 @@ from app.core.scheduler import scheduler
 from app.core.errors import DomainError, domain_error_handler
 from app.middleware.audit import AuditMiddleware
 from app.api import agent as agent_api, health
-from app.api.v1 import agent_profiles, agent_storage, agents, auth, users
+from app.api.v1 import agent_profiles, agent_storage, agents, auth, file_backups, users
 from app.api.v1 import cleanup_runtime, remote_cleanup, file_manager
 from app.api.v1 import access_runtime, backups_runtime, connections, insights
 from app.services.backup_runtime_service import load_backup_schedules
@@ -72,3 +72,4 @@ app.include_router(insights.dashboard_router, prefix="/api/v1/dashboard", tags=[
 app.include_router(insights.notifications_router, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(insights.reports_router, prefix="/api/v1/reports", tags=["reports"])
 app.include_router(insights.search_router, prefix="/api/v1/search", tags=["search"])
+app.include_router(file_backups.router, prefix="/api/v1/file-backup", tags=["file-backup"])

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -138,6 +139,28 @@ class AgentHeartbeatRequest(BaseModel):
     @field_validator("metadata")
     @classmethod
     def validate_public_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        capabilities = value.get("capabilities")
+        if capabilities is not None:
+            valid = (
+                isinstance(capabilities, list)
+                and len(capabilities) <= 32
+                and len(set(capabilities)) == len(capabilities)
+                and all(
+                    isinstance(item, str)
+                    and re.fullmatch(r"[a-z][a-z0-9_.-]{0,63}", item)
+                    for item in capabilities
+                )
+            )
+            if not valid:
+                raise ValueError("metadata.capabilities no es válido")
+        catalog_revision = value.get("fileCatalogRevision")
+        if catalog_revision is not None and (
+            not isinstance(catalog_revision, int)
+            or isinstance(catalog_revision, bool)
+            or catalog_revision < 0
+            or catalog_revision > 2_000_000_000
+        ):
+            raise ValueError("metadata.fileCatalogRevision no es válido")
         try:
             serialized = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
         except (TypeError, ValueError) as exc:
@@ -147,3 +170,42 @@ class AgentHeartbeatRequest(BaseModel):
         if _metadata_contains_secret(value):
             raise ValueError("metadata solo admite información pública")
         return value
+
+
+class AgentReplacementMachine(BaseModel):
+    id: uuid.UUID
+    hostname: str
+    agent_version: str = Field(alias="agentVersion")
+    status: str
+    health_status: str = Field(alias="healthStatus")
+    last_heartbeat_at: datetime | None = Field(None, alias="lastHeartbeatAt")
+    volumes: list[dict[str, Any]] = Field(default_factory=list)
+    sql_candidates: list[dict[str, Any]] = Field(
+        default_factory=list, alias="sqlCandidates"
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class AgentReplacementResponse(BaseModel):
+    id: uuid.UUID
+    status: Literal[
+        "awaiting_candidate",
+        "awaiting_confirmation",
+        "completed",
+        "cancelled",
+        "expired",
+    ]
+    expires_at: datetime = Field(alias="expiresAt")
+    old_agent: AgentReplacementMachine = Field(alias="oldAgent")
+    candidate_agent: AgentReplacementMachine | None = Field(
+        None, alias="candidateAgent"
+    )
+    profiles_requiring_secret: list[dict[str, Any]] = Field(
+        default_factory=list, alias="profilesRequiringSecret"
+    )
+    can_confirm: bool = Field(False, alias="canConfirm")
+    blockers: list[str] = Field(default_factory=list)
+    code: str | None = None
+
+    model_config = {"populate_by_name": True}

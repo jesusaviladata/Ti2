@@ -14,6 +14,11 @@ from app.repositories.agent_repository import AgentRepository
 from app.repositories.cleanup_repository import tenant_uuid
 from app.services.agent_command_service import AgentCommandService
 from app.services.backup_origin import create_backup_origin_snapshot
+from app.agent_protocol import (
+    DIRECT_BACKUP_CAPABILITY,
+    FILE_BACKUP_CAPABILITY,
+    MANAGED_FILE_COMMAND_TYPES,
+)
 
 
 FIXED_TARGET_FOLDERS = ["Log", "LogSec", "LogsRadian", "Respuesta"]
@@ -21,11 +26,58 @@ FIXED_TARGET_FILES = ["BD_log.txt"]
 
 
 class AgentOperationService:
-    def __init__(self, db: Any):
+    def __init__(
+        self,
+        db: Any,
+        *,
+        agents: Any | None = None,
+        admin: Any | None = None,
+        commands: Any | None = None,
+    ):
         self.db = db
-        self.agents = AgentRepository(db)
-        self.admin = AgentAdminRepository(db)
-        self.commands = AgentCommandService(db)
+        self.agents = agents or AgentRepository(db)
+        self.admin = admin or AgentAdminRepository(db)
+        self.commands = commands or AgentCommandService(db)
+
+    async def start_managed_file_command(
+        self,
+        tenant_id: str,
+        agent_id: str,
+        *,
+        command_type: str,
+        payload: dict[str, Any],
+        resource_id: uuid.UUID,
+        idempotency_key: str,
+        ttl_seconds: int | None = None,
+    ) -> BackgroundJob:
+        if command_type not in MANAGED_FILE_COMMAND_TYPES:
+            raise DomainError(
+                "AGENT_COMMAND_TYPE_INVALID", "El tipo de orden no está permitido", 422
+            )
+        agent = await self._agent(tenant_id, agent_id)
+        capabilities = (agent.metadata_json or {}).get("capabilities") or []
+        supported = (
+            bool(capabilities.get(FILE_BACKUP_CAPABILITY))
+            if isinstance(capabilities, dict)
+            else FILE_BACKUP_CAPABILITY in capabilities
+        )
+        if not supported:
+            raise ConflictError(
+                "El agente debe actualizarse para respaldar archivos",
+                code="AGENT_FILE_BACKUP_UNSUPPORTED",
+            )
+        job = self._job(agent, f"agent_{command_type}", resource_id)
+        await self.db.flush()
+        await self.commands.create_command(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            command_type=command_type,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            job_id=str(job.id),
+            ttl_seconds=ttl_seconds,
+        )
+        return job
 
     async def profiles(self, tenant_id: str, agent_id: str) -> dict[str, Any]:
         agent = await self._agent(tenant_id, agent_id, require_online=False)
@@ -66,8 +118,27 @@ class AgentOperationService:
     ) -> tuple[BackgroundJob, list[Backup]]:
         agent = await self._agent(tenant_id, agent_id)
         self._require_profile(agent, "sqlInstances", sql_profile_id)
+        destination_profile = None
         if destination_profile_id:
-            self._require_profile(agent, "backupDestinations", destination_profile_id)
+            destination_profile = self._require_profile(
+                agent, "backupDestinations", destination_profile_id
+            )
+        delivery_mode = (
+            "direct"
+            if str((destination_profile or {}).get("type") or "").lower() == "smb_direct"
+            else "archive"
+        )
+        capabilities = (agent.metadata_json or {}).get("capabilities") or []
+        direct_supported = (
+            bool(capabilities.get(DIRECT_BACKUP_CAPABILITY))
+            if isinstance(capabilities, dict)
+            else DIRECT_BACKUP_CAPABILITY in capabilities
+        )
+        if delivery_mode == "direct" and not direct_supported:
+            raise ConflictError(
+                "Actualice el agente antes de usar respaldo directo SMB",
+                code="AGENT_DIRECT_BACKUP_UNSUPPORTED",
+            )
         names = list(dict.fromkeys(name.strip() for name in database_names if name.strip()))
         if not names or len(names) > 100:
             raise DomainError(
@@ -120,6 +191,7 @@ class AgentOperationService:
                 "databaseNames": names,
                 "backupType": parsed_type.value,
                 "destinationProfileId": destination_profile_id,
+                "deliveryMode": delivery_mode,
                 "backupIds": {item.database_name: str(item.id) for item in records},
                 "origin": origin,
             },
@@ -315,13 +387,15 @@ class AgentOperationService:
         return server
 
     @staticmethod
-    def _require_profile(agent: RemoteAgent, key: str, profile_id: str) -> None:
+    def _require_profile(agent: RemoteAgent, key: str, profile_id: str) -> dict:
         profiles = list((agent.metadata_json or {}).get(key) or [])
-        if not any(str(item.get("id")) == profile_id for item in profiles):
-            raise ConflictError(
-                "El perfil seleccionado no está disponible en el agente",
-                code="AGENT_PROFILE_NOT_AVAILABLE",
-            )
+        for item in profiles:
+            if str(item.get("id")) == profile_id:
+                return item
+        raise ConflictError(
+            "El perfil seleccionado no está disponible en el agente",
+            code="AGENT_PROFILE_NOT_AVAILABLE",
+        )
 
     def _job(self, agent: RemoteAgent, kind: str, resource_id: uuid.UUID) -> BackgroundJob:
         job = BackgroundJob(

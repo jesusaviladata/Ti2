@@ -23,6 +23,13 @@ class ProfileApplyError(RuntimeError):
 
 
 class ManagedProfileStore:
+    LEGACY_IMPORT_VERSION = 1
+    LEGACY_NAMESPACE = uuid.UUID("2b488c74-2259-4f1f-aa48-5c24b13b1084")
+    SECRET_FIELDS = frozenset(
+        {"password", "connectionString", "privateKey", "privateKeyPassphrase"}
+    )
+    LOCAL_ONLY_FIELDS = frozenset({"privateKeyPath"})
+
     def __init__(
         self,
         path: Path,
@@ -66,6 +73,18 @@ class ManagedProfileStore:
             if not isinstance(public_config, dict):
                 raise ProfileApplyError("PROFILE_CONFIG_INVALID", "La configuración pública no es válida")
             existing = dict(document["profiles"].get(profile_id) or {})
+            legacy_match_id = None
+            if not existing:
+                profile_key = str(item.get("profileKey") or profile_id)[:64]
+                for candidate_id, candidate in document["profiles"].items():
+                    if (
+                        candidate.get("legacyImported")
+                        and candidate.get("profileType") == profile_type
+                        and candidate.get("profileKey") == profile_key
+                    ):
+                        existing = dict(candidate)
+                        legacy_match_id = candidate_id
+                        break
             protected_secret = existing.get("protectedSecret")
             envelope = item.get("secretEnvelope")
             if envelope:
@@ -79,6 +98,11 @@ class ManagedProfileStore:
                         json.dumps(secret, separators=(",", ":")).encode("utf-8")
                     )
                 ).decode("ascii")
+            local_config = {
+                key: value
+                for key, value in dict(existing.get("localConfig") or {}).items()
+                if key in self.LOCAL_ONLY_FIELDS
+            }
             updates[profile_id] = {
                 "id": profile_id,
                 "profileType": profile_type,
@@ -86,9 +110,13 @@ class ManagedProfileStore:
                 "label": str(item.get("label") or profile_id)[:128],
                 "publicConfig": public_config,
                 "protectedSecret": protected_secret,
+                "localConfig": local_config,
+                "requiresSecret": bool(existing.get("requiresSecret")) and not protected_secret,
                 "desiredRevision": int(item.get("desiredRevision") or 1),
                 "isActive": bool(item.get("isActive", True)),
             }
+            if legacy_match_id and legacy_match_id != profile_id:
+                document["profiles"].pop(legacy_match_id, None)
         next_document = {
             "version": 1,
             "configRevision": revision,
@@ -108,6 +136,88 @@ class ManagedProfileStore:
             temporary.unlink(missing_ok=True)
         return {"configRevision": revision, "applied": len(updates), "status": "applied"}
 
+    def import_legacy_profiles(
+        self,
+        sql_instances: tuple[dict, ...],
+        backup_destinations: tuple[dict, ...],
+    ) -> dict[str, Any]:
+        document = self._load_document()
+        if int(document.get("legacyImportVersion") or 0) >= self.LEGACY_IMPORT_VERSION:
+            return {"status": "unchanged", "imported": 0}
+        profiles = dict(document["profiles"])
+        imported = 0
+        for profile_type, items in (
+            ("sql", sql_instances),
+            ("destination", backup_destinations),
+        ):
+            for position, raw in enumerate(items):
+                if not isinstance(raw, dict):
+                    continue
+                profile_key = str(raw.get("profileKey") or raw.get("id") or f"legacy-{position}")[:64]
+                label = str(raw.get("label") or profile_key)[:128]
+                stable_id = str(
+                    uuid.uuid5(
+                        self.LEGACY_NAMESPACE,
+                        f"{self.identity.installation_id}:{profile_type}:{profile_key}",
+                    )
+                )
+                public_config = {
+                    key: value
+                    for key, value in raw.items()
+                    if key
+                    not in {"id", "label", "profileKey"}
+                    | self.SECRET_FIELDS
+                    | self.LOCAL_ONLY_FIELDS
+                }
+                local_config = {
+                    key: raw[key]
+                    for key in self.LOCAL_ONLY_FIELDS
+                    if raw.get(key)
+                }
+                requires_secret = any(raw.get(key) for key in self.SECRET_FIELDS)
+                profiles.setdefault(
+                    stable_id,
+                    {
+                        "id": stable_id,
+                        "profileType": profile_type,
+                        "profileKey": profile_key,
+                        "label": label,
+                        "publicConfig": public_config,
+                        "localConfig": local_config,
+                        "protectedSecret": None,
+                        "requiresSecret": requires_secret,
+                        "desiredRevision": 0,
+                        "isActive": True,
+                        "legacyImported": True,
+                    },
+                )
+                imported += 1
+        next_document = {
+            **document,
+            "legacyImportVersion": self.LEGACY_IMPORT_VERSION,
+            "profiles": profiles,
+        }
+        self._replace_document(next_document)
+        return {"status": "imported", "imported": imported}
+
+    def _replace_document(self, document: dict[str, Any]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
+        try:
+            temporary.write_text(
+                json.dumps(
+                    document,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                encoding="utf-8",
+            )
+            json.loads(temporary.read_text(encoding="utf-8"))
+            os.replace(temporary, self.path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
     def runtime_profiles(self) -> tuple[tuple[dict, ...], tuple[dict, ...]]:
         document = self._load_document()
         sql: list[dict] = []
@@ -120,6 +230,8 @@ class ManagedProfileStore:
                 "profileKey": item.get("profileKey"),
                 "label": item["label"],
                 **dict(item.get("publicConfig") or {}),
+                **dict(item.get("localConfig") or {}),
+                "requiresSecret": bool(item.get("requiresSecret")),
             }
             if item.get("protectedSecret"):
                 protected = base64.b64decode(item["protectedSecret"].encode("ascii"), validate=True)
@@ -147,7 +259,7 @@ class ManagedProfileStore:
         for profile in destinations:
             if profile["id"] != profile_id:
                 continue
-            if str(profile.get("type") or "").lower() == "smb":
+            if str(profile.get("type") or "").lower() in {"smb", "smb_direct"}:
                 root = Path(str(profile.get("path") or ""))
                 probe = root / f".dataexpress-probe-{uuid.uuid4().hex}"
                 renamed = probe.with_suffix(".verified")

@@ -8,12 +8,18 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.operations import (
+    AgentBackupPlan,
     AgentCommand,
+    AgentConnectionProfile,
     AgentPairingToken,
+    AgentReplacementSession,
     AgentRequestNonce,
+    AgentVolumeState,
     BackgroundJob,
     RemoteAgent,
+    RemoteServer,
 )
+from app.models.file_backup import FileBackupRun, FileBackupTask, FileRestoreJob
 from app.repositories.cleanup_repository import tenant_uuid
 
 
@@ -72,6 +78,107 @@ class AgentRepository:
             .with_for_update()
         )
         return result.scalar_one_or_none()
+
+    async def get_replacement_session(
+        self, tenant_id: str, session_id: str, *, for_update: bool = False
+    ) -> AgentReplacementSession | None:
+        try:
+            parsed_id = uuid.UUID(session_id)
+        except ValueError:
+            return None
+        statement = select(AgentReplacementSession).where(
+            AgentReplacementSession.id == parsed_id,
+            AgentReplacementSession.tenant_id == tenant_uuid(tenant_id),
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        result = await self.db.execute(statement)
+        return result.scalar_one_or_none()
+
+    async def get_open_replacement_for_old(
+        self, tenant_id: str, old_agent_id: uuid.UUID
+    ) -> AgentReplacementSession | None:
+        result = await self.db.execute(
+            select(AgentReplacementSession).where(
+                AgentReplacementSession.tenant_id == tenant_uuid(tenant_id),
+                AgentReplacementSession.old_agent_id == old_agent_id,
+                AgentReplacementSession.status.in_(
+                    {"awaiting_candidate", "awaiting_confirmation"}
+                ),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def list_agent_profiles(
+        self, tenant_id: str, agent_id: uuid.UUID
+    ) -> list[AgentConnectionProfile]:
+        result = await self.db.execute(
+            select(AgentConnectionProfile).where(
+                AgentConnectionProfile.tenant_id == tenant_uuid(tenant_id),
+                AgentConnectionProfile.agent_id == agent_id,
+                AgentConnectionProfile.is_active.is_(True),
+            )
+        )
+        return list(result.scalars().all())
+
+    async def list_agent_backup_plans(
+        self, tenant_id: str, agent_id: uuid.UUID
+    ) -> list[AgentBackupPlan]:
+        result = await self.db.execute(
+            select(AgentBackupPlan).where(
+                AgentBackupPlan.tenant_id == tenant_uuid(tenant_id),
+                AgentBackupPlan.agent_id == agent_id,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def list_file_backup_tasks(
+        self, tenant_id: str, agent_id: uuid.UUID
+    ) -> list[FileBackupTask]:
+        result = await self.db.execute(
+            select(FileBackupTask).where(
+                FileBackupTask.tenant_id == tenant_uuid(tenant_id),
+                FileBackupTask.agent_id == agent_id,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def get_remote_server_for_agent(
+        self, tenant_id: str, agent_id: uuid.UUID
+    ) -> RemoteServer | None:
+        result = await self.db.execute(
+            select(RemoteServer).where(
+                RemoteServer.tenant_id == tenant_uuid(tenant_id),
+                RemoteServer.agent_id == agent_id,
+                RemoteServer.transport == "agent",
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def list_agent_volumes(
+        self, tenant_id: str, agent_id: uuid.UUID
+    ) -> list[AgentVolumeState]:
+        result = await self.db.execute(
+            select(AgentVolumeState).where(
+                AgentVolumeState.tenant_id == tenant_uuid(tenant_id),
+                AgentVolumeState.agent_id == agent_id,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def has_active_agent_work(
+        self, tenant_id: str, agent_id: uuid.UUID
+    ) -> bool:
+        result = await self.db.execute(
+            select(AgentCommand.id)
+            .where(
+                AgentCommand.tenant_id == tenant_uuid(tenant_id),
+                AgentCommand.agent_id == agent_id,
+                AgentCommand.status.in_({"pending", "claimed"}),
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
 
     async def reserve_nonce(
         self,
@@ -142,6 +249,36 @@ class AgentRepository:
     ) -> BackgroundJob | None:
         result = await self.db.execute(
             select(BackgroundJob).where(BackgroundJob.id == job_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_file_backup_run(
+        self,
+        tenant_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        run_id: uuid.UUID,
+    ) -> FileBackupRun | None:
+        result = await self.db.execute(
+            select(FileBackupRun).where(
+                FileBackupRun.id == run_id,
+                FileBackupRun.tenant_id == tenant_id,
+                FileBackupRun.agent_id == agent_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_file_restore_job(
+        self,
+        tenant_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        restore_id: uuid.UUID,
+    ) -> FileRestoreJob | None:
+        result = await self.db.execute(
+            select(FileRestoreJob).where(
+                FileRestoreJob.id == restore_id,
+                FileRestoreJob.tenant_id == tenant_id,
+                FileRestoreJob.agent_id == agent_id,
+            )
         )
         return result.scalar_one_or_none()
 

@@ -103,6 +103,25 @@ def test_backup_is_ready_only_after_restore_verifyonly(tmp_path: Path):
     assert any(call.startswith("RESTORE VERIFYONLY") for call in connection.calls)
 
 
+def test_direct_backup_requests_native_sql_compression(tmp_path: Path):
+    connection = _SuccessfulConnection()
+    executor = BackupExecutor()
+
+    executor._backup_database(
+        connection,
+        "Ipsofactu",
+        "full",
+        tmp_path / "Ipsofactu.bak",
+        compression=True,
+    )
+
+    backup_statement = next(
+        call for call in connection.calls if call.startswith("BACKUP DATABASE")
+    )
+    assert "COMPRESSION" in backup_statement
+    assert "CHECKSUM" in backup_statement
+
+
 def test_retry_delivery_uses_existing_verified_zip_without_repeating_sql(tmp_path: Path):
     dated = tmp_path / "2026-08-20"
     dated.mkdir(parents=True)
@@ -200,3 +219,79 @@ def test_atomic_archive_keeps_previous_daily_zip_if_replacement_fails(tmp_path: 
 
     assert hashlib.sha256(final_path.read_bytes()).hexdigest() == previous_hash
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_direct_backup_writes_validated_bak_without_zip_or_local_work(tmp_path: Path):
+    connection = _SuccessfulConnection()
+    destination_root = tmp_path / "remote-share"
+    executor = BackupExecutor(
+        sql_profiles=({"id": "sql-main", "label": "SQL", "backupRoot": str(tmp_path / "local")},),
+        destination_profiles=(
+            {"id": "direct", "label": "Directo", "type": "smb_direct", "path": str(destination_root)},
+        ),
+        connect=lambda _profile: connection,
+        now=lambda: __import__("datetime").datetime(2026, 8, 20, 12, 0, 0),
+        disk_usage=lambda _root: type("Usage", (), {"free": 10_000, "total": 20_000})(),
+        size_history={"Ipsofactu": 100},
+    )
+
+    def create_backup(_connection, _database, _backup_type, path, **kwargs):
+        path.write_bytes(b"validated direct backup")
+        if kwargs.get("phase"):
+            kwargs["phase"]("validating_bak")
+        return "restore_verifyonly"
+
+    executor._backup_database = create_backup
+    result = executor.run_batch(
+        {
+            "runId": "direct-run",
+            "sqlProfileId": "sql-main",
+            "databaseNames": ["Ipsofactu"],
+            "backupType": "full",
+            "destinationProfileId": "direct",
+            "deliveryMode": "direct",
+            "storageThresholds": {"criticalFreeBytes": 10},
+        },
+        allow_local_direct_path=True,
+    )
+
+    final_path = destination_root / "2026-08-20" / "Ipsofactu_2026-08-20.bak"
+    assert final_path.read_bytes() == b"validated direct backup"
+    assert result["deliveryMode"] == "direct"
+    assert result["transfer"]["type"] == "smb_direct"
+    assert result["databases"][0]["filePath"] == str(final_path)
+    assert "zipPath" not in result
+    assert not (tmp_path / "local" / ".work").exists()
+
+
+def test_direct_backup_rejects_existing_final_artifact(tmp_path: Path):
+    destination_root = tmp_path / "remote-share"
+    dated = destination_root / "2026-08-20"
+    dated.mkdir(parents=True)
+    (dated / "Ipsofactu_2026-08-20.bak").write_bytes(b"previous")
+    executor = BackupExecutor(
+        sql_profiles=({"id": "sql-main", "backupRoot": str(tmp_path / "local")},),
+        destination_profiles=(
+            {"id": "direct", "type": "smb_direct", "path": str(destination_root)},
+        ),
+        connect=lambda _profile: _SuccessfulConnection(),
+        now=lambda: __import__("datetime").datetime(2026, 8, 20, 12, 0, 0),
+        disk_usage=lambda _root: type("Usage", (), {"free": 10_000, "total": 20_000})(),
+        size_history={"Ipsofactu": 100},
+    )
+
+    with pytest.raises(BackupError) as rejected:
+        executor.run_batch(
+            {
+                "runId": "direct-conflict",
+                "sqlProfileId": "sql-main",
+                "databaseNames": ["Ipsofactu"],
+                "backupType": "full",
+                "destinationProfileId": "direct",
+                "deliveryMode": "direct",
+                "storageThresholds": {"criticalFreeBytes": 10},
+            },
+            allow_local_direct_path=True,
+        )
+
+    assert rejected.value.code == "DIRECT_BACKUP_CONFLICT"

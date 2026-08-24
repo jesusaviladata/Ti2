@@ -18,7 +18,8 @@ export function AgentConnectionWizard({ agent, onClose }: { agent: AgentRecord; 
     hostname?: string;
     serviceAccount?: string;
     sqlCandidates?: Array<{ server?: string; label?: string }>;
-    destinationCandidates?: Array<{ type?: string; path?: string; label?: string }>;
+    destinationCandidates?: Array<{ type?: string; path?: string; label?: string; profileKey?: string; host?: string; username?: string; hasLocalPrivateKey?: boolean; requiresSecret?: boolean }>;
+    volumeCandidates?: Array<{ mountPoint: string; totalBytes?: number | null; freeBytes?: number | null }>;
   }>(discoveryJobId);
   const [step, setStep] = useState(0);
   const [sqlLabel, setSqlLabel] = useState("SQL Producción");
@@ -26,11 +27,14 @@ export function AgentConnectionWizard({ agent, onClose }: { agent: AgentRecord; 
   const [backupRoot, setBackupRoot] = useState("D:\\Backups");
   const [destinationEnabled, setDestinationEnabled] = useState(true);
   const [destinationLabel, setDestinationLabel] = useState("Destino central");
-  const [destinationType, setDestinationType] = useState<"smb" | "sftp">("smb");
+  const [destinationType, setDestinationType] = useState<"smb" | "smb_direct" | "sftp">("smb");
   const [destinationPath, setDestinationPath] = useState("\\\\servidor\\backups");
   const [host, setHost] = useState("");
   const [username, setUsername] = useState("");
   const [privateKey, setPrivateKey] = useState("");
+  const [destinationProfileKey, setDestinationProfileKey] = useState("destination-main");
+  const [destinationRequiresSecret, setDestinationRequiresSecret] = useState(false);
+  const [hasLocalPrivateKey, setHasLocalPrivateKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function detect() {
@@ -51,7 +55,12 @@ export function AgentConnectionWizard({ agent, onClose }: { agent: AgentRecord; 
     if (sql?.label) setSqlLabel(sql.label);
     if (destination?.path) setDestinationPath(destination.path);
     if (destination?.label) setDestinationLabel(destination.label);
-    if (destination?.type === "smb" || destination?.type === "sftp") setDestinationType(destination.type);
+    if (destination?.profileKey) setDestinationProfileKey(destination.profileKey);
+    if (destination?.host) setHost(destination.host);
+    if (destination?.username) setUsername(destination.username);
+    setDestinationRequiresSecret(Boolean(destination?.requiresSecret));
+    setHasLocalPrivateKey(Boolean(destination?.hasLocalPrivateKey));
+    if (destination?.type === "smb" || destination?.type === "smb_direct" || destination?.type === "sftp") setDestinationType(destination.type);
     setStep(1);
   }
 
@@ -70,12 +79,13 @@ export function AgentConnectionWizard({ agent, onClose }: { agent: AgentRecord; 
         await save.mutateAsync({
           input: {
             profileType: "destination",
-            profileKey: "destination-main",
+            profileKey: destinationProfileKey,
             label: destinationLabel,
-            publicConfig: destinationType === "smb"
-              ? { type: "smb", path: destinationPath }
+            publicConfig: destinationType !== "sftp"
+              ? { type: destinationType, path: destinationPath }
               : { type: "sftp", path: destinationPath, host, port: 22, username },
             secret: destinationType === "sftp" && privateKey ? { privateKey } : undefined,
+            requiresSecret: destinationType === "sftp" && destinationRequiresSecret && !privateKey,
           },
         });
       }
@@ -99,9 +109,9 @@ export function AgentConnectionWizard({ agent, onClose }: { agent: AgentRecord; 
           {step === 1 ? <div className="grid gap-4 sm:grid-cols-2"><label className="space-y-2 text-xs text-crema/45">Nombre visible<input className={INPUT} value={sqlLabel} onChange={(event) => setSqlLabel(event.target.value)} /></label><label className="space-y-2 text-xs text-crema/45">Servidor / instancia<input className={INPUT} value={server} onChange={(event) => setServer(event.target.value)} placeholder="localhost\\SQLEXPRESS" /></label></div> : null}
           {step === 2 ? <div className="space-y-3"><p className="text-sm text-crema/70">Autenticación integrada de Windows</p><p className="text-xs leading-relaxed text-crema/40">SQL Server reconocerá la cuenta real del servicio DataExpressAgent. Consulte StartName y reemplace CUENTA_SERVICIO en el script. No se guarda contraseña SQL.</p><button type="button" onClick={() => navigator.clipboard.writeText("# PowerShell: (Get-CimInstance Win32_Service -Filter \"Name='DataExpressAgent'\").StartName\n\n-- SQL Server: reemplace CUENTA_SERVICIO por el resultado anterior\nGRANT BACKUP DATABASE TO [CUENTA_SERVICIO];\nGRANT VIEW SERVER STATE TO [CUENTA_SERVICIO];")} className="rounded-[0.5rem] border border-musgo/25 px-3 py-2 text-xs text-arcilla">Copiar comprobación y permisos</button></div> : null}
           {step === 3 ? <label className="block space-y-2 text-xs text-crema/45">Raíz local de backups<input className={INPUT} value={backupRoot} onChange={(event) => setBackupRoot(event.target.value)} /><span className="block text-[10px] text-crema/30">Full se guarda en Fecha; Diferencial y Log conservan su subcarpeta.</span></label> : null}
-          {step === 4 ? <div className="space-y-4"><label className="flex items-center gap-2 text-sm text-crema/65"><input type="checkbox" checked={destinationEnabled} onChange={(event) => setDestinationEnabled(event.target.checked)} /> Enviar ZIP a otro servidor</label>{destinationEnabled ? <><div className="grid grid-cols-2 gap-2">{(["smb","sftp"] as const).map((value) => <button type="button" key={value} onClick={() => setDestinationType(value)} className={destinationType === value ? "h-9 rounded-[0.5rem] border border-arcilla/35 bg-arcilla/10 text-xs text-arcilla" : "h-9 rounded-[0.5rem] border border-musgo/25 text-xs text-crema/40"}>{value.toUpperCase()}</button>)}</div><div className="grid gap-3 sm:grid-cols-2"><input className={INPUT} value={destinationLabel} onChange={(event) => setDestinationLabel(event.target.value)} placeholder="Nombre del destino" /><input className={INPUT} value={destinationPath} onChange={(event) => setDestinationPath(event.target.value)} placeholder={destinationType === "smb" ? "\\\\servidor\\backups" : "/backups"} />{destinationType === "sftp" ? <><input className={INPUT} value={host} onChange={(event) => setHost(event.target.value)} placeholder="Host" /><input className={INPUT} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Usuario" /><textarea className="min-h-24 rounded-[0.625rem] border border-musgo/25 bg-musgo/10 p-3 text-xs text-crema/65 outline-none sm:col-span-2" value={privateKey} onChange={(event) => setPrivateKey(event.target.value)} placeholder="Llave privada (se cifra para este agente)" /></> : null}</div></> : <p className="text-xs text-crema/35">Se aceptará sólo Full/ZIP local; no es obligatorio configurar diferenciales ni destino remoto.</p>}</div> : null}
+          {step === 4 ? <div className="space-y-4"><label className="flex items-center gap-2 text-sm text-crema/65"><input type="checkbox" checked={destinationEnabled} onChange={(event) => setDestinationEnabled(event.target.checked)} /> Configurar un destino de respaldo</label>{destinationEnabled ? <><div className="grid grid-cols-3 gap-2">{([['smb','ZIP · SMB'],['sftp','ZIP · SFTP'],['smb_direct','Directo SMB']] as const).map(([value,label]) => <button type="button" key={value} onClick={() => setDestinationType(value)} className={destinationType === value ? "h-9 rounded-[0.5rem] border border-arcilla/35 bg-arcilla/10 text-xs text-arcilla" : "h-9 rounded-[0.5rem] border border-musgo/25 text-xs text-crema/40"}>{label}</button>)}</div>{destinationType === "smb_direct" ? <p className="rounded-[0.5rem] border border-blue-400/20 bg-blue-400/[0.05] px-3 py-2 text-xs leading-relaxed text-blue-200/80">Para bases grandes: SQL Server crea y valida el .BAK directamente en esta ruta. No usa ZIP ni espacio temporal local. La cuenta del servicio SQL necesita permisos sobre el recurso.</p> : null}{hasLocalPrivateKey && destinationType === "sftp" ? <p className="rounded-[0.5rem] border border-green-500/20 bg-green-500/[0.05] px-3 py-2 text-xs text-green-300">La llave existente permanece protegida en este servidor; no se enviará al panel.</p> : null}{destinationRequiresSecret && destinationType === "sftp" ? <p className="rounded-[0.5rem] border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-300">La credencial anterior no se puede migrar. Capture una llave nueva para activar este destino.</p> : null}<div className="grid gap-3 sm:grid-cols-2"><input className={INPUT} value={destinationLabel} onChange={(event) => setDestinationLabel(event.target.value)} placeholder="Nombre del destino" /><input className={INPUT} value={destinationPath} onChange={(event) => setDestinationPath(event.target.value)} placeholder={destinationType !== "sftp" ? "\\\\servidor\\backups" : "/backups"} />{destinationType === "sftp" ? <><input className={INPUT} value={host} onChange={(event) => setHost(event.target.value)} placeholder="Host" /><input className={INPUT} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Usuario" />{!hasLocalPrivateKey || destinationRequiresSecret ? <textarea className="min-h-24 rounded-[0.625rem] border border-musgo/25 bg-musgo/10 p-3 text-xs text-crema/65 outline-none sm:col-span-2" value={privateKey} onChange={(event) => setPrivateKey(event.target.value)} placeholder="Llave privada (se cifra para este agente)" /> : null}</> : null}</div></> : <p className="text-xs text-crema/35">Se aceptará sólo Full/ZIP local; no es obligatorio configurar diferenciales ni destino remoto.</p>}</div> : null}
           {step === 5 ? <div className="rounded-[0.875rem] border border-musgo/20 p-4"><p className="text-sm text-crema/70">Limpieza segura por propiedad</p><p className="mt-1 text-xs leading-relaxed text-crema/40">La raíz fija se configura aparte. El agente vacía únicamente archivos dentro de Propiedad\core\Log, LogSec, LogsRadian, Respuesta y BD_log.txt; conserva las carpetas.</p></div> : null}
-          {step === 6 ? <div className="space-y-3"><p className="text-sm text-crema/70">Listo para activar</p><div className="rounded-[0.75rem] border border-musgo/20 p-4 text-xs text-crema/45"><p>SQL: {sqlLabel} · {server}</p><p className="mt-1">Raíz: {backupRoot}</p><p className="mt-1">Destino: {destinationEnabled ? `${destinationLabel} · ${destinationType.toUpperCase()}` : "Sólo ZIP local"}</p></div>{error ? <p className="text-xs text-red-400">{error}</p> : null}</div> : null}
+          {step === 6 ? <div className="space-y-3"><p className="text-sm text-crema/70">Listo para activar</p><div className="rounded-[0.75rem] border border-musgo/20 p-4 text-xs text-crema/45"><p>SQL: {sqlLabel} · {server}</p><p className="mt-1">Raíz: {backupRoot}</p><p className="mt-1">Destino: {destinationEnabled ? `${destinationLabel} · ${destinationType === "smb_direct" ? "Directo SMB" : destinationType.toUpperCase()}` : "Sólo ZIP local"}</p></div>{error ? <p className="text-xs text-red-400">{error}</p> : null}</div> : null}
         </div>
         <footer className="flex items-center justify-between border-t border-musgo/20 px-6 py-4"><button type="button" disabled={step === 0} onClick={() => setStep((value) => value - 1)} className="flex items-center gap-1 text-xs text-crema/40 disabled:opacity-20"><ChevronLeft size={14} /> Anterior</button>{step < STEPS.length - 1 ? <button type="button" onClick={() => setStep((value) => value + 1)} className="flex h-9 items-center gap-1 rounded-[0.5rem] bg-arcilla px-4 text-xs font-medium text-carbon">Siguiente <ChevronRight size={14} /></button> : <button type="button" onClick={activate} disabled={save.isPending} className="flex h-9 items-center gap-2 rounded-[0.5rem] bg-arcilla px-4 text-xs font-medium text-carbon disabled:opacity-40">{save.isPending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Activar perfiles</button>}</footer>
       </section>

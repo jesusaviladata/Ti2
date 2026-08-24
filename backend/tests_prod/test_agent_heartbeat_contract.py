@@ -20,6 +20,50 @@ def test_legacy_030_heartbeat_remains_valid():
     assert body.volumes == []
 
 
+def test_legacy_042_heartbeat_without_capabilities_remains_valid():
+    body = AgentHeartbeatRequest.model_validate(
+        {
+            "agentVersion": "0.4.2",
+            "metadata": {"hostname": "CORE-LEGACY", "sqlInstances": []},
+        }
+    )
+
+    assert body.agent_version == "0.4.2"
+    assert "capabilities" not in body.metadata
+
+
+def test_050_heartbeat_accepts_bounded_file_backup_capability_and_catalog_revision():
+    body = AgentHeartbeatRequest.model_validate(
+        {
+            "agentVersion": "0.5.0",
+            "metadata": {
+                "hostname": "CORE-FILES",
+                "capabilities": ["file_backup_v1"],
+                "fileCatalogRevision": 3,
+            },
+        }
+    )
+
+    assert body.metadata["capabilities"] == ["file_backup_v1"]
+    assert body.metadata["fileCatalogRevision"] == 3
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"capabilities": ["invalid capability"]},
+        {"capabilities": ["x"] * 33},
+        {"fileCatalogRevision": -1},
+        {"fileCatalogRevision": "three"},
+    ],
+)
+def test_heartbeat_rejects_invalid_capability_metadata(metadata):
+    with pytest.raises(ValidationError):
+        AgentHeartbeatRequest.model_validate(
+            {"agentVersion": "0.5.0", "metadata": metadata}
+        )
+
+
 def test_040_heartbeat_accepts_health_and_bounded_volume_telemetry():
     observed_at = datetime.now(timezone.utc)
     body = AgentHeartbeatRequest.model_validate(

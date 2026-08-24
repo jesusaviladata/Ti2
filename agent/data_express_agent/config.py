@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
+from .bootstrap import AgentBootstrap
+
 
 class AgentConfigError(ValueError):
     pass
@@ -32,6 +34,43 @@ class AgentConfig:
     sql_instances: tuple[dict, ...] = ()
     backup_destinations: tuple[dict, ...] = ()
     cleanup_roots: tuple[str, ...] = ()
+
+    @classmethod
+    def from_bootstrap(
+        cls,
+        bootstrap: AgentBootstrap,
+        runtime_path: Path | None = None,
+    ) -> "AgentConfig":
+        """Build immutable trust from the package and optional local runtime state.
+
+        A legacy 0.4.2 agent.json is accepted only as a source of public profiles and
+        runtime timing values. It cannot replace TLS, the control-plane URL or command
+        trust shipped in the signed package.
+        """
+        raw: dict = {}
+        if runtime_path is not None and runtime_path.exists():
+            try:
+                raw = json.loads(runtime_path.read_text(encoding="utf-8-sig"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise AgentConfigError(
+                    "No se pudo leer la configuración local del agente"
+                ) from exc
+        config = cls(
+            server_url=bootstrap.control_plane_url,
+            command_signing_public_key=bootstrap.command_trust.public_key(),
+            command_signing_key_id=bootstrap.command_trust.active_key_id,
+            data_dir=Path(raw.get("dataDir") or default_data_dir()),
+            agent_version=bootstrap.agent_version,
+            poll_wait_seconds=bootstrap.poll_wait_seconds,
+            request_timeout_seconds=bootstrap.request_timeout_seconds,
+            heartbeat_interval_seconds=bootstrap.heartbeat_interval_seconds,
+            verify_tls=True,
+            sql_instances=tuple(raw.get("sqlInstances") or ()),
+            backup_destinations=tuple(raw.get("backupDestinations") or ()),
+            cleanup_roots=tuple(str(item) for item in (raw.get("cleanupRoots") or ())),
+        )
+        config.validate()
+        return config
 
     @classmethod
     def from_file(cls, path: Path) -> "AgentConfig":

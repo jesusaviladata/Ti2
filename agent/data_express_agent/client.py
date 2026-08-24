@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from .config import AgentConfig
+from .bootstrap import CommandTrust
 from .identity import AgentIdentity
 from .protocol import AgentProtocolError, load_public_key, sign_request, verify_command
 
@@ -44,6 +45,7 @@ class AgentClient:
         identity: AgentIdentity,
         *,
         transport: httpx.BaseTransport | None = None,
+        command_trust: CommandTrust | None = None,
     ):
         self.config = config
         self.identity = identity
@@ -55,7 +57,15 @@ class AgentClient:
             follow_redirects=False,
         )
         self._legacy_heartbeat = False
-        self.command_public_key = load_public_key(config.command_signing_public_key)
+        self.command_trust = command_trust
+        self.command_public_keys = {
+            key_id: load_public_key(public_key)
+            for key_id, public_key in (
+                command_trust.keys
+                if command_trust is not None
+                else ((config.command_signing_key_id, config.command_signing_public_key),)
+            )
+        }
 
     def close(self) -> None:
         self.http.close()
@@ -141,12 +151,13 @@ class AgentClient:
             return None
         key_id = response.headers.get("X-Command-Key-Id", "")
         signature = response.headers.get("X-Command-Signature", "")
-        if key_id != self.config.command_signing_key_id:
+        command_public_key = self.command_public_keys.get(key_id)
+        if command_public_key is None:
             raise AgentClientError(
                 "COMMAND_SIGNATURE_INVALID", "La orden no tiene una firma válida"
             )
         try:
-            verify_command(self.command_public_key, key_id, response.content, signature)
+            verify_command(command_public_key, key_id, response.content, signature)
             command = response.json()
             self._validate_command(command)
             return command

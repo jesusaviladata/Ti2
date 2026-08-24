@@ -116,3 +116,34 @@ async def test_local_zip_is_ready_without_being_reported_as_remotely_delivered()
 
     assert item.delivery_status == "local_ready"
     assert item.delivery_phase == "local_ready"
+
+
+@pytest.mark.asyncio
+async def test_direct_backup_completion_does_not_require_zip_fields():
+    item = backup()
+    service = LifecycleService([item])
+
+    await service._project_backup_complete(
+        command(),
+        {
+            "deliveryMode": "direct",
+            "databases": [
+                {
+                    "databaseName": "Ipsofactu",
+                    "fileName": "Ipsofactu_2026-08-21.bak",
+                    "filePath": r"\\backup\Respaldos\2026-08-21\Ipsofactu_2026-08-21.bak",
+                    "fileSizeBytes": 1024,
+                    "fileSha256": "c" * 64,
+                    "verificationMethod": "restore_verifyonly",
+                }
+            ],
+            "transfer": {"type": "smb_direct", "verified": True},
+        },
+        datetime.now(timezone.utc),
+    )
+
+    assert item.status == BackupStatus.completed
+    assert item.delivery_status == "delivered"
+    assert item.delivery_phase == "direct_ready"
+    assert item.file_path.endswith("Ipsofactu_2026-08-21.bak")
+    assert item.archive_path is None

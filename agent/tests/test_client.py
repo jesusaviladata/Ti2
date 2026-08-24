@@ -10,6 +10,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from agent.data_express_agent.client import AgentClient, AgentClientError, canonical_json
+from agent.data_express_agent.bootstrap import CommandTrust
 from agent.data_express_agent.config import AgentConfig
 from agent.data_express_agent.identity import AgentIdentity
 from agent.data_express_agent.protocol import (
@@ -104,6 +105,53 @@ def test_client_rejects_tampered_command_before_parsing_or_execution():
     with pytest.raises(AgentClientError) as rejected:
         client.next_command()
     assert rejected.value.code == "COMMAND_SIGNATURE_INVALID"
+    client.close()
+
+
+def test_client_accepts_any_key_in_signed_packaged_trust():
+    current = Ed25519PrivateKey.generate()
+    next_key = Ed25519PrivateKey.generate()
+    identity = AgentIdentity.generate()
+    identity.agent_id = str(uuid.uuid4())
+    identity.tenant_id = str(uuid.uuid4())
+    command = {
+        "id": str(uuid.uuid4()),
+        "agentId": identity.agent_id,
+        "tenantId": identity.tenant_id,
+        "type": "browse_drives",
+        "payload": {},
+        "issuedAt": datetime.now(timezone.utc).isoformat(),
+        "expiresAt": (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat(),
+        "idempotencyKey": "rotated-key",
+    }
+    body = canonical_json(command)
+
+    def handler(_request):
+        return httpx.Response(
+            200,
+            content=body,
+            headers={
+                "X-Command-Key-Id": "next",
+                "X-Command-Signature": sign_command(next_key, "next", body),
+            },
+        )
+
+    trust = CommandTrust.from_document(
+        {
+            "activeKeyId": "current",
+            "keys": [
+                {"keyId": "current", "publicKey": public_key_to_base64(current.public_key())},
+                {"keyId": "next", "publicKey": public_key_to_base64(next_key.public_key())},
+            ],
+        }
+    )
+    client = AgentClient(
+        _config(current),
+        identity,
+        transport=httpx.MockTransport(handler),
+        command_trust=trust,
+    )
+    assert client.next_command() == command
     client.close()
 
 

@@ -8,8 +8,15 @@ from typing import Any, Callable
 
 from sqlalchemy import select
 
+from app.agent_protocol import MANAGED_FILE_COMMAND_TYPES
 from app.core.errors import ConflictError, DomainError, NotFoundError
 from app.models.backup import Backup, BackupStatus
+from app.models.file_backup import (
+    FileBackupArtifact,
+    FileBackupChain,
+    FileBackupRunStatus,
+    FileRestoreStatus,
+)
 from app.models.operations import AgentCommand, AgentConnectionProfile, RemoteAgent, RemoteCleanupExecution
 from app.repositories.agent_repository import AgentRepository
 
@@ -32,7 +39,7 @@ ALLOWED_COMMAND_TYPES = frozenset(
         "test_connection_profile",
         "discover_agent_environment",
     }
-)
+) | MANAGED_FILE_COMMAND_TYPES
 
 
 def canonical_json(value: dict[str, Any]) -> bytes:
@@ -89,6 +96,11 @@ class AgentCommandService:
             raise ConflictError(
                 "El agente está revocado", code="AGENT_REVOKED"
             )
+        if agent.status == "replacement_pending":
+            raise ConflictError(
+                "El agente candidato espera confirmación",
+                code="AGENT_REPLACEMENT_PENDING",
+            )
         existing = await self.repo.find_command_by_idempotency(
             agent.id, normalized_key
         )
@@ -113,6 +125,8 @@ class AgentCommandService:
         return command
 
     async def claim_next(self, agent: RemoteAgent) -> AgentCommand | None:
+        if agent.status == "replacement_pending":
+            return None
         command = await self.repo.claim_next_command(agent.id, self.now())
         if command is not None and command.job_id:
             job = await self.repo.get_background_job(command.job_id)
@@ -160,6 +174,14 @@ class AgentCommandService:
             processed_units=processed_units,
             total_units=total_units,
         )
+        await self._project_file_progress(
+            command,
+            phase=phase,
+            processed_units=processed_units,
+            total_units=total_units,
+            found_count=found_count,
+            details=details or {},
+        )
         await self.db.flush()
         return command
 
@@ -197,6 +219,7 @@ class AgentCommandService:
         await self._project_backup_complete(command, result, now)
         await self._project_cleanup_complete(command, result, now)
         await self._project_profile_complete(command, result, now)
+        await self._project_file_complete(command, result, now)
         if command.command_type == "run_backup_batch":
             self._create_backup_success_notification(command, result)
         elif command.command_type == "execute_structural_direct":
@@ -234,6 +257,9 @@ class AgentCommandService:
         await self._project_backup_failure(command, command.error_message, now)
         await self._project_cleanup_failure(command, command.error_message, now)
         await self._project_profile_failure(command, command.error_message, now)
+        await self._project_file_failure(
+            command, command.error_code, command.error_message, now
+        )
         if command.command_type == "execute_structural_direct":
             self._create_cleanup_notification(
                 command,
@@ -274,6 +300,173 @@ class AgentCommandService:
             )
         )
         return list(result.scalars().all())
+
+    async def _file_run_for_command(self, command: AgentCommand):
+        raw_id = command.payload.get("fileRunId")
+        if command.command_type not in MANAGED_FILE_COMMAND_TYPES or not raw_id:
+            return None
+        try:
+            run_id = uuid.UUID(str(raw_id))
+        except ValueError:
+            return None
+        return await self.repo.get_file_backup_run(
+            command.tenant_id, command.agent_id, run_id
+        )
+
+    async def _file_restore_for_command(self, command: AgentCommand):
+        raw_id = command.payload.get("restoreJobId")
+        if command.command_type not in MANAGED_FILE_COMMAND_TYPES or not raw_id:
+            return None
+        try:
+            restore_id = uuid.UUID(str(raw_id))
+        except ValueError:
+            return None
+        return await self.repo.get_file_restore_job(
+            command.tenant_id, command.agent_id, restore_id
+        )
+
+    @staticmethod
+    def _nonnegative_int(value: Any, default: int = 0) -> int:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return default
+        return max(0, parsed)
+
+    async def _project_file_progress(
+        self,
+        command: AgentCommand,
+        *,
+        phase: str,
+        processed_units: int,
+        total_units: int,
+        found_count: int,
+        details: dict[str, Any],
+    ) -> None:
+        run = await self._file_run_for_command(command)
+        if run is not None:
+            run.status = FileBackupRunStatus.running
+            run.started_at = run.started_at or self.now()
+            run.phase = phase[:40]
+            run.files_processed = max(0, processed_units)
+            run.files_total = max(0, found_count or total_units) or None
+            run.bytes_processed = self._nonnegative_int(
+                details.get("bytesProcessed"), run.bytes_processed or 0
+            )
+            bytes_total = self._nonnegative_int(details.get("bytesTotal"))
+            if bytes_total:
+                run.bytes_total = bytes_total
+            if total_units > 0:
+                run.progress_percent = min(
+                    99, max(0, int(processed_units * 100 / total_units))
+                )
+            run.updated_at = self.now()
+        restore = await self._file_restore_for_command(command)
+        if restore is not None:
+            restore.status = (
+                FileRestoreStatus.simulating
+                if command.command_type == "simulate_file_restore"
+                else FileRestoreStatus.restoring
+            )
+            restore.started_at = restore.started_at or self.now()
+
+    async def _project_file_complete(
+        self, command: AgentCommand, result: dict[str, Any], now: datetime
+    ) -> None:
+        run = await self._file_run_for_command(command)
+        if run is not None:
+            reported = str(result.get("status") or "completed")
+            run.status = (
+                FileBackupRunStatus.completed_with_warnings
+                if reported == "completed_with_warnings"
+                else FileBackupRunStatus.completed
+            )
+            run.phase = run.status.value
+            run.progress_percent = 100
+            run.summary = dict(result)
+            run.checkpoint_ref = str(result.get("checkpointRef") or "")[:1024] or None
+            summary = result.get("summary") if isinstance(result.get("summary"), dict) else {}
+            run.files_processed = self._nonnegative_int(
+                summary.get("filesCopied"), run.files_processed or 0
+            )
+            run.bytes_processed = self._nonnegative_int(
+                summary.get("bytesCopied"), run.bytes_processed or 0
+            )
+            run.error_code = None
+            run.error_message = None
+            run.finished_at = now
+            run.updated_at = now
+            artifact = result.get("artifact") if isinstance(result.get("artifact"), dict) else None
+            if artifact and run.chain_id and artifact.get("location"):
+                self.db.add(
+                    FileBackupArtifact(
+                        tenant_id=command.tenant_id,
+                        run_id=run.id,
+                        chain_id=run.chain_id,
+                        kind=str(artifact.get("kind") or "directory")[:30],
+                        location=str(artifact["location"])[:2048],
+                        size_bytes=self._nonnegative_int(artifact.get("sizeBytes")) or None,
+                        sha256=str(artifact.get("manifestSha256") or "")[:64] or None,
+                        manifest_ref=str(artifact.get("manifestRef") or "")[:2048] or None,
+                        manifest_summary=dict(summary),
+                    )
+                )
+                chain = (
+                    await self.db.execute(
+                        select(FileBackupChain).where(
+                            FileBackupChain.id == run.chain_id,
+                            FileBackupChain.tenant_id == command.tenant_id,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if chain is not None:
+                    chain.latest_run_at = now
+        restore = await self._file_restore_for_command(command)
+        if restore is not None:
+            reported = str(result.get("status") or "completed")
+            if command.command_type == "simulate_file_restore":
+                restore.status = FileRestoreStatus.awaiting_confirmation
+                restore.simulation_summary = dict(result.get("summary") or result)
+                restore.simulation_hash = str(result.get("simulationHash") or "") or None
+            else:
+                restore.status = (
+                    FileRestoreStatus.completed_with_warnings
+                    if reported == "completed_with_warnings"
+                    else FileRestoreStatus.completed
+                )
+                restore.finished_at = now
+
+    async def _project_file_failure(
+        self,
+        command: AgentCommand,
+        error_code: str,
+        message: str,
+        now: datetime,
+    ) -> None:
+        run = await self._file_run_for_command(command)
+        if run is not None:
+            retryable_codes = {
+                "NETWORK_UNAVAILABLE",
+                "DESTINATION_UNAVAILABLE",
+                "SOURCE_UNAVAILABLE",
+                "AGENT_REQUEST_TIMEOUT",
+            }
+            run.status = (
+                FileBackupRunStatus.retryable
+                if error_code in retryable_codes
+                else FileBackupRunStatus.failed
+            )
+            run.phase = run.status.value
+            run.error_code = error_code[:80]
+            run.error_message = message[:1000]
+            run.finished_at = now
+            run.updated_at = now
+        restore = await self._file_restore_for_command(command)
+        if restore is not None:
+            restore.status = FileRestoreStatus.failed
+            restore.error_code = error_code[:80]
+            restore.error_message = message[:1000]
+            restore.finished_at = now
 
     async def _project_backup_progress(
         self,
@@ -331,6 +524,7 @@ class AgentCommandService:
             if isinstance(item, dict)
         }
         transfer = result.get("transfer") if isinstance(result.get("transfer"), dict) else {}
+        direct = result.get("deliveryMode") == "direct" or transfer.get("type") == "smb_direct"
         for backup in backups:
             data = results.get(backup.database_name)
             if data:
@@ -338,17 +532,24 @@ class AgentCommandService:
                 backup.phase = "backup_ready"
                 backup.progress_percent = 100
                 backup.validation_method = str(data.get("verificationMethod") or "restore_verifyonly")
-                backup.file_path = str(data.get("fileName") or "") or backup.file_path
+                backup.file_path = str(
+                    data.get("filePath") or data.get("fileName") or ""
+                ) or backup.file_path
                 backup.file_size_bytes = int(data.get("fileSizeBytes") or 0) or backup.file_size_bytes
                 backup.sha256_hash = str(data.get("fileSha256") or "") or backup.sha256_hash
                 backup.finished_at = backup.finished_at or now
                 local_only = transfer.get("type") == "local"
                 backup.delivery_status = "local_ready" if local_only else "delivered"
-                backup.delivery_phase = "local_ready" if local_only else "delivered"
+                backup.delivery_phase = (
+                    "direct_ready" if direct else "local_ready" if local_only else "delivered"
+                )
                 backup.delivery_progress = 100
-                backup.archive_path = str(transfer.get("path") or result.get("zipPath") or "") or None
-                backup.archive_size_bytes = int(result.get("zipSizeBytes") or 0) or None
-                backup.archive_sha256 = str(result.get("zipSha256") or "") or None
+                if not direct:
+                    backup.archive_path = str(
+                        transfer.get("path") or result.get("zipPath") or ""
+                    ) or None
+                    backup.archive_size_bytes = int(result.get("zipSizeBytes") or 0) or None
+                    backup.archive_sha256 = str(result.get("zipSha256") or "") or None
             elif command.command_type == "retry_backup_delivery":
                 backup.delivery_status = "delivered"
                 backup.delivery_phase = "delivered"

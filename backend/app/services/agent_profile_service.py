@@ -38,6 +38,7 @@ def serialize_managed_profile(item: AgentConnectionProfile) -> dict[str, Any]:
         "lastTestAt": item.last_test_at.isoformat() if item.last_test_at else None,
         "lastError": item.last_error,
         "hasSecret": bool(item.secret_envelope),
+        "requiresSecret": item.sync_status == "requires_secret",
         "isActive": item.is_active,
     }
 
@@ -88,8 +89,15 @@ class AgentProfileService:
             )
         if profile_type == "destination":
             destination_type = str(public_config.get("type") or "").lower()
-            if destination_type not in {"smb", "sftp"} or not str(public_config.get("path") or "").strip():
+            path = str(public_config.get("path") or "").strip()
+            if destination_type not in {"smb", "smb_direct", "sftp"} or not path:
                 raise DomainError("AGENT_PROFILE_CONFIG_INVALID", "Indique tipo y ruta del destino", 422)
+            if destination_type == "smb_direct" and not path.startswith(("\\\\", "//")):
+                raise DomainError(
+                    "AGENT_PROFILE_CONFIG_INVALID",
+                    "El respaldo directo requiere una ruta UNC",
+                    422,
+                )
 
     @staticmethod
     def _seal(agent: RemoteAgent, profile_id: uuid.UUID, secret: dict | None) -> str | None:
@@ -133,6 +141,7 @@ class AgentProfileService:
         label: str,
         public_config: dict,
         secret: dict | None,
+        requires_secret: bool = False,
     ) -> AgentConnectionProfile:
         agent = await self._agent(tenant_id, agent_id)
         self._validate(profile_type, public_config, secret)
@@ -159,8 +168,13 @@ class AgentProfileService:
         item.public_config = dict(public_config)
         if secret is not None:
             item.secret_envelope = self._seal(agent, item.id, secret)
-        item.sync_status = "pending"
-        item.last_error = None
+        needs_secret = bool(requires_secret and secret is None)
+        item.sync_status = "requires_secret" if needs_secret else "pending"
+        item.last_error = (
+            "Capture y pruebe la credencial para completar la migración"
+            if needs_secret
+            else None
+        )
         item.is_active = True
         agent.desired_config_revision = max(
             int(agent.desired_config_revision or 0) + 1,
@@ -168,7 +182,8 @@ class AgentProfileService:
         )
         await self.db.flush()
         self._sync_compat_metadata(agent, item)
-        await self._queue_apply(agent, item)
+        if not needs_secret:
+            await self._queue_apply(agent, item)
         return item
 
     @staticmethod

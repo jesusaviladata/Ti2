@@ -59,11 +59,13 @@ function BakBatchProgress({ records }: { records: BackupRecord[] }) {
   );
 }
 
-function deliveryLabel(job: AgentJob | undefined, records: BackupRecord[]) {
-  if (job?.status === "failed" || job?.status === "cancelled") return "ZIP o entrega fallida";
+function deliveryLabel(job: AgentJob | undefined, records: BackupRecord[], direct: boolean) {
+  if (job?.status === "failed" || job?.status === "cancelled") return direct ? "Respaldo directo fallido" : "ZIP o entrega fallida";
   if (job?.status === "completed") {
-    return records.some((item) => item.deliveryStatus === "failed") ? "Entrega fallida" : "Entrega verificada";
+    return records.some((item) => item.deliveryStatus === "failed") ? "Entrega fallida" : direct ? "Directo y validado" : "Entrega verificada";
   }
+  if (direct && job?.phase === "checking_destination") return "Comprobando destino";
+  if (direct) return records.every((item) => item.status === "completed") ? "Registrando respaldo directo" : "Se publica al validar cada .BAK";
   if (job?.phase === "transferring") return "Enviando ZIP";
   if (job?.phase === "archive_ready") return "ZIP validado";
   if (job?.phase === "compressing") return "Creando ZIP";
@@ -75,6 +77,7 @@ function BackupRunRow({ status }: { status: BackupRecord }) {
   const failed = status.status === "failed";
   const progress = failed ? 100 : status.progressPercent ?? 0;
   const delivery = status.deliveryStatus ?? "pending";
+  const direct = status.origin?.destinationProfile?.type === "smb_direct";
   return (
     <div className="rounded-[0.875rem] border border-musgo/20 bg-musgo/[0.05] p-3.5">
       <div className="flex items-center justify-between gap-3">
@@ -92,7 +95,7 @@ function BackupRunRow({ status }: { status: BackupRecord }) {
         <div className="mt-2 flex items-center gap-2 border-t border-musgo/15 pt-2 text-[10px]">
           {delivery === "delivered" || delivery === "local_ready" ? <PackageCheck size={12} className="text-green-400" /> : delivery === "failed" ? <XCircle size={12} className="text-amber-400" /> : <Send size={12} className="text-arcilla" />}
           <span className={delivery === "failed" ? "text-amber-400" : delivery === "delivered" || delivery === "local_ready" ? "text-green-400/80" : "text-crema/40"}>
-            {delivery === "delivered" ? "Entregado y verificado" : delivery === "local_ready" ? "ZIP local listo" : delivery === "failed" ? `Backup listo · entrega fallida${status.deliveryErrorMessage ? `: ${status.deliveryErrorMessage}` : ""}` : status.deliveryPhase === "transferring" ? "Enviando en segundo plano…" : "Preparando ZIP en segundo plano…"}
+            {delivery === "delivered" ? direct ? "Directo y validado" : "Entregado y verificado" : delivery === "local_ready" ? "ZIP local listo" : delivery === "failed" ? `Backup listo · entrega fallida${status.deliveryErrorMessage ? `: ${status.deliveryErrorMessage}` : ""}` : direct ? "Publicando en el destino…" : status.deliveryPhase === "transferring" ? "Enviando en segundo plano…" : "Preparando ZIP en segundo plano…"}
           </span>
         </div>
       ) : null}
@@ -119,6 +122,8 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
   const backupQueries = useBackupStatuses(records.map((item) => item.id));
   const liveRecords = records.map((record, index) => backupQueries[index]?.data ?? record);
   const job = useBackupAgentJob(jobId || undefined).data;
+  const selectedDestination = profiles.data?.backupDestinations.find((item) => item.id === destinationProfileId);
+  const directDelivery = selectedDestination?.type === "smb_direct";
 
   useEffect(() => {
     const first = profiles.data?.sqlInstances[0]?.id ?? "";
@@ -230,7 +235,7 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
               <BakBatchProgress records={liveRecords} />
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-[0.75rem] border border-green-500/20 bg-green-500/[0.04] px-3 py-2.5"><p className="font-mono text-[9px] uppercase tracking-wider text-green-300/60">1 · .BAK + validación</p><p className="mt-1 text-xs text-crema/55">Progreso principal</p></div>
-                <div className="rounded-[0.75rem] border border-musgo/20 bg-musgo/[0.04] px-3 py-2.5"><p className="font-mono text-[9px] uppercase tracking-wider text-crema/30">2 · ZIP + envío</p><p className="mt-1 truncate text-xs text-crema/55">{deliveryLabel(job, liveRecords)}</p></div>
+                <div className="rounded-[0.75rem] border border-musgo/20 bg-musgo/[0.04] px-3 py-2.5"><p className="font-mono text-[9px] uppercase tracking-wider text-crema/30">{directDelivery ? "2 · Entrega directa" : "2 · ZIP + envío"}</p><p className="mt-1 truncate text-xs text-crema/55">{deliveryLabel(job, liveRecords, directDelivery)}</p></div>
               </div>
               <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
                 {liveRecords.map((record) => <BackupRunRow key={record.id} status={record} />)}
@@ -241,9 +246,10 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
             <div className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1.5"><span className="text-[10px] uppercase tracking-wider text-crema/35">Instancia SQL</span><select value={sqlProfileId} onChange={(event) => setSqlProfileId(event.target.value)} className="h-10 w-full rounded-[0.625rem] border border-musgo/25 bg-musgo/10 px-3 text-xs text-crema/70 outline-none"><option value="">Seleccionar</option>{profiles.data?.sqlInstances.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-                <label className="space-y-1.5"><span className="text-[10px] uppercase tracking-wider text-crema/35">Entrega</span><select value={destinationProfileId} onChange={(event) => setDestinationProfileId(event.target.value)} className="h-10 w-full rounded-[0.625rem] border border-musgo/25 bg-musgo/10 px-3 text-xs text-crema/70 outline-none"><option value="">Sólo almacenamiento local</option>{profiles.data?.backupDestinations.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+                <label className="space-y-1.5"><span className="text-[10px] uppercase tracking-wider text-crema/35">Entrega</span><select value={destinationProfileId} onChange={(event) => setDestinationProfileId(event.target.value)} className="h-10 w-full rounded-[0.625rem] border border-musgo/25 bg-musgo/10 px-3 text-xs text-crema/70 outline-none"><option value="">Sólo almacenamiento local</option>{profiles.data?.backupDestinations.map((item) => <option key={item.id} value={item.id}>{item.label}{item.type === "smb_direct" ? " · Directo" : ""}</option>)}</select></label>
               </div>
               <div><p className="mb-2 text-[10px] uppercase tracking-wider text-crema/35">Tipo</p><div className="grid grid-cols-3 gap-2">{([['full','Full'],['differential','Diferencial'],['log','Log']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setBackupType(value)} className={backupType === value ? "h-9 rounded-[0.625rem] border border-arcilla/35 bg-arcilla/10 text-xs text-arcilla" : "h-9 rounded-[0.625rem] border border-musgo/20 text-xs text-crema/40"}>{label}</button>)}</div></div>
+              {directDelivery ? <p className="rounded-[0.625rem] border border-blue-400/20 bg-blue-400/[0.05] px-3 py-2 text-xs text-blue-200/75">SQL Server escribirá el .BAK comprimido directamente en el destino. No se creará ZIP ni temporal local.</p> : null}
               <div>
                 <div className="mb-2 flex items-center justify-between"><p className="text-[10px] uppercase tracking-wider text-crema/35">Bases de datos</p><button type="button" onClick={loadDatabases} disabled={!sqlProfileId || Boolean(catalogJobId && catalog.data && !["completed","failed","cancelled"].includes(catalog.data.status))} className="flex items-center gap-1.5 text-[10px] text-arcilla disabled:opacity-35">{catalogJobId && catalog.data?.status !== "completed" && catalog.data?.status !== "failed" ? <Loader2 size={11} className="animate-spin" /> : <Database size={11} />} Consultar agente</button></div>
                 {databases.length ? <div className="overflow-hidden rounded-[0.75rem] border border-musgo/20"><div className="flex items-center gap-2 border-b border-musgo/15 px-3"><Search size={12} className="text-crema/25" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar…" className="h-9 flex-1 bg-transparent text-xs text-crema/65 outline-none" /></div><div className="max-h-48 overflow-y-auto p-1">{filtered.map((database) => { const checked = selected.includes(database); return <button type="button" key={database} onClick={() => setSelected(checked ? selected.filter((item) => item !== database) : [...selected, database])} className="flex w-full items-center gap-2 rounded-[0.5rem] px-3 py-2 text-left font-mono text-xs text-crema/60 hover:bg-musgo/10"><span className={checked ? "grid h-3.5 w-3.5 place-items-center rounded-sm bg-arcilla text-carbon" : "h-3.5 w-3.5 rounded-sm border border-musgo/35"}>{checked ? <Check size={9} /> : null}</span>{database}</button>; })}</div></div> : <div className="rounded-[0.75rem] border border-musgo/15 p-4 text-xs text-crema/30">Seleccione una instancia y consulte las bases del agente.</div>}

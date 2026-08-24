@@ -32,6 +32,39 @@ export interface AgentRecord {
   configuration: AgentConfiguration | null;
 }
 
+export interface AgentReplacementMachine {
+  id: string;
+  hostname: string;
+  agentVersion: string;
+  status: string;
+  healthStatus: string;
+  lastHeartbeatAt: string | null;
+  volumes: Array<{
+    volumeKey: string;
+    label: string;
+    mountPoint: string;
+    totalBytes: number | null;
+    freeBytes: number | null;
+  }>;
+  sqlCandidates: AgentProfile[];
+}
+
+export interface AgentReplacement {
+  id: string;
+  status: "awaiting_candidate" | "awaiting_confirmation" | "completed" | "cancelled" | "expired";
+  expiresAt: string;
+  oldAgent: AgentReplacementMachine;
+  candidateAgent: AgentReplacementMachine | null;
+  profilesRequiringSecret: Array<{
+    profileId: string;
+    profileType: string;
+    label: string;
+  }>;
+  canConfirm: boolean;
+  blockers: string[];
+  code?: string | null;
+}
+
 export interface AgentProfile {
   id: string;
   label: string;

@@ -19,6 +19,8 @@ from app.services.agent_admin_service import (
 )
 from app.services.agent_enrollment_service import AgentEnrollmentService
 from app.services.agent_operation_service import AgentOperationService, _is_online
+from app.services.agent_replacement_service import AgentReplacementService
+from app.schemas.agent import AgentReplacementResponse
 
 
 router = APIRouter()
@@ -188,10 +190,79 @@ async def replace_agent(
     db: AsyncSession = Depends(get_db),
 ):
     _require_enabled()
-    result = await AgentEnrollmentService(
-        db, enrollment_ttl_seconds=settings.AGENT_ENROLLMENT_TTL_SEC
-    ).issue_pairing_code(
-        str(current_user.tenant_id), str(current_user.id), agent_id
+    result = await AgentReplacementService(
+        db, ttl_seconds=settings.AGENT_ENROLLMENT_TTL_SEC
+    ).create(
+        str(current_user.tenant_id), agent_id, str(current_user.id)
+    )
+    await db.commit()
+    return result
+
+
+@router.post(
+    "/{agent_id}/replacement-sessions",
+    response_model=AgentReplacementResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_agent_replacement(
+    agent_id: str,
+    current_user: User = Depends(manage_config),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    result = await AgentReplacementService(
+        db, ttl_seconds=settings.AGENT_ENROLLMENT_TTL_SEC
+    ).create(str(current_user.tenant_id), agent_id, str(current_user.id))
+    await db.commit()
+    return result
+
+
+@router.get(
+    "/replacement-sessions/{session_id}",
+    response_model=AgentReplacementResponse,
+)
+async def get_agent_replacement(
+    session_id: str,
+    current_user: User = Depends(read_operation),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    result = await AgentReplacementService(db).get(
+        str(current_user.tenant_id), session_id
+    )
+    await db.commit()
+    return result
+
+
+@router.post(
+    "/replacement-sessions/{session_id}/confirm",
+    response_model=AgentReplacementResponse,
+)
+async def confirm_agent_replacement(
+    session_id: str,
+    current_user: User = Depends(manage_config),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    result = await AgentReplacementService(db).confirm(
+        str(current_user.tenant_id), session_id, str(current_user.id)
+    )
+    await db.commit()
+    return result
+
+
+@router.post(
+    "/replacement-sessions/{session_id}/cancel",
+    response_model=AgentReplacementResponse,
+)
+async def cancel_agent_replacement(
+    session_id: str,
+    current_user: User = Depends(manage_config),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_enabled()
+    result = await AgentReplacementService(db).cancel(
+        str(current_user.tenant_id), session_id, str(current_user.id)
     )
     await db.commit()
     return result
