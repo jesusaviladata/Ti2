@@ -11,6 +11,7 @@ from .config import AgentConfig, configured_path
 from .identity import IdentityStore
 from .journal import ExecutionJournal
 from .runner import AgentRunner
+from .file_backup import FileBackupExecutor
 
 
 def main() -> int:
@@ -69,6 +70,10 @@ def main() -> int:
     runner = AgentRunner(
         client,
         ExecutionJournal(config.data_dir / "execution-journal.json"),
+        file_backup_executor=FileBackupExecutor(
+            config.data_dir,
+            destination_profiles=config.backup_destinations,
+        ),
     )
     runner.run_forever()
     return 0

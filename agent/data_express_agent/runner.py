@@ -16,6 +16,7 @@ from .storage import StorageCollector
 from .profiles import ManagedProfileStore, ProfileApplyError
 from .discovery import discover_environment
 from .protocol import MANAGED_FILE_COMMAND_TYPES
+from .file_backup import FileBackupError
 
 
 logger = logging.getLogger("data_express_agent")
@@ -28,8 +29,6 @@ DESTRUCTIVE_COMMANDS = frozenset(
         "purge_quarantine_items",
         "run_backup_batch",
         "retry_backup_delivery",
-        "run_file_backup",
-        "resume_file_backup",
         "run_file_restore",
     }
 )
@@ -73,6 +72,8 @@ class AgentRunner:
         )
         self.cleanup = cleanup_executor or StructuralCleanupExecutor(journal.path.parent)
         self.file_backups = file_backup_executor
+        if self.file_backups is not None:
+            self.file_backups.destination_profiles = destination_profiles
         if health_supervisor is not None:
             self.health = health_supervisor
         else:
@@ -127,9 +128,12 @@ class AgentRunner:
         )
         metadata = {"hostname": platform.node(), "os": platform.platform(), **profiles}
         if self.file_backups is not None:
-            from .protocol import FILE_BACKUP_CAPABILITY
+            from .protocol import DIRECT_BACKUP_CAPABILITY, FILE_BACKUP_CAPABILITY
 
-            metadata["capabilities"] = [FILE_BACKUP_CAPABILITY]
+            metadata["capabilities"] = [
+                DIRECT_BACKUP_CAPABILITY,
+                FILE_BACKUP_CAPABILITY,
+            ]
             metadata["fileCatalogRevision"] = max(
                 0, int(getattr(self.file_backups, "catalog_revision", 0))
             )
@@ -146,10 +150,12 @@ class AgentRunner:
                     "La conexión se interrumpió durante una operación destructiva; revise el estado y simule nuevamente.",
                 )
                 continue
+            if command_type == "run_file_backup":
+                command = {**command, "type": "resume_file_backup"}
             try:
                 result = self._execute(command)
                 self.journal.record_completed(command_id, result)
-            except (ExplorerError, BackupError, CleanupError, ProfileApplyError, ValueError, KeyError) as exc:
+            except (ExplorerError, BackupError, CleanupError, ProfileApplyError, FileBackupError, ValueError, KeyError) as exc:
                 code = getattr(exc, "code", "COMMAND_FAILED")
                 self.journal.record_failed(command_id, code, str(exc))
 
@@ -182,7 +188,7 @@ class AgentRunner:
         try:
             result = self._execute(command)
             self.journal.record_completed(command_id, result)
-        except (ExplorerError, BackupError, CleanupError, ProfileApplyError, ValueError, KeyError) as exc:
+        except (ExplorerError, BackupError, CleanupError, ProfileApplyError, FileBackupError, ValueError, KeyError) as exc:
             code = getattr(exc, "code", "COMMAND_FAILED")
             logger.exception("Command %s failed: %s", command_id, code)
             self.journal.record_failed(command_id, code, str(exc))
@@ -313,6 +319,8 @@ class AgentRunner:
         sql_profiles, destination_profiles = self.profile_store.runtime_profiles()
         self.backups.sql_profiles = sql_profiles
         self.backups.destination_profiles = destination_profiles
+        if self.file_backups is not None:
+            self.file_backups.destination_profiles = destination_profiles
         self.health.set_applied_config_revision(int(result["configRevision"]))
         return result
 

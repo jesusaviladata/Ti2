@@ -8,15 +8,20 @@ from typing import Any
 from app.core.errors import ConflictError, DomainError, NotFoundError
 from app.models.file_backup import (
     FileBackupArtifact,
+    FileBackupChain,
     FileBackupFilter,
+    FileBackupRun,
+    FileBackupRunStatus,
     FileBackupSource,
+    FileBackupStrategy,
     FileBackupTask,
 )
 from app.repositories.agent_profile_repository import AgentProfileRepository
 from app.repositories.agent_repository import AgentRepository
 from app.repositories.cleanup_repository import tenant_uuid
 from app.repositories.file_backup_repository import FileBackupRepository
-from app.schemas.file_backup import FileBackupTaskCreate, FileBackupTaskUpdate
+from app.schemas.file_backup import FileBackupRunCreate, FileBackupTaskCreate, FileBackupTaskUpdate
+from app.services.agent_operation_service import AgentOperationService
 
 
 FILE_BACKUP_CAPABILITY = "file_backup_v1"
@@ -45,11 +50,13 @@ class FileBackupService:
         repository: Any | None = None,
         agents: Any | None = None,
         profiles: Any | None = None,
+        operations: Any | None = None,
     ):
         self.db = db
         self.repository = repository or FileBackupRepository(db)
         self.agents = agents or AgentRepository(db)
         self.profiles = profiles or AgentProfileRepository(db)
+        self.operations = operations or AgentOperationService(db)
 
     async def list(
         self,
@@ -210,6 +217,186 @@ class FileBackupService:
             "protected": artifact.protected,
             "protectedAt": _iso(artifact.protected_at),
             "protectedBy": str(artifact.protected_by) if artifact.protected_by else None,
+        }
+
+    async def create_simulation(
+        self, tenant_id: str, task_id: str | uuid.UUID
+    ) -> dict[str, Any]:
+        task = await self._task(tenant_id, task_id)
+        await self._agent(tenant_id, task.agent_id)
+        payload = await self._command_payload(task, file_run_id=uuid.uuid4())
+        job = await self.operations.start_managed_file_command(
+            tenant_id,
+            str(task.agent_id),
+            command_type="simulate_file_backup",
+            payload=payload,
+            resource_id=task.id,
+            idempotency_key=f"file-simulation:{uuid.uuid4()}",
+            ttl_seconds=300,
+        )
+        return self._serialize_simulation(job, task.id)
+
+    async def get_simulation(
+        self, tenant_id: str, simulation_id: str | uuid.UUID
+    ) -> dict[str, Any]:
+        job = await self.repository.get_simulation(tenant_id, simulation_id)
+        if job is None or job.resource_id is None:
+            raise NotFoundError("Simulación")
+        return self._serialize_simulation(job, job.resource_id)
+
+    async def list_runs(
+        self,
+        tenant_id: str,
+        task_id: str | uuid.UUID,
+        *,
+        page: int,
+        page_size: int,
+    ) -> dict[str, Any]:
+        task = await self._task(tenant_id, task_id)
+        items, total = await self.repository.list_runs(
+            tenant_id, task.id, skip=(page - 1) * page_size, limit=page_size
+        )
+        return {
+            "items": [self._serialize_run(item) for item in items],
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+        }
+
+    async def create_run(
+        self,
+        tenant_id: str,
+        task_id: str | uuid.UUID,
+        body: FileBackupRunCreate,
+    ) -> dict[str, Any]:
+        task = await self._task(tenant_id, task_id)
+        await self._agent(tenant_id, task.agent_id)
+        if not task.is_active:
+            raise ConflictError(
+                "La tarea está pausada", code="FILE_BACKUP_TASK_INACTIVE"
+            )
+        if await self.repository.active_run(tenant_id, task.id) is not None:
+            raise ConflictError(
+                "Esta tarea ya tiene una copia en ejecución",
+                code="FILE_BACKUP_RUN_ALREADY_ACTIVE",
+            )
+        latest = await self.repository.latest_completed_run(tenant_id, task.id)
+        requested = body.strategy or task.strategy
+        effective = requested if latest is not None and latest.chain_id else FileBackupStrategy.full
+        now = datetime.now(timezone.utc)
+        if effective == FileBackupStrategy.full:
+            chain = FileBackupChain(
+                id=uuid.uuid4(),
+                tenant_id=task.tenant_id,
+                task_id=task.id,
+                status="open",
+                full_started_at=now,
+                latest_run_at=now,
+            )
+            self.db.add(chain)
+            parent_id = None
+        else:
+            chain = await self.repository.get_chain(tenant_id, latest.chain_id)
+            if chain is None:
+                raise ConflictError(
+                    "La cadena anterior ya no está disponible",
+                    code="FILE_BACKUP_CHAIN_INVALID",
+                )
+            chain.latest_run_at = now
+            parent_id = latest.id
+        run = FileBackupRun(
+            id=uuid.uuid4(),
+            tenant_id=task.tenant_id,
+            task_id=task.id,
+            agent_id=task.agent_id,
+            chain_id=chain.id,
+            parent_run_id=parent_id,
+            config_revision=task.config_revision,
+            strategy=effective,
+            status=FileBackupRunStatus.queued,
+            phase="queued",
+            progress_percent=0,
+            files_processed=0,
+            bytes_processed=0,
+            summary={"requestedStrategy": _value(requested)},
+            updated_at=now,
+        )
+        self.db.add(run)
+        await self.db.flush()
+        payload = await self._command_payload(task, file_run_id=run.id)
+        payload["strategy"] = _value(effective)
+        payload["chainId"] = str(chain.id)
+        await self.operations.start_managed_file_command(
+            tenant_id,
+            str(task.agent_id),
+            command_type="run_file_backup",
+            payload=payload,
+            resource_id=run.id,
+            idempotency_key=f"file-run:{run.id}",
+            ttl_seconds=900,
+        )
+        return self._serialize_run(run)
+
+    async def get_run(
+        self, tenant_id: str, run_id: str | uuid.UUID
+    ) -> dict[str, Any]:
+        run = await self.repository.get_run(tenant_id, run_id)
+        if run is None:
+            raise NotFoundError("Ejecución")
+        return self._serialize_run(run)
+
+    async def _command_payload(
+        self, task: FileBackupTask, *, file_run_id: uuid.UUID
+    ) -> dict[str, Any]:
+        source_map, filter_map = await self.repository.components(
+            str(task.tenant_id), [task.id]
+        )
+        serialized = self._serialize(
+            task, source_map.get(task.id, []), filter_map.get(task.id, [])
+        )
+        return {
+            "taskId": str(task.id),
+            "taskName": task.name,
+            "fileRunId": str(file_run_id),
+            "configRevision": task.config_revision,
+            "destinationProfileId": str(task.destination_profile_id),
+            "sources": serialized["sources"],
+            "filters": serialized["filters"],
+            "strategy": _value(task.strategy),
+            "format": _value(task.format),
+            "vssPolicy": task.vss_policy,
+            "verificationMode": task.verification_mode,
+        }
+
+    @staticmethod
+    def _serialize_simulation(job: Any, task_id: uuid.UUID) -> dict[str, Any]:
+        return {
+            "id": str(job.id),
+            "taskId": str(task_id),
+            "status": job.status,
+            "summary": dict(job.result or {}),
+            "createdAt": job.created_at,
+        }
+
+    @staticmethod
+    def _serialize_run(run: FileBackupRun) -> dict[str, Any]:
+        return {
+            "id": str(run.id),
+            "taskId": str(run.task_id),
+            "agentId": str(run.agent_id),
+            "status": _value(run.status),
+            "strategy": _value(run.strategy),
+            "phase": run.phase,
+            "progressPercent": run.progress_percent,
+            "filesTotal": run.files_total,
+            "filesProcessed": run.files_processed,
+            "bytesTotal": run.bytes_total,
+            "bytesProcessed": run.bytes_processed,
+            "errorCode": run.error_code,
+            "errorMessage": run.error_message,
+            "createdAt": run.created_at,
+            "startedAt": run.started_at,
+            "finishedAt": run.finished_at,
         }
 
     async def _task(self, tenant_id: str, task_id: str | uuid.UUID) -> FileBackupTask:

@@ -153,6 +153,37 @@ def test_interrupted_file_restore_requires_manual_review(tmp_path):
     assert client.failed[0][1] == "MANUAL_REVIEW_REQUIRED"
 
 
+def test_interrupted_file_backup_resumes_from_verified_checkpoints(tmp_path):
+    class FakeFileEngine:
+        catalog_revision = 1
+
+        def __init__(self):
+            self.operations = []
+
+        def execute(self, command_type, payload, progress):
+            self.operations.append(command_type)
+            return {"status": "completed", "operation": command_type}
+
+    command = _command("run_file_backup")
+    journal = ExecutionJournal(tmp_path / "journal.json")
+    journal.record_started(command)
+    engine = FakeFileEngine()
+    client = FakeClient()
+
+    runner = AgentRunner(
+        client,
+        journal,
+        explorer=FakeExplorer(),
+        file_backup_executor=engine,
+    )
+    runner.recover_interrupted()
+    runner.flush_reports()
+
+    assert engine.operations == ["resume_file_backup"]
+    assert client.completed[0][1]["operation"] == "resume_file_backup"
+    assert not client.failed
+
+
 def test_retry_delay_is_exponential_bounded_and_jittered():
     assert retry_delay(0, random_value=0.5) == 1.0
     assert retry_delay(3, random_value=0.5) == 8.0

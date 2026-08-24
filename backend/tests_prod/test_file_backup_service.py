@@ -7,8 +7,9 @@ from types import SimpleNamespace
 import pytest
 
 from app.core.errors import DomainError
-from app.models.file_backup import FileBackupArtifact
+from app.models.file_backup import FileBackupArtifact, FileBackupRun, FileBackupStrategy
 from app.schemas.file_backup import (
+    FileBackupRunCreate,
     FileBackupTaskCreate,
     FileBackupTaskUpdate,
 )
@@ -64,6 +65,10 @@ def _payload() -> FileBackupTaskCreate:
 class FakeDb:
     def __init__(self):
         self.flushed = 0
+        self.added = []
+
+    def add(self, item):
+        self.added.append(item)
 
     async def flush(self):
         self.flushed += 1
@@ -99,6 +104,9 @@ class FakeRepository:
         self.history = set()
         self.artifact = None
         self.last_list = None
+        self.runs = []
+        self.chains = {}
+        self.current_run = None
 
     def add_task(self, task):
         self.tasks[task.id] = task
@@ -146,8 +154,35 @@ class FakeRepository:
             return self.artifact
         return None
 
+    async def latest_completed_run(self, tenant_id, task_id):
+        assert tenant_id == TENANT_ID
+        matches = [item for item in self.runs if item.task_id == task_id]
+        return matches[-1] if matches else None
 
-def _service(*, agent=None, profile=None, repo=None):
+    async def active_run(self, tenant_id, task_id):
+        assert tenant_id == TENANT_ID
+        return self.current_run
+
+    async def get_chain(self, tenant_id, chain_id):
+        assert tenant_id == TENANT_ID
+        return self.chains.get(chain_id)
+
+
+class FakeOperations:
+    def __init__(self):
+        self.commands = []
+
+    async def start_managed_file_command(self, tenant_id, agent_id, **kwargs):
+        self.commands.append((tenant_id, agent_id, kwargs))
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            status="queued",
+            result=None,
+            created_at=datetime.now(timezone.utc),
+        )
+
+
+def _service(*, agent=None, profile=None, repo=None, operations=None):
     repository = repo or FakeRepository()
     return (
         FileBackupService(
@@ -155,6 +190,7 @@ def _service(*, agent=None, profile=None, repo=None):
             repository=repository,
             agents=FakeAgents(agent),
             profiles=FakeProfiles(profile),
+            operations=operations or FakeOperations(),
         ),
         repository,
     )
@@ -291,3 +327,27 @@ async def test_protect_artifact_changes_only_audited_protection_fields():
     assert artifact.protected_by == user_id
     assert artifact.protected_at is not None
     assert result["protected"] is True
+
+
+@pytest.mark.asyncio
+async def test_first_incremental_run_is_persisted_and_sent_as_full():
+    operations = FakeOperations()
+    service, repo = _service(operations=operations)
+    created = await service.create(TENANT_ID, _payload())
+
+    result = await service.create_run(
+        TENANT_ID,
+        created["id"],
+        FileBackupRunCreate(strategy=FileBackupStrategy.incremental),
+    )
+
+    run = next(item for item in service.db.added if isinstance(item, FileBackupRun))
+    command = operations.commands[0][2]
+    assert result["strategy"] == "full"
+    assert run.strategy == FileBackupStrategy.full
+    assert command["command_type"] == "run_file_backup"
+    assert command["payload"]["strategy"] == "full"
+    assert command["payload"]["sources"] == [
+        {"path": r"D:\Core", "includeSubfolders": True}
+    ]
+    assert "secret" not in command["payload"]

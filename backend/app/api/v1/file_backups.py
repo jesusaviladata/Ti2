@@ -118,16 +118,24 @@ async def delete_task(
 async def create_simulation(
     task_id: uuid.UUID,
     current_user: User = Depends(run_file_backups),
+    db: AsyncSession = Depends(get_db),
 ):
-    _not_ready()
+    result = await FileBackupService(db).create_simulation(
+        str(current_user.tenant_id), task_id
+    )
+    await db.commit()
+    return result
 
 
 @router.get("/simulations/{simulation_id}", response_model=FileBackupSimulationResponse)
 async def get_simulation(
     simulation_id: uuid.UUID,
     current_user: User = Depends(read_file_backups),
+    db: AsyncSession = Depends(get_db),
 ):
-    _not_ready()
+    return await FileBackupService(db).get_simulation(
+        str(current_user.tenant_id), simulation_id
+    )
 
 
 @router.get("/tasks/{task_id}/runs", response_model=FileBackupRunPage)
@@ -136,8 +144,14 @@ async def list_runs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, alias="pageSize", ge=1, le=100),
     current_user: User = Depends(read_file_backups),
+    db: AsyncSession = Depends(get_db),
 ):
-    _not_ready()
+    return await FileBackupService(db).list_runs(
+        str(current_user.tenant_id),
+        task_id,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post(
@@ -149,16 +163,22 @@ async def create_run(
     task_id: uuid.UUID,
     body: FileBackupRunCreate,
     current_user: User = Depends(run_file_backups),
+    db: AsyncSession = Depends(get_db),
 ):
-    _not_ready()
+    result = await FileBackupService(db).create_run(
+        str(current_user.tenant_id), task_id, body
+    )
+    await db.commit()
+    return result
 
 
 @router.get("/runs/{run_id}", response_model=FileBackupRunResponse)
 async def get_run(
     run_id: uuid.UUID,
     current_user: User = Depends(read_file_backups),
+    db: AsyncSession = Depends(get_db),
 ):
-    _not_ready()
+    return await FileBackupService(db).get_run(str(current_user.tenant_id), run_id)
 
 
 @router.post("/runs/{run_id}/cancellations", status_code=status.HTTP_202_ACCEPTED)

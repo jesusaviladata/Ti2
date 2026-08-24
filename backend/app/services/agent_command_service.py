@@ -11,7 +11,12 @@ from sqlalchemy import select
 from app.agent_protocol import MANAGED_FILE_COMMAND_TYPES
 from app.core.errors import ConflictError, DomainError, NotFoundError
 from app.models.backup import Backup, BackupStatus
-from app.models.file_backup import FileBackupRunStatus, FileRestoreStatus
+from app.models.file_backup import (
+    FileBackupArtifact,
+    FileBackupChain,
+    FileBackupRunStatus,
+    FileRestoreStatus,
+)
 from app.models.operations import AgentCommand, AgentConnectionProfile, RemoteAgent, RemoteCleanupExecution
 from app.repositories.agent_repository import AgentRepository
 
@@ -341,6 +346,7 @@ class AgentCommandService:
         run = await self._file_run_for_command(command)
         if run is not None:
             run.status = FileBackupRunStatus.running
+            run.started_at = run.started_at or self.now()
             run.phase = phase[:40]
             run.files_processed = max(0, processed_units)
             run.files_total = max(0, found_count or total_units) or None
@@ -378,10 +384,43 @@ class AgentCommandService:
             run.phase = run.status.value
             run.progress_percent = 100
             run.summary = dict(result)
+            run.checkpoint_ref = str(result.get("checkpointRef") or "")[:1024] or None
+            summary = result.get("summary") if isinstance(result.get("summary"), dict) else {}
+            run.files_processed = self._nonnegative_int(
+                summary.get("filesCopied"), run.files_processed or 0
+            )
+            run.bytes_processed = self._nonnegative_int(
+                summary.get("bytesCopied"), run.bytes_processed or 0
+            )
             run.error_code = None
             run.error_message = None
             run.finished_at = now
             run.updated_at = now
+            artifact = result.get("artifact") if isinstance(result.get("artifact"), dict) else None
+            if artifact and run.chain_id and artifact.get("location"):
+                self.db.add(
+                    FileBackupArtifact(
+                        tenant_id=command.tenant_id,
+                        run_id=run.id,
+                        chain_id=run.chain_id,
+                        kind=str(artifact.get("kind") or "directory")[:30],
+                        location=str(artifact["location"])[:2048],
+                        size_bytes=self._nonnegative_int(artifact.get("sizeBytes")) or None,
+                        sha256=str(artifact.get("manifestSha256") or "")[:64] or None,
+                        manifest_ref=str(artifact.get("manifestRef") or "")[:2048] or None,
+                        manifest_summary=dict(summary),
+                    )
+                )
+                chain = (
+                    await self.db.execute(
+                        select(FileBackupChain).where(
+                            FileBackupChain.id == run.chain_id,
+                            FileBackupChain.tenant_id == command.tenant_id,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if chain is not None:
+                    chain.latest_run_at = now
         restore = await self._file_restore_for_command(command)
         if restore is not None:
             reported = str(result.get("status") or "completed")
