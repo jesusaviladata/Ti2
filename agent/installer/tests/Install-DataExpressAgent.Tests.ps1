@@ -18,13 +18,36 @@ Describe "Install-DataExpressAgent" {
     }
 
     It "valida bootstrap antes de instalar el servicio" {
+        $integrity = $source.IndexOf('Test-PackageIntegrity -PackageRoot $packageRoot')
         $validation = $source.IndexOf('$bootstrap = Test-OfficialBootstrap')
         $install = $source.IndexOf('& $serviceWrapper install')
+        $integrity | Should BeGreaterThan -1
+        $validation | Should BeGreaterThan $integrity
         $validation | Should BeGreaterThan -1
         $install | Should BeGreaterThan $validation
     }
 
     It "elimina el codigo si falla la instalacion del servicio" {
         $source | Should Match 'Remove-Item -LiteralPath \$pairingPath'
+    }
+
+    It "rechaza sobrescribir una instalacion existente" {
+        $source | Should Match 'ya está instalado\. Use Update-DataExpressAgent\.ps1'
+        $source | Should Not Match '& \$serviceWrapper uninstall\s*\r?\n}\s*\r?\n\s*New-Item'
+    }
+
+    It "confirma heartbeat antes de informar instalacion exitosa" {
+        $source | Should Match 'Wait-AgentHeartbeat -TimeoutSeconds \$EnrollmentTimeoutSeconds -Version'
+        $source | Should Match 'Heartbeat confirmado con backend para agente \$Version'
+        $source | Should Match 'instalado y vinculado correctamente'
+    }
+
+    It "archiva logs anteriores para no aceptar un heartbeat viejo" {
+        $source | Should Match 'before-install-\$installStamp'
+    }
+
+    It "usa NetworkService para acceso SMB con identidad de maquina" {
+        $source | Should Match 'NETWORK SERVICE:\(OI\)\(CI\)M'
+        $source | Should Not Match 'LOCAL SERVICE:\(OI\)\(CI\)M'
     }
 }

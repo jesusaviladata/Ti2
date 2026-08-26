@@ -19,6 +19,7 @@ build/
 .mypy_cache/
 .ruff_cache/
 .test-deps/
+.test-tmp/
 
 # Node
 node_modules/

@@ -6,7 +6,8 @@ param(
     [switch]$MigrationMode,
     [ValidatePattern('^https://')][string]$ServerUrl = "",
     [string]$CommandSigningPublicKey = "",
-    [string]$CommandSigningKeyId = ""
+    [string]$CommandSigningKeyId = "",
+    [ValidateRange(30, 300)][int]$EnrollmentTimeoutSeconds = 90
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +19,7 @@ $agentBundle = Join-Path $packageRoot "DataExpressAgent"
 $packageBootstrap = Join-Path $packageRoot "bootstrap.json"
 $installedBootstrap = Join-Path $InstallDirectory "bootstrap.json"
 $pairingPath = Join-Path $dataDirectory "pairing-code.tmp"
+. (Join-Path $scriptRoot "Test-PackageIntegrity.ps1")
 
 function Test-OfficialBootstrap {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -49,9 +51,32 @@ function Test-OfficialBootstrap {
     return $document
 }
 
+function Wait-AgentHeartbeat {
+    param(
+        [Parameter(Mandatory = $true)][int]$TimeoutSeconds,
+        [Parameter(Mandatory = $true)][string]$Version
+    )
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        Start-Sleep -Seconds 2
+        $service = Get-Service -Name DataExpressAgent -ErrorAction SilentlyContinue
+        if (-not $service -or $service.Status -ne "Running") {
+            return $false
+        }
+        $logs = Get-ChildItem -LiteralPath $InstallDirectory -Filter "DataExpressAgent.Service*.log" -File -ErrorAction SilentlyContinue
+        foreach ($log in $logs) {
+            if (Select-String -LiteralPath $log.FullName -SimpleMatch "Heartbeat confirmado con backend para agente $Version" -Quiet) {
+                return $true
+            }
+        }
+    } while ((Get-Date) -lt $deadline)
+    return $false
+}
+
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw "Ejecute este instalador como administrador."
 }
+Test-PackageIntegrity -PackageRoot $packageRoot | Out-Null
 if (-not (Test-Path (Join-Path $agentBundle "DataExpressAgent.exe"))) {
     throw "Falta la carpeta autocontenida DataExpressAgent en el paquete."
 }
@@ -86,11 +111,7 @@ if (-not $PairingCode -or $PairingCode.Length -gt 256) {
 }
 
 if (Get-Service -Name DataExpressAgent -ErrorAction SilentlyContinue) {
-    if (-not (Test-Path -LiteralPath $serviceWrapper)) {
-        throw "Existe un servicio DataExpressAgent, pero no se encontró su WinSW para actualizarlo."
-    }
-    & $serviceWrapper stop
-    & $serviceWrapper uninstall
+    throw "DataExpressAgent ya está instalado. Use Update-DataExpressAgent.ps1 para conservar identidad y configuración."
 }
 
 New-Item -ItemType Directory -Force -Path $InstallDirectory, $dataDirectory | Out-Null
@@ -130,18 +151,35 @@ $configurationJson = $configuration | ConvertTo-Json -Depth 8
     $configurationJson,
     $utf8WithoutBom
 )
-[System.IO.File]::WriteAllText($pairingPath, $PairingCode, [System.Text.Encoding]::ASCII)
-$PairingCode = $null
-
-& icacls $dataDirectory /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" "LOCAL SERVICE:(OI)(CI)M" | Out-Null
-& icacls $InstallDirectory /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" "LOCAL SERVICE:(OI)(CI)RX" | Out-Null
 
 try {
+    [System.IO.File]::WriteAllText($pairingPath, $PairingCode, [System.Text.Encoding]::ASCII)
+    $PairingCode = $null
+
+    & icacls $dataDirectory /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" "NETWORK SERVICE:(OI)(CI)M" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "No fue posible proteger el directorio de datos." }
+    & icacls $InstallDirectory /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" "NETWORK SERVICE:(OI)(CI)RX" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "No fue posible proteger el directorio de instalación." }
+
+    $installStamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    Get-ChildItem -LiteralPath $InstallDirectory -Filter "DataExpressAgent.Service*.log" -File -ErrorAction SilentlyContinue | ForEach-Object {
+        Move-Item -LiteralPath $_.FullName -Destination "$($_.FullName).before-install-$installStamp"
+    }
+
     & $serviceWrapper install
+    if ($LASTEXITCODE -ne 0) { throw "WinSW no pudo instalar el servicio." }
     & $serviceWrapper start
+    if ($LASTEXITCODE -ne 0) { throw "WinSW no pudo iniciar el servicio." }
+    if (-not (Wait-AgentHeartbeat -TimeoutSeconds $EnrollmentTimeoutSeconds -Version ([string]$bootstrap.agentVersion))) {
+        throw "El servicio inició, pero no confirmó vinculación con el backend dentro de $EnrollmentTimeoutSeconds segundos."
+    }
 }
 catch {
+    if (Test-Path -LiteralPath $serviceWrapper -PathType Leaf) {
+        & $serviceWrapper stop 2>$null
+        & $serviceWrapper uninstall 2>$null
+    }
     Remove-Item -LiteralPath $pairingPath -Force -ErrorAction SilentlyContinue
     throw
 }
-Write-Host "Data Express Agent instalado. Espere a que aparezca conectado en el panel."
+Write-Host "Data Express Agent instalado y vinculado correctamente con el backend."

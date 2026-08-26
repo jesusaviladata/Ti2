@@ -8,7 +8,7 @@
   <startmode>Automatic</startmode>
   <delayedAutoStart>true</delayedAutoStart>
   <serviceaccount>
-    <username>NT AUTHORITY\LocalService</username>
+    <username>NT AUTHORITY\NetworkService</username>
     <allowservicelogon>true</allowservicelogon>
   </serviceaccount>
   <onfailure action="restart" delay="15 sec" />
