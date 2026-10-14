@@ -590,7 +590,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
           <div>
             <p className="font-mono text-xs text-arcilla uppercase tracking-widest mb-0.5">Módulo Backups</p>
             <h2 className="font-display text-2xl italic font-light text-crema">
-              Nuevo Backup<span className="text-arcilla">.</span>
+              Nuevo Backup
             </h2>
             {activeConn && (
               <p className="font-mono text-[10px] text-crema/30 mt-0.5">→ {activeConn.label}</p>

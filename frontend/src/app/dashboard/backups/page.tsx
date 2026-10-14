@@ -59,7 +59,7 @@ export default function BackupsPage() {
         <div>
           <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Módulo</p>
           <h1 className="font-title text-4xl font-semibold text-crema">
-            Backups<span className="text-arcilla">.</span>
+            Backups
           </h1>
         </div>
 

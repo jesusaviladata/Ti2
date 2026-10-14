@@ -27,7 +27,7 @@ export default function FileBackupsPage() {
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-musgo/25 pb-5">
         <div>
           <p className="mb-1 text-xs uppercase tracking-[0.18em] text-arcilla">Protección de archivos</p>
-          <h1 className="font-title text-4xl font-semibold text-crema">Copias de carpetas<span className="text-arcilla">.</span></h1>
+          <h1 className="font-title text-4xl font-semibold text-crema">Copias de carpetas</h1>
           <p className="mt-2 max-w-2xl text-sm text-crema/40">Confirma qué carpetas están protegidas, dónde se guardan y si la última copia quedó verificada.</p>
         </div>
       </header>

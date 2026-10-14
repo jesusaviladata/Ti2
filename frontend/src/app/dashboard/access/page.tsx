@@ -476,7 +476,7 @@ export default function AccessPage() {
         <div>
           <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Módulo</p>
           <h1 className="font-title text-4xl font-semibold text-crema">
-            Acceso Remoto<span className="text-arcilla">.</span>
+            Acceso Remoto
           </h1>
         </div>
         <div className="flex items-center gap-2">

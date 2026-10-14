@@ -65,7 +65,7 @@ export default function SettingsPage() {
       <div>
         <p className="mb-1 font-mono text-xs uppercase tracking-[0.18em] text-arcilla">Cuenta</p>
         <h1 className="font-title text-4xl font-semibold text-crema">
-          Configuración<span className="text-arcilla">.</span>
+          Configuración
         </h1>
       </div>
 

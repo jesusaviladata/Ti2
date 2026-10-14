@@ -48,7 +48,7 @@ export default function CleanupPage() {
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div><p className="mb-1 text-xs uppercase tracking-[0.18em] text-arcilla">Servidores Core</p><h1 className="font-title text-4xl font-semibold text-crema">Limpieza<span className="text-arcilla">.</span></h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-crema/40">Una sola operación segura por agente: simular, revisar y vaciar los archivos autorizados. Las carpetas se conservan.</p></div>
+        <div><p className="mb-1 text-xs uppercase tracking-[0.18em] text-arcilla">Servidores Core</p><h1 className="font-title text-4xl font-semibold text-crema">Limpieza</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-crema/40">Una sola operación segura por agente: simular, revisar y vaciar los archivos autorizados. Las carpetas se conservan.</p></div>
         <AgentSelector agents={agents} value={agentId} onChange={setAgentId} />
       </header>
 

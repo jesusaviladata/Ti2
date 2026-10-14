@@ -152,7 +152,7 @@ export function SqlConnectionModal({ open, onClose }: Props) {
             <div>
               <p className="font-mono text-xs text-arcilla uppercase tracking-widest mb-0.5">SQL Server</p>
               <h2 id="sqlconn-title" className="font-display text-xl italic font-light text-crema">
-                Nueva conexión<span className="text-arcilla">.</span>
+                Nueva conexión
               </h2>
             </div>
           </div>

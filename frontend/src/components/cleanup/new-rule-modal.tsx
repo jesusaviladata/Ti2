@@ -76,7 +76,7 @@ export function NewRuleModal({ open, onClose }: Props) {
             <div>
               <p className="font-mono text-xs text-arcilla uppercase tracking-widest mb-0.5">Limpieza</p>
               <h2 className="font-display text-xl italic font-light text-crema">
-                Nueva regla BCK<span className="text-arcilla">.</span>
+                Nueva regla BCK
               </h2>
             </div>
           </div>

@@ -316,7 +316,7 @@ export default function DashboardPage() {
         <div>
           <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Panel principal</p>
           <h1 className="font-title text-4xl font-semibold text-crema">
-            Resumen general<span className="text-arcilla">.</span>
+            Resumen general
           </h1>
         </div>
         <div className="flex items-center gap-2">
