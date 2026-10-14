@@ -63,7 +63,7 @@ export function NewRuleModal({ open, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="!m-0 fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-carbon/80 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative z-10 w-full max-w-lg rounded-[1.5rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">

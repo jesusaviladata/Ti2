@@ -87,7 +87,7 @@ function ModalFrame({
   const dialogRef = useDialog(true, onClose);
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+    <div className="!m-0 fixed inset-0 z-[90] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-carbon/80 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
         ref={dialogRef}

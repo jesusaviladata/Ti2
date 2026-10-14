@@ -222,7 +222,7 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4">
+    <div className="!m-0 fixed inset-0 z-50 grid place-items-center p-4">
       <button type="button" aria-label="Cerrar" className="absolute inset-0 bg-carbon/85 backdrop-blur-sm" onClick={close} />
       <section className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-musgo/30 bg-carbon">
         <header className="flex items-start justify-between border-b border-musgo/20 px-6 py-5">

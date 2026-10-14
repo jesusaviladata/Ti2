@@ -133,7 +133,7 @@ export function SqlConnectionModal({ open, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="!m-0 fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-carbon/80 backdrop-blur-sm" onClick={handleClose} aria-hidden="true" />
 
       <div

@@ -26,3 +26,4 @@ Revisión: el alcance corresponde a la propuesta aprobada; los porcentajes provi
 - Simulación de respuestas 503: métricas desconocidas con guion, mensajes de error visibles y recuperación mediante Actualizar. Respuestas vacías: indicadores en cero y enlaces de inicio, sin calendario vacío dominante.
 - Revisión visual de escritorio y móvil de 390 px en claro y oscuro. Ancho del documento de 390 px, con desplazamiento contenido únicamente en tablas.
 - Los datos de estas pruebas viven fuera del repositorio desplegado; el panel utiliza los servicios existentes.
+- Revisión en Railway: resumen conectado a la base real, navegación a Servidores y copias, y formulario de programación sin guardar cambios. Corrección de los marcos de diálogos: el margen heredado de `space-y-7` desplazaba el fondo 28 px; se neutraliza en los marcos fijos. La reproducción local pasa de top/margen 28 px a 0 px y cubre los 720 px de la ventana.

@@ -97,7 +97,7 @@ export function AgentConnectionWizard({ agent, onClose }: { agent: AgentRecord; 
   }
 
   return (
-    <div className="fixed inset-0 z-[90] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+    <div className="!m-0 fixed inset-0 z-[90] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
       <section className="w-full max-w-3xl overflow-hidden rounded-xl border border-musgo/30 bg-carbon">
         <header className="flex items-start justify-between border-b border-musgo/20 px-6 py-5">
           <div><p className="text-xs uppercase tracking-[0.18em] text-arcilla">Asistente de conexión · {agent.hostname}</p><h2 className="mt-1 text-xl font-medium text-crema">Conectar SQL Server y destino</h2></div>

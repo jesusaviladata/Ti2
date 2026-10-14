@@ -50,7 +50,7 @@ export function AgentRootWizard({ agent, onClose }: { agent: AgentRecord; onClos
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4">
+    <div className="!m-0 fixed inset-0 z-50 grid place-items-center p-4">
       <button type="button" aria-label="Cerrar" className="absolute inset-0 bg-carbon/85 backdrop-blur-sm" onClick={onClose} />
       <section className="relative w-full max-w-xl rounded-xl border border-musgo/30 bg-carbon p-6">
         <div className="mb-5 flex items-start justify-between gap-4">

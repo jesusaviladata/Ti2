@@ -136,7 +136,7 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+    <div className="!m-0 fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
       <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[1.5rem] border border-musgo/40 bg-carbon shadow-2xl shadow-black/60">
         <div className="flex items-start justify-between border-b border-musgo/20 px-6 py-5">
           <div>

@@ -137,7 +137,7 @@ function NewSessionModal({ onClose, onCreated }: {
   const INPUT = "w-full h-9 bg-surface border border-musgo/25 rounded-[0.5rem] px-3 font-sans text-xs text-crema placeholder:text-subtle focus:outline-none focus:border-arcilla/40 transition-colors";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="!m-0 fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
         ref={dialogRef}
@@ -240,7 +240,7 @@ function TerminateModal({ session, onClose, onClosed }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="!m-0 fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-sm rounded-xl border border-red-800/40 bg-carbon shadow-2xl p-6">
         <div className="flex items-center gap-2 mb-5">

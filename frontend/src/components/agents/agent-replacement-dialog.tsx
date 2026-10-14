@@ -33,7 +33,7 @@ export function AgentReplacementDialog({ agent, onClose }: { agent: AgentRecord;
   }
 
   return (
-    <div className="fixed inset-0 z-[95] grid place-items-center bg-black/70 p-4">
+    <div className="!m-0 fixed inset-0 z-[95] grid place-items-center bg-black/70 p-4">
       <section className="w-full max-w-4xl overflow-hidden rounded-[0.75rem] border border-musgo/30 bg-carbon">
         <header className="flex items-start justify-between border-b border-musgo/20 px-6 py-5">
           <div><p className="text-xs uppercase tracking-[0.16em] text-arcilla">Cambio de infraestructura</p><h2 className="mt-1 text-xl font-medium text-crema">Reemplazar {agent.hostname}</h2><p className="mt-1 text-xs text-muted">El servidor actual continuará operando hasta que compare y confirme el cambio.</p></div>

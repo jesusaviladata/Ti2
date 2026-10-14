@@ -159,4 +159,3 @@ export function BackupHeatmap({ days }: { days: ChartDay[] }) {
     </div>
   );
 }
-
