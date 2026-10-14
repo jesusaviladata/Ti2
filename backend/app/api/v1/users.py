@@ -16,7 +16,7 @@ require_admin = require_roles(UserRole.admin)
 
 
 class PasswordChangeBody(BaseModel):
-    new_password: str = Field(min_length=14, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 @router.get("", response_model=dict)
@@ -118,3 +118,4 @@ def _serialize(user: User) -> dict:
         "role": user.role.value,
         "isActive": user.is_active,
     }
+

@@ -150,7 +150,7 @@ function CreateUserModal({
     if (form.username.trim().length < 3 || !USERNAME_PATTERN.test(form.username.trim())) {
       nextErrors.username = "Usa al menos 3 caracteres: letras, números, punto, guion o guion bajo.";
     }
-    if (form.password.length < 14) nextErrors.password = "La contraseña debe tener al menos 14 caracteres.";
+    if (form.password.length < 8) nextErrors.password = "La contraseña debe tener al menos 8 caracteres.";
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -275,8 +275,8 @@ function PasswordModal({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (password.length < 14) {
-      setError("La contraseña debe tener al menos 14 caracteres.");
+    if (password.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
     if (password !== confirmation) {
@@ -553,3 +553,4 @@ export function UsersAdmin() {
     </section>
   );
 }
+

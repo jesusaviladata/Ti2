@@ -21,12 +21,12 @@ def bootstrap_credentials() -> tuple[str, str]:
         raise SystemExit(
             "Define BOOTSTRAP_ADMIN_EMAIL y BOOTSTRAP_ADMIN_PASSWORD solo para este comando"
         )
-    if len(password) < 14 or password.lower() in {
+    if len(password) < 8 or password.lower() in {
         "admin1234!",
         "password123456",
     }:
         raise SystemExit(
-            "La contrasena inicial debe tener al menos 14 caracteres y no ser conocida"
+            "La contrasena inicial debe tener al menos 8 caracteres y no ser conocida"
         )
     return email, password
 
@@ -64,3 +64,4 @@ async def seed() -> None:
 
 if __name__ == "__main__":
     asyncio.run(seed())
+

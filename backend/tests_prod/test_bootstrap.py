@@ -37,3 +37,24 @@ def test_bootstrap_accepts_explicit_strong_credentials(monkeypatch):
 
     assert email == "admin@dataexpress.example"
     assert password == "A-unique-long-password-2026"
+
+
+@pytest.mark.parametrize("password,valid", [("Q7v!x2L", False), ("Q7v!x2Lm", True)])
+def test_password_minimum_is_consistent_for_bootstrap_create_and_change(monkeypatch, password, valid):
+    from pydantic import ValidationError
+    from app.schemas.user import UserCreate
+    from app.api.v1.users import PasswordChangeBody
+
+    monkeypatch.setenv("BOOTSTRAP_ADMIN_EMAIL", "admin@dataexpress.example")
+    monkeypatch.setenv("BOOTSTRAP_ADMIN_PASSWORD", password)
+    checks = [
+        lambda: _module().bootstrap_credentials(),
+        lambda: UserCreate(email="admin@dataexpress.example", username="admin", password=password, full_name="Admin Test"),
+        lambda: PasswordChangeBody(new_password=password),
+    ]
+    for check in checks:
+        if valid:
+            check()
+        else:
+            with pytest.raises((SystemExit, ValidationError)):
+                check()
