@@ -38,7 +38,7 @@
   },
   "overrides": {
     "form-data": "4.0.6",
-    "sharp": "0.35.3",
+    "sharp": "0.35.5",
     "postcss": "$postcss"
   }
 }
