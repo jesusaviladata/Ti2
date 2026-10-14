@@ -48,7 +48,7 @@ function Dropdown({ label, options, value, onChange }: {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
-      <p className="font-mono text-[10px] text-crema/35 uppercase tracking-wider mb-1.5">{label}</p>
+      <p className="font-sans text-xs text-subtle uppercase tracking-wider mb-1.5">{label}</p>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -57,14 +57,14 @@ function Dropdown({ label, options, value, onChange }: {
         aria-label={label}
         className={cn(
           "w-full h-9 flex items-center justify-between px-3",
-          "bg-musgo/10 border border-musgo/25 rounded-[0.5rem]",
-          "font-mono text-xs transition-colors",
-          value ? "text-crema/75" : "text-crema/25",
+          "bg-surface border border-musgo/25 rounded-[0.5rem]",
+          "font-sans text-xs transition-colors",
+          value ? "text-crema" : "text-subtle",
           open ? "border-arcilla/40" : "hover:border-musgo/45"
         )}
       >
         <span>{value || `Seleccionar ${label.toLowerCase()}`}</span>
-        <ChevronDown size={11} className={cn("text-crema/30 transition-transform", open && "rotate-180")} />
+        <ChevronDown size={11} className={cn("text-subtle transition-transform", open && "rotate-180")} />
       </button>
       {open && (
         <div
@@ -80,10 +80,10 @@ function Dropdown({ label, options, value, onChange }: {
               aria-selected={value === opt}
               onClick={() => { onChange(opt); setOpen(false); }}
               className={cn(
-                "w-full text-left px-3 py-2 font-mono text-xs transition-colors",
+                "w-full text-left px-3 py-2 font-sans text-xs transition-colors",
                 value === opt
                   ? "bg-arcilla/10 text-arcilla/80"
-                  : "text-crema/60 hover:bg-musgo/15"
+                  : "text-muted hover:bg-musgo/15"
               )}
             >
               {opt}
@@ -134,7 +134,7 @@ function NewSessionModal({ onClose, onCreated }: {
     }
   }
 
-  const INPUT = "w-full h-9 bg-musgo/10 border border-musgo/25 rounded-[0.5rem] px-3 font-mono text-xs text-crema/75 placeholder:text-crema/20 focus:outline-none focus:border-arcilla/40 transition-colors";
+  const INPUT = "w-full h-9 bg-surface border border-musgo/25 rounded-[0.5rem] px-3 font-sans text-xs text-crema placeholder:text-subtle focus:outline-none focus:border-arcilla/40 transition-colors";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -144,15 +144,15 @@ function NewSessionModal({ onClose, onCreated }: {
         role="dialog"
         aria-modal="true"
         aria-labelledby="newsession-title"
-        className="relative z-10 w-full max-w-md rounded-[1.25rem] border border-musgo/30 bg-carbon shadow-2xl p-6"
+        className="relative z-10 w-full max-w-md rounded-xl border border-musgo/30 bg-carbon shadow-2xl p-6"
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Monitor size={15} className="text-arcilla/70" />
-            <span id="newsession-title" className="font-mono text-sm text-crema/80">Nueva sesión remota</span>
+            <span id="newsession-title" className="font-sans text-sm text-crema">Nueva sesión remota</span>
           </div>
-          <button onClick={onClose} aria-label="Cerrar" className="text-crema/25 hover:text-crema/60 transition-colors">
+          <button onClick={onClose} aria-label="Cerrar" className="text-subtle hover:text-muted transition-colors">
             <X size={15} />
           </button>
         </div>
@@ -166,7 +166,7 @@ function NewSessionModal({ onClose, onCreated }: {
 
           {/* Reason */}
           <div>
-            <p className="font-mono text-[10px] text-crema/35 uppercase tracking-wider mb-1.5">Motivo</p>
+            <p className="font-sans text-xs text-subtle uppercase tracking-wider mb-1.5">Motivo</p>
             <input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -177,7 +177,7 @@ function NewSessionModal({ onClose, onCreated }: {
 
           {/* Client */}
           <div>
-            <p className="font-mono text-[10px] text-crema/35 uppercase tracking-wider mb-1.5">Cliente</p>
+            <p className="font-sans text-xs text-subtle uppercase tracking-wider mb-1.5">Cliente</p>
             <input
               value={client}
               onChange={(e) => setClient(e.target.value)}
@@ -187,27 +187,27 @@ function NewSessionModal({ onClose, onCreated }: {
           </div>
 
           {/* Start time */}
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-[0.5rem] bg-musgo/10 border border-musgo/20">
-            <Clock size={12} className="text-crema/30 shrink-0" />
-            <span className="font-mono text-[10px] text-crema/35 uppercase tracking-wider">Hora de inicio</span>
-            <span className="font-mono text-xs text-crema/70 ml-auto">
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-[0.5rem] bg-surface border border-musgo/20">
+            <Clock size={12} className="text-subtle shrink-0" />
+            <span className="font-sans text-xs text-subtle uppercase tracking-wider">Hora de inicio</span>
+            <span className="font-sans text-xs text-crema ml-auto">
               {startAt.toLocaleTimeString("es", { timeStyle: "short" })}
             </span>
           </div>
 
           {error && (
-            <p className="font-mono text-[10px] text-red-400/80 bg-red-900/10 border border-red-700/25 rounded-[0.5rem] px-3 py-2">
+            <p className="font-sans text-xs text-danger bg-danger/10 border border-red-700/25 rounded-[0.5rem] px-3 py-2">
               {error}
             </p>
           )}
 
           <div className="flex gap-2 pt-1">
             <button onClick={onClose}
-              className="flex-1 h-9 rounded-[0.75rem] border border-musgo/25 font-mono text-xs text-crema/40 hover:text-crema/70 transition-colors">
+              className="flex-1 h-9 rounded-[0.75rem] border border-musgo/25 font-sans text-xs text-muted hover:text-crema transition-colors">
               Cancelar
             </button>
             <button onClick={handleSubmit} disabled={loading}
-              className="flex-1 h-9 rounded-[0.75rem] bg-arcilla/10 border border-arcilla/35 font-mono text-xs text-arcilla/80 hover:bg-arcilla/15 disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+              className="flex-1 h-9 rounded-[0.75rem] bg-arcilla/10 border border-arcilla/35 font-sans text-xs text-arcilla/80 hover:bg-arcilla/15 disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
               {loading ? <Loader2 size={13} className="animate-spin" /> : <Wifi size={13} />}
               Iniciar sesión
             </button>
@@ -242,29 +242,29 @@ function TerminateModal({ session, onClose, onClosed }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm rounded-[1.25rem] border border-red-800/40 bg-carbon shadow-2xl p-6">
+      <div className="relative z-10 w-full max-w-sm rounded-xl border border-red-800/40 bg-carbon shadow-2xl p-6">
         <div className="flex items-center gap-2 mb-5">
-          <WifiOff size={15} className="text-red-400/70" />
-          <span className="font-mono text-sm text-crema/80">Confirmar término de sesión</span>
+          <WifiOff size={15} className="text-danger" />
+          <span className="font-sans text-sm text-crema">Confirmar término de sesión</span>
         </div>
 
         {/* Summary */}
-        <div className="rounded-[0.75rem] border border-musgo/20 bg-musgo/10 p-3 space-y-2 mb-4">
+        <div className="rounded-[0.75rem] border border-musgo/20 bg-surface p-3 space-y-2 mb-4">
           <div className="flex justify-between">
-            <span className="font-mono text-[10px] text-crema/30 uppercase tracking-wider">Servidor</span>
-            <span className="font-mono text-xs text-crema/70">{session.server}</span>
+            <span className="font-sans text-xs text-subtle uppercase tracking-wider">Servidor</span>
+            <span className="font-sans text-xs text-crema">{session.server}</span>
           </div>
           <div className="flex justify-between">
-            <span className="font-mono text-[10px] text-crema/30 uppercase tracking-wider">Ingeniero</span>
-            <span className="font-mono text-xs text-crema/70">{(session as any).engineer ?? session.user}</span>
+            <span className="font-sans text-xs text-subtle uppercase tracking-wider">Ingeniero</span>
+            <span className="font-sans text-xs text-crema">{(session as any).engineer ?? session.user}</span>
           </div>
           <div className="flex justify-between">
-            <span className="font-mono text-[10px] text-crema/30 uppercase tracking-wider">Hora inicio</span>
-            <span className="font-mono text-xs text-crema/70">{formatTime(session.start)}</span>
+            <span className="font-sans text-xs text-subtle uppercase tracking-wider">Hora inicio</span>
+            <span className="font-sans text-xs text-crema">{formatTime(session.start)}</span>
           </div>
           <div className="flex justify-between border-t border-musgo/15 pt-2">
-            <span className="font-mono text-[10px] text-red-400/60 uppercase tracking-wider">Hora término</span>
-            <span className="font-mono text-xs text-red-400/80 font-medium">
+            <span className="font-sans text-xs text-danger uppercase tracking-wider">Hora término</span>
+            <span className="font-sans text-xs text-danger font-medium">
               {endTime.toLocaleTimeString("es", { timeStyle: "short" })}
             </span>
           </div>
@@ -275,16 +275,16 @@ function TerminateModal({ session, onClose, onClosed }: {
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Notas adicionales (opcional)"
           rows={2}
-          className="w-full bg-musgo/10 border border-musgo/25 rounded-[0.5rem] px-3 py-2 font-mono text-xs text-crema/75 placeholder:text-crema/20 focus:outline-none focus:border-red-800/40 transition-colors resize-none mb-4"
+          className="w-full bg-surface border border-musgo/25 rounded-[0.5rem] px-3 py-2 font-sans text-xs text-crema placeholder:text-subtle focus:outline-none focus:border-red-800/40 transition-colors resize-none mb-4"
         />
 
         <div className="flex gap-2">
           <button onClick={onClose}
-            className="flex-1 h-9 rounded-[0.75rem] border border-musgo/25 font-mono text-xs text-crema/40 hover:text-crema/70 transition-colors">
+            className="flex-1 h-9 rounded-[0.75rem] border border-musgo/25 font-sans text-xs text-muted hover:text-crema transition-colors">
             Cancelar
           </button>
           <button onClick={handleTerminate} disabled={loading}
-            className="flex-1 h-9 rounded-[0.75rem] bg-red-900/20 border border-red-700/40 font-mono text-xs text-red-400 hover:bg-red-900/30 disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+            className="flex-1 h-9 rounded-[0.75rem] bg-danger/10 border border-red-700/40 font-sans text-xs text-danger hover:bg-red-900/30 disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
             {loading ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
             Terminado
           </button>
@@ -319,9 +319,9 @@ function SessionCard({ session, onTerminate, onDelete }: {
       className={cn(
         "rounded-[1rem] border p-4 transition-colors cursor-context-menu select-none",
         session.is_suspicious
-          ? "border-orange-700/35 bg-orange-900/10"
+          ? "border-orange-700/35 bg-warning/10"
           : session.status === "active"
-            ? "border-musgo/30 bg-musgo/10"
+            ? "border-musgo/30 bg-surface"
             : "border-musgo/15 bg-carbon"
       )}
     >
@@ -334,26 +334,26 @@ function SessionCard({ session, onTerminate, onDelete }: {
           )} />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1.5">
-              <span className="font-mono text-sm text-crema/90 font-medium">{session.server}</span>
+              <span className="font-sans text-sm text-crema font-medium">{session.server}</span>
               {session.is_suspicious && (
-                <span className="flex items-center gap-1 font-mono text-[9px] px-2 py-0.5 rounded-full border border-orange-700/35 bg-orange-900/15 text-orange-400/80">
+                <span className="flex items-center gap-1 font-sans text-xs px-2 py-0.5 rounded-full border border-orange-700/35 bg-warning/10 text-warning">
                   <AlertTriangle size={9} /> Sospechoso
                 </span>
               )}
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1">
               <div className="flex items-center gap-1.5">
-                <User size={10} className="text-crema/25 shrink-0" />
-                <span className="font-mono text-[10px] text-crema/50">{engineer}</span>
+                <User size={10} className="text-subtle shrink-0" />
+                <span className="font-sans text-xs text-muted">{engineer}</span>
               </div>
               {session.client && (
                 <div className="flex items-center gap-1.5">
-                  <Server size={10} className="text-crema/25 shrink-0" />
-                  <span className="font-mono text-[10px] text-crema/50">{session.client}</span>
+                  <Server size={10} className="text-subtle shrink-0" />
+                  <span className="font-sans text-xs text-muted">{session.client}</span>
                 </div>
               )}
               {session.reason && (
-                <div className="col-span-2 font-mono text-[10px] text-crema/35 truncate mt-0.5">
+                <div className="col-span-2 font-sans text-xs text-subtle truncate mt-0.5">
                   {session.reason}
                 </div>
               )}
@@ -364,23 +364,23 @@ function SessionCard({ session, onTerminate, onDelete }: {
         {/* Right — times + button */}
         <div className="shrink-0 text-right space-y-1.5">
           <div className="flex items-center gap-1.5 justify-end">
-            <Clock size={10} className="text-crema/25" />
-            <span className="font-mono text-[10px] text-crema/45">
+            <Clock size={10} className="text-subtle" />
+            <span className="font-sans text-xs text-muted">
               Inicio: {formatTime(session.start)}
             </span>
           </div>
 
           {session.status === "closed" && session.end ? (
             <div className="flex items-center gap-1.5 justify-end">
-              <Clock size={10} className="text-red-400/40" />
-              <span className="font-mono text-[10px] text-red-400/60">
+              <Clock size={10} className="text-danger" />
+              <span className="font-sans text-xs text-danger">
                 Fin: {formatTime(session.end)}
               </span>
             </div>
           ) : null}
 
           {session.status === "closed" && (
-            <div className="font-mono text-[10px] text-crema/30">
+            <div className="font-sans text-xs text-subtle">
               Duración: {formatDuration(session.duration_min)}
             </div>
           )}
@@ -388,7 +388,7 @@ function SessionCard({ session, onTerminate, onDelete }: {
           {session.status === "active" && onTerminate && (
             <button
               onClick={onTerminate}
-              className="mt-1 h-7 px-3 rounded-[0.5rem] bg-red-900/20 border border-red-700/35 font-mono text-[10px] text-red-400 hover:bg-red-900/30 transition-colors"
+              className="mt-1 h-7 px-3 rounded-[0.5rem] bg-danger/10 border border-red-700/35 font-sans text-xs text-danger hover:bg-red-900/30 transition-colors"
             >
               Terminado
             </button>
@@ -397,7 +397,7 @@ function SessionCard({ session, onTerminate, onDelete }: {
       </div>
 
       {session.notes && (
-        <p className="mt-2.5 pt-2.5 border-t border-musgo/15 font-mono text-[10px] text-crema/30">
+        <p className="mt-2.5 pt-2.5 border-t border-musgo/15 font-sans text-xs text-subtle">
           {session.notes}
         </p>
       )}
@@ -474,8 +474,8 @@ export default function AccessPage() {
       {/* Header */}
       <div className="flex items-end justify-between shrink-0">
         <div>
-          <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Módulo</p>
-          <h1 className="font-title text-4xl font-semibold text-crema">
+          <p className="font-sans text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Módulo</p>
+          <h1 className="font-title text-[28px] font-semibold text-crema">
             Acceso Remoto
           </h1>
         </div>
@@ -492,13 +492,13 @@ export default function AccessPage() {
                 URL.revokeObjectURL(url);
               } catch {}
             }}
-            className="flex items-center gap-2 h-9 px-4 rounded-[0.75rem] border border-musgo/25 font-mono text-xs text-crema/40 hover:text-crema/70 hover:border-musgo/45 transition-colors"
+            className="flex items-center gap-2 h-9 px-4 rounded-[0.75rem] border border-musgo/25 font-sans text-xs text-muted hover:text-crema hover:border-musgo/45 transition-colors"
           >
             <Download size={13} /> Descargar .log
           </button>
           <button
             onClick={() => setShowNew(true)}
-            className="flex items-center gap-2 h-9 px-4 rounded-[0.75rem] bg-arcilla/10 border border-arcilla/35 font-mono text-xs text-arcilla/80 hover:bg-arcilla/15 transition-colors"
+            className="flex items-center gap-2 h-9 px-4 rounded-[0.75rem] bg-arcilla/10 border border-arcilla/35 font-sans text-xs text-arcilla/80 hover:bg-arcilla/15 transition-colors"
           >
             <Plus size={13} /> Nueva sesión
           </button>
@@ -510,16 +510,16 @@ export default function AccessPage() {
         {TABS.map(({ key, label, count, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)}
             className={cn(
-              "flex items-center gap-2 px-4 py-2.5 font-mono text-xs transition-all border-b-2 -mb-px",
-              tab === key ? "text-crema/90 border-arcilla" : "text-crema/35 border-transparent hover:text-crema/60"
+              "flex items-center gap-2 px-4 py-2.5 font-sans text-xs transition-all border-b-2 -mb-px",
+              tab === key ? "text-crema border-arcilla" : "text-subtle border-transparent hover:text-muted"
             )}>
             <Icon size={12} />
             {label}
             {count !== undefined && count > 0 && (
               <span className={cn(
-                "flex items-center justify-center w-4 h-4 rounded-full text-[9px]",
-                key === "alerts" ? "bg-orange-900/40 text-orange-400/80" :
-                key === "active" ? "bg-green-900/30 text-green-400/70" : "bg-musgo/30 text-crema/40"
+                "flex items-center justify-center w-4 h-4 rounded-full text-xs",
+                key === "alerts" ? "bg-orange-900/40 text-warning" :
+                key === "active" ? "bg-green-900/30 text-success" : "bg-surface text-muted"
               )}>{count}</span>
             )}
           </button>
@@ -535,10 +535,10 @@ export default function AccessPage() {
         ) : tab === "active" ? (
           sessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3">
-              <Shield size={28} className="text-crema/15" />
-              <p className="font-mono text-xs text-crema/25">Sin sesiones activas</p>
+              <Shield size={28} className="text-subtle" />
+              <p className="font-sans text-xs text-subtle">Sin sesiones activas</p>
               <button onClick={() => setShowNew(true)}
-                className="font-mono text-[10px] text-arcilla/60 hover:text-arcilla/90 underline transition-colors">
+                className="font-sans text-xs text-arcilla/60 hover:text-arcilla/90 underline transition-colors">
                 Iniciar una sesión
               </button>
             </div>
@@ -552,8 +552,8 @@ export default function AccessPage() {
         ) : tab === "history" ? (
           logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-2">
-              <Clock size={28} className="text-crema/15" />
-              <p className="font-mono text-xs text-crema/25">Sin historial de sesiones</p>
+              <Clock size={28} className="text-subtle" />
+              <p className="font-sans text-xs text-subtle">Sin historial de sesiones</p>
             </div>
           ) : (
             <div className="space-y-2 pr-1">
@@ -572,9 +572,9 @@ export default function AccessPage() {
         ) : (
           alerts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-2">
-              <ShieldAlert size={28} className="text-crema/15" />
-              <p className="font-mono text-xs text-crema/25">Sin accesos sospechosos</p>
-              <p className="font-mono text-[10px] text-crema/20 text-center max-w-xs">
+              <ShieldAlert size={28} className="text-subtle" />
+              <p className="font-sans text-xs text-subtle">Sin accesos sospechosos</p>
+              <p className="font-sans text-xs text-subtle text-center max-w-xs">
                 Se detectan sesiones fuera de horario (08:00–20:00) o mayores a 4 horas
               </p>
             </div>

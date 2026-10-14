@@ -34,7 +34,7 @@ export function BackupList() {
     return (
       <div className="space-y-2">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-14 rounded-[0.75rem] bg-musgo/10 animate-pulse" />
+          <div key={i} className="h-14 rounded-[0.75rem] bg-surface animate-pulse" />
         ))}
       </div>
     );
@@ -43,11 +43,11 @@ export function BackupList() {
   if (!data?.items.length) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-12 h-12 rounded-[0.75rem] bg-musgo/20 flex items-center justify-center mb-3">
-          <ShieldCheck size={22} className="text-crema/20" />
+        <div className="w-12 h-12 rounded-[0.75rem] bg-surface flex items-center justify-center mb-3">
+          <ShieldCheck size={22} className="text-subtle" />
         </div>
-        <p className="font-sans text-sm text-crema/40">Sin backups registrados</p>
-        <p className="font-mono text-xs text-crema/20 mt-1">Crea el primero con el botón "Nuevo Backup"</p>
+        <p className="font-sans text-sm text-muted">Sin backups registrados</p>
+        <p className="font-sans text-xs text-subtle mt-1">Crea el primero con el botón "Nuevo Backup"</p>
       </div>
     );
   }
@@ -55,7 +55,7 @@ export function BackupList() {
   return (
     <div className="overflow-x-auto">
       {/* Table header */}
-      <div className="grid min-w-[1020px] grid-cols-[minmax(180px,1fr)_minmax(150px,0.8fr)_85px_110px_125px_80px_110px_70px] gap-3 px-4 py-2 text-[10px] font-mono text-crema/30 uppercase tracking-wider border-b border-musgo/15">
+      <div className="grid min-w-[1020px] grid-cols-[minmax(180px,1fr)_minmax(150px,0.8fr)_85px_110px_125px_80px_110px_70px] gap-3 px-4 py-2 text-xs font-sans text-subtle uppercase tracking-wider border-b border-musgo/15">
         <span>Base de datos</span>
         <span>Origen</span>
         <span>Tipo</span>
@@ -77,28 +77,28 @@ export function BackupList() {
             )}
           >
             <div>
-              <p className="font-sans text-sm text-crema/80 truncate">{b.databaseName}</p>
-              {b.triggerReason === "full_initial_required" ? <p className="mt-0.5 text-[10px] text-amber-400/80">Full inicial requerido</p> : null}
+              <p className="font-sans text-sm text-crema truncate">{b.databaseName}</p>
+              {b.triggerReason === "full_initial_required" ? <p className="mt-0.5 text-xs text-warning">Full inicial requerido</p> : null}
               {b.errorMessage && (
-                <p className="font-mono text-[10px] text-red-400/70 truncate mt-0.5">{b.errorMessage}</p>
+                <p className="font-sans text-xs text-danger truncate mt-0.5">{b.errorMessage}</p>
               )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs text-crema/55">{b.origin?.sourceLabel ?? "Origen anterior no registrado"}</p>
-              {b.origin?.destinationProfile ? <p className="mt-0.5 truncate text-[10px] text-crema/25">→ {b.origin.destinationProfile.label}</p> : null}
+              <p className="truncate text-xs text-muted">{b.origin?.sourceLabel ?? "Origen anterior no registrado"}</p>
+              {b.origin?.destinationProfile ? <p className="mt-0.5 truncate text-xs text-subtle">→ {b.origin.destinationProfile.label}</p> : null}
             </div>
-            <span className="font-mono text-xs text-crema/40 capitalize">{b.backupType}</span>
+            <span className="font-sans text-xs text-muted capitalize">{b.backupType}</span>
             <BackupStatusBadge status={b.status} />
             <DeliveryStatus status={b.deliveryStatus} phase={b.deliveryPhase} direct={b.origin?.destinationProfile?.type === "smb_direct"} error={b.deliveryErrorMessage} onRetry={b.deliveryStatus === "failed" ? () => retryDelivery.mutate(b.id) : undefined} />
-            <span className="text-xs tabular-nums text-crema/40">
+            <span className="text-xs tabular-nums text-muted">
               {b.fileSizeBytes ? formatBytes(b.fileSizeBytes) : "—"}
             </span>
-            <span className="text-xs tabular-nums text-crema/30">
+            <span className="text-xs tabular-nums text-subtle">
               {b.startedAt
                 ? new Date(b.startedAt).toLocaleString("es", { dateStyle: "short", timeStyle: "short" })
                 : "—"}
             </span>
-            <span className="text-xs tabular-nums text-crema/30">
+            <span className="text-xs tabular-nums text-subtle">
               {b.durationSecs != null ? formatDuration(Math.ceil(b.durationSecs / 60)) : "—"}
             </span>
           </div>
@@ -107,17 +107,17 @@ export function BackupList() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between px-4 py-3 border-t border-musgo/15">
-        <span className="font-mono text-xs text-crema/25">
+        <span className="font-sans text-xs text-subtle">
           {data.total} backup{data.total !== 1 ? "s" : ""} en total
           {isFetching && <RefreshCw size={10} className="inline ml-2 animate-spin" />}
         </span>
         <div className="flex gap-2">
           <button disabled={page === 0} onClick={() => setPage((p) => p - 1)}
-            className="font-mono text-xs text-crema/30 hover:text-crema disabled:opacity-20 transition-colors px-2">
+            className="font-sans text-xs text-subtle hover:text-crema disabled:opacity-20 transition-colors px-2">
             ← Anterior
           </button>
           <button disabled={(page + 1) * limit >= data.total} onClick={() => setPage((p) => p + 1)}
-            className="font-mono text-xs text-crema/30 hover:text-crema disabled:opacity-20 transition-colors px-2">
+            className="font-sans text-xs text-subtle hover:text-crema disabled:opacity-20 transition-colors px-2">
             Siguiente →
           </button>
         </div>
@@ -143,9 +143,9 @@ export function BackupList() {
 }
 
 function DeliveryStatus({ status, phase, direct, error, onRetry }: { status?: string; phase?: string | null; direct?: boolean; error?: string | null; onRetry?: () => void }) {
-  if (status === "delivered") return <span className="text-xs text-green-400/80">{direct || phase === "direct_ready" ? "Directo validado" : "Entregado"}</span>;
-  if (status === "local_ready") return <span className="text-xs text-green-400/80">ZIP local listo</span>;
-  if (status === "failed") return <button type="button" title={error ?? "Reintentar entrega"} onClick={(event) => { event.stopPropagation(); onRetry?.(); }} className="truncate text-left text-xs text-amber-400 underline decoration-amber-400/30 underline-offset-2">Reintentar</button>;
+  if (status === "delivered") return <span className="text-xs text-success">{direct || phase === "direct_ready" ? "Directo validado" : "Entregado"}</span>;
+  if (status === "local_ready") return <span className="text-xs text-success">ZIP local listo</span>;
+  if (status === "failed") return <button type="button" title={error ?? "Reintentar entrega"} onClick={(event) => { event.stopPropagation(); onRetry?.(); }} className="truncate text-left text-xs text-warning underline decoration-amber-400/30 underline-offset-2">Reintentar</button>;
   if (status === "processing") return <span className="text-xs text-arcilla">{phase === "transferring" ? "Enviando…" : "Comprimiendo…"}</span>;
-  return <span className="text-xs text-crema/30">Pendiente</span>;
+  return <span className="text-xs text-subtle">Pendiente</span>;
 }

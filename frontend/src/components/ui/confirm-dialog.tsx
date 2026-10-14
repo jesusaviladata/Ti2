@@ -40,17 +40,17 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-message"
-        className="relative z-10 w-full max-w-sm rounded-[1.25rem] bg-carbon border border-musgo/30 shadow-2xl p-6"
+        className="relative z-10 w-full max-w-sm rounded-xl bg-carbon border border-musgo/30 shadow-2xl p-6"
       >
         <div className="flex items-start gap-3 mb-4">
           <div className={`w-9 h-9 rounded-[0.65rem] flex items-center justify-center shrink-0 ${
-            danger ? "bg-red-900/20" : "bg-musgo/30"
+            danger ? "bg-danger/10" : "bg-surface"
           }`}>
-            <AlertTriangle size={16} className={danger ? "text-red-400/80" : "text-arcilla/80"} />
+            <AlertTriangle size={16} className={danger ? "text-danger" : "text-arcilla/80"} />
           </div>
           <div className="min-w-0">
-            <h2 id="confirm-title" className="font-sans text-base font-medium text-crema/90">{title}</h2>
-            <p id="confirm-message" className="font-mono text-xs text-crema/45 mt-1 leading-relaxed">{message}</p>
+            <h2 id="confirm-title" className="font-sans text-base font-medium text-crema">{title}</h2>
+            <p id="confirm-message" className="font-sans text-xs text-muted mt-1 leading-relaxed">{message}</p>
           </div>
         </div>
 

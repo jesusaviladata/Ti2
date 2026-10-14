@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 const INPUT =
-  "w-full h-11 rounded-[0.75rem] border border-musgo/35 bg-carbon/55 px-3.5 text-sm text-crema placeholder:text-crema/25 outline-none transition-colors focus:border-arcilla/70 focus:ring-1 focus:ring-arcilla/30";
+  "w-full h-11 rounded-[0.75rem] border border-musgo/35 bg-carbon/55 px-3.5 text-sm text-crema placeholder:text-subtle outline-none transition-colors focus:border-arcilla/70 focus:ring-1 focus:ring-arcilla/30";
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Administrador",
@@ -66,9 +66,9 @@ function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-medium text-crema/70">{label}</span>
+      <span className="text-xs font-medium text-crema">{label}</span>
       {children}
-      {error ? <span className="block text-xs text-red-300">{error}</span> : null}
+      {error ? <span className="block text-xs text-danger">{error}</span> : null}
     </label>
   );
 }
@@ -95,18 +95,18 @@ function ModalFrame({
         aria-modal="true"
         aria-labelledby="user-dialog-title"
         aria-describedby="user-dialog-description"
-        className="relative z-10 w-full max-w-lg overflow-hidden rounded-[1.25rem] border border-musgo/35 bg-carbon shadow-2xl"
+        className="relative z-10 w-full max-w-lg overflow-hidden rounded-xl border border-musgo/35 bg-carbon shadow-2xl"
       >
         <div className="flex items-start justify-between border-b border-musgo/20 px-6 py-5">
           <div>
             <h2 id="user-dialog-title" className="text-lg font-semibold text-crema">{title}</h2>
-            <p id="user-dialog-description" className="mt-1 text-xs leading-relaxed text-crema/45">{description}</p>
+            <p id="user-dialog-description" className="mt-1 text-xs leading-relaxed text-muted">{description}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="flex h-8 w-8 items-center justify-center rounded-[0.65rem] text-crema/35 transition-colors hover:bg-musgo/20 hover:text-crema"
+            className="flex h-8 w-8 items-center justify-center rounded-[0.65rem] text-subtle transition-colors hover:bg-musgo/20 hover:text-crema"
           >
             <X size={15} />
           </button>
@@ -222,7 +222,7 @@ function CreateUserModal({
                 type="button"
                 onClick={() => setShowPassword((value) => !value)}
                 aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-crema/35 hover:text-crema/70"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-crema"
               >
                 {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
@@ -314,7 +314,7 @@ function PasswordModal({
               type="button"
               onClick={() => setShowPassword((value) => !value)}
               aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-crema/35 hover:text-crema/70"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-crema"
             >
               {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
@@ -416,7 +416,7 @@ export function UsersAdmin() {
             <ShieldCheck size={15} className="text-arcilla" />
             <h2 id="users-title" className="text-base font-semibold text-crema">Usuarios</h2>
           </div>
-          <p className="mt-1 text-xs leading-relaxed text-crema/45">
+          <p className="mt-1 text-xs leading-relaxed text-muted">
             Administra el acceso del personal de tu organización. Las cuentas no se registran desde el login.
           </p>
         </div>
@@ -433,7 +433,7 @@ export function UsersAdmin() {
             "flex items-start gap-2 rounded-[0.75rem] border px-3.5 py-3 text-xs",
             notice.kind === "error"
               ? "border-red-400/25 bg-red-950/20 text-red-200"
-              : "border-emerald-400/20 bg-emerald-950/15 text-emerald-200",
+              : "border-emerald-400/20 bg-emerald-950/15 text-success",
           )}
         >
           {notice.kind === "error" ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
@@ -441,20 +441,20 @@ export function UsersAdmin() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-[1rem] border border-musgo/25 bg-musgo/[0.06]">
+      <div className="overflow-hidden rounded-[1rem] border border-musgo/25 bg-surface">
         {usersQuery.isLoading ? (
-          <div className="flex items-center justify-center gap-2 px-5 py-12 text-xs text-crema/40">
+          <div className="flex items-center justify-center gap-2 px-5 py-12 text-xs text-muted">
             <Loader2 size={15} className="animate-spin" />
             Cargando usuarios…
           </div>
         ) : usersQuery.isError ? (
-          <div role="alert" className="px-5 py-10 text-center text-sm text-red-300">
+          <div role="alert" className="px-5 py-10 text-center text-sm text-danger">
             No fue posible cargar los usuarios.
           </div>
         ) : users.length === 0 ? (
           <div className="px-5 py-12 text-center">
-            <Users size={24} className="mx-auto text-crema/20" />
-            <p className="mt-2 text-sm text-crema/45">Todavía no hay usuarios.</p>
+            <Users size={24} className="mx-auto text-subtle" />
+            <p className="mt-2 text-sm text-muted">Todavía no hay usuarios.</p>
           </div>
         ) : (
           <div className="divide-y divide-musgo/15">
@@ -468,14 +468,14 @@ export function UsersAdmin() {
               return (
                 <article key={user.id} className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(220px,1fr)_170px_110px_auto] lg:items-center">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.7rem] border border-arcilla/20 bg-arcilla/10 font-mono text-xs text-arcilla">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.7rem] border border-arcilla/20 bg-arcilla/10 font-sans text-xs text-arcilla">
                       {initials}
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-crema">
-                        {user.fullName}{isSelf ? <span className="ml-2 text-[10px] font-normal text-arcilla">Tú</span> : null}
+                        {user.fullName}{isSelf ? <span className="ml-2 text-xs font-normal text-arcilla">Tú</span> : null}
                       </p>
-                      <p className="truncate text-xs text-crema/40">{user.email} · @{user.username}</p>
+                      <p className="truncate text-xs text-muted">{user.email} · @{user.username}</p>
                     </div>
                   </div>
 
@@ -484,16 +484,16 @@ export function UsersAdmin() {
                     onChange={(event) => changeRole(user, event.target.value as UserRole)}
                     disabled={isSelf || busy}
                     aria-label={`Rol de ${user.fullName}`}
-                    className="h-9 rounded-[0.65rem] border border-musgo/30 bg-carbon/60 px-3 text-xs text-crema/75 outline-none focus:border-arcilla/60 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-9 rounded-[0.65rem] border border-musgo/30 bg-carbon/60 px-3 text-xs text-crema outline-none focus:border-arcilla/60 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {ROLE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
 
                   <span className={cn(
-                    "inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px]",
+                    "inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 font-sans text-xs",
                     user.isActive
-                      ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
-                      : "border-crema/10 bg-crema/5 text-crema/40",
+                      ? "border-emerald-400/20 bg-emerald-500/10 text-success"
+                      : "border-crema/10 bg-crema/5 text-muted",
                   )}>
                     <span className={cn("h-1.5 w-1.5 rounded-full", user.isActive ? "bg-emerald-400" : "bg-crema/30")} />
                     {user.isActive ? "Activo" : "Inactivo"}
@@ -503,7 +503,7 @@ export function UsersAdmin() {
                     <button
                       type="button"
                       onClick={() => setPasswordUser(user)}
-                      className="flex h-9 items-center gap-1.5 rounded-[0.65rem] px-2.5 text-xs text-crema/50 transition-colors hover:bg-musgo/20 hover:text-crema"
+                      className="flex h-9 items-center gap-1.5 rounded-[0.65rem] px-2.5 text-xs text-muted transition-colors hover:bg-musgo/20 hover:text-crema"
                     >
                       <KeyRound size={13} />
                       Contraseña
@@ -513,7 +513,7 @@ export function UsersAdmin() {
                         type="button"
                         onClick={() => setDeactivateTarget(user)}
                         disabled={isSelf || busy}
-                        className="flex h-9 items-center gap-1.5 rounded-[0.65rem] px-2.5 text-xs text-red-300/70 transition-colors hover:bg-red-950/25 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="flex h-9 items-center gap-1.5 rounded-[0.65rem] px-2.5 text-xs text-danger transition-colors hover:bg-red-950/25 hover:text-danger disabled:cursor-not-allowed disabled:opacity-30"
                       >
                         <PowerOff size={13} />
                         Desactivar
@@ -523,7 +523,7 @@ export function UsersAdmin() {
                         type="button"
                         onClick={() => activate(user)}
                         disabled={busy}
-                        className="flex h-9 items-center gap-1.5 rounded-[0.65rem] px-2.5 text-xs text-emerald-300/70 transition-colors hover:bg-emerald-950/20 hover:text-emerald-300 disabled:opacity-30"
+                        className="flex h-9 items-center gap-1.5 rounded-[0.65rem] px-2.5 text-xs text-success transition-colors hover:bg-emerald-950/20 hover:text-success disabled:opacity-30"
                       >
                         <Power size={13} />
                         Activar

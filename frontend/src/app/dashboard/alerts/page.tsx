@@ -64,8 +64,8 @@ export default function AlertsPage() {
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-          <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Centro de alertas</p>
-          <h1 className="font-title text-4xl font-semibold text-crema">
+          <p className="font-sans text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Centro de alertas</p>
+          <h1 className="font-title text-[28px] font-semibold text-crema">
             Notificaciones
           </h1>
         </div>
@@ -75,14 +75,14 @@ export default function AlertsPage() {
               type="button"
               onClick={clear}
               disabled={clearing}
-              className="flex h-8 items-center gap-1.5 rounded-[0.5rem] border border-musgo/25 px-3 font-mono text-[10px] text-crema/35 transition-colors hover:border-red-400/30 hover:text-red-300 disabled:opacity-40"
+              className="flex h-8 items-center gap-1.5 rounded-[0.5rem] border border-musgo/25 px-3 font-sans text-xs text-subtle transition-colors hover:border-red-400/30 hover:text-danger disabled:opacity-40"
             >
               <Trash2 size={12} /> {clearing ? "Limpiando…" : "Limpiar"}
             </button>
           )}
           <button
             onClick={load}
-            className="w-7 h-7 flex items-center justify-center rounded-[0.5rem] border border-musgo/25 text-crema/30 hover:text-crema/70 transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-[0.5rem] border border-musgo/25 text-subtle hover:text-crema transition-colors"
             aria-label="Actualizar"
           >
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
@@ -91,18 +91,18 @@ export default function AlertsPage() {
       </div>
 
       {/* List */}
-      <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 overflow-hidden">
+      <div className="rounded-xl bg-surface border border-musgo/20 overflow-hidden">
         {loading ? (
           <div className="p-10 text-center">
-            <p className="font-mono text-xs text-crema/25">Cargando…</p>
+            <p className="font-sans text-xs text-subtle">Cargando…</p>
           </div>
         ) : items.length === 0 ? (
           <div className="p-12 flex flex-col items-center justify-center text-center gap-3">
-            <div className="w-12 h-12 rounded-[0.75rem] bg-musgo/20 flex items-center justify-center">
-              <CheckCircle2 size={20} className="text-crema/25" />
+            <div className="w-12 h-12 rounded-[0.75rem] bg-surface flex items-center justify-center">
+              <CheckCircle2 size={20} className="text-subtle" />
             </div>
-            <p className="font-sans text-sm text-crema/50">Sin notificaciones</p>
-            <p className="font-mono text-xs text-crema/25">
+            <p className="font-sans text-sm text-muted">Sin notificaciones</p>
+            <p className="font-sans text-xs text-subtle">
               Aquí aparecerán backups fallidos y accesos sospechosos.
             </p>
           </div>
@@ -114,15 +114,15 @@ export default function AlertsPage() {
                 className="flex items-start gap-3 px-5 py-4 border-b border-musgo/10 last:border-0 hover:bg-musgo/10 transition-colors"
               >
                 <div className="mt-0.5 shrink-0">
-                  {n.kind === "backup_fail" && <AlertTriangle size={15} className="text-red-400/80" />}
-                  {n.kind === "backup_success" && <CheckCircle2 size={15} className="text-green-400/80" />}
-                  {n.kind !== "backup_fail" && n.kind !== "backup_success" && <ShieldAlert size={15} className="text-orange-400/80" />}
+                  {n.kind === "backup_fail" && <AlertTriangle size={15} className="text-danger" />}
+                  {n.kind === "backup_success" && <CheckCircle2 size={15} className="text-success" />}
+                  {n.kind !== "backup_fail" && n.kind !== "backup_success" && <ShieldAlert size={15} className="text-warning" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-sans text-sm font-medium text-crema/85">{n.title}</p>
-                  <p className="font-mono text-[11px] text-crema/40 mt-0.5 break-words">{n.body}</p>
+                  <p className="font-sans text-sm font-medium text-crema">{n.title}</p>
+                  <p className="font-sans text-xs text-muted mt-0.5 break-words">{n.body}</p>
                 </div>
-                <span className="font-mono text-[10px] text-crema/25 shrink-0 mt-0.5">{timeAgo(n.ts)}</span>
+                <span className="font-sans text-xs text-subtle shrink-0 mt-0.5">{timeAgo(n.ts)}</span>
               </div>
             ))}
           </div>
@@ -130,7 +130,7 @@ export default function AlertsPage() {
       </div>
 
       {items.length > 0 && (
-        <p className="font-mono text-[10px] text-crema/25 flex items-center gap-1.5">
+        <p className="font-sans text-xs text-subtle flex items-center gap-1.5">
           <Bell size={10} /> {items.length} notificación{items.length !== 1 ? "es" : ""} · se actualiza cada 30&nbsp;s
         </p>
       )}

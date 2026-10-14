@@ -7,7 +7,7 @@ import { remoteCleanupService } from "@/services/remote-cleanup.service";
 import type { CleanupServer } from "@/types/remote-cleanup";
 
 const INPUT =
-  "w-full h-9 bg-musgo/10 border border-musgo/25 rounded-[0.5rem] px-3 font-mono text-xs text-crema/75 placeholder:text-crema/25 focus:outline-none focus:border-arcilla/40 transition-colors";
+  "w-full h-9 bg-surface border border-musgo/25 rounded-[0.5rem] px-3 font-sans text-xs text-crema placeholder:text-subtle focus:outline-none focus:border-arcilla/40 transition-colors";
 
 /**
  * Administración de servidores Core (solo admin): alta/baja de servidores SFTP/FTP,
@@ -61,26 +61,26 @@ export function CleanupServersAdmin() {
   return (
     <div className="space-y-6">
       {/* Servidores existentes */}
-      <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 p-5">
+      <div className="rounded-xl bg-surface border border-musgo/20 p-5">
         <div className="flex items-center gap-2 mb-3">
           <Server size={14} className="text-arcilla/70" />
-          <span className="font-sans text-sm font-medium text-crema/75">Servidores Core</span>
-          <span className="font-mono text-[10px] text-crema/30">({servers.length})</span>
+          <span className="font-sans text-sm font-medium text-crema">Servidores Core</span>
+          <span className="font-sans text-xs text-subtle">({servers.length})</span>
         </div>
         {servers.length === 0 ? (
-          <p className="font-mono text-xs text-crema/30 py-3">
+          <p className="font-sans text-xs text-subtle py-3">
             Aún no hay servidores. Configura uno abajo con sus rutas autorizadas.
           </p>
         ) : (
           <div className="space-y-1.5">
             {servers.map((s) => (
               <div key={s.id} className="flex items-center justify-between px-3 py-2 rounded-[0.5rem] bg-musgo/5 border border-musgo/15">
-                <span className="font-mono text-[11px] text-crema/60">
+                <span className="font-sans text-xs text-muted">
                   {s.name} · {s.protocol}://{s.host}:{s.port} · {s.allowlist.length} ruta(s)
                 </span>
                 <button onClick={() => remoteCleanupService.deleteServer(s.id).then(loadServers)}
                   aria-label="Eliminar servidor"
-                  className="text-crema/25 hover:text-red-400 transition-colors">
+                  className="text-subtle hover:text-danger transition-colors">
                   <Trash2 size={12} />
                 </button>
               </div>
@@ -90,10 +90,10 @@ export function CleanupServersAdmin() {
       </div>
 
       {/* Alta de servidor */}
-      <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 p-5">
+      <div className="rounded-xl bg-surface border border-musgo/20 p-5">
         <div className="flex items-center gap-2 mb-4">
           <Plus size={14} className="text-arcilla/70" />
-          <span className="font-sans text-sm font-medium text-crema/75">Agregar servidor y rutas autorizadas</span>
+          <span className="font-sans text-sm font-medium text-crema">Agregar servidor y rutas autorizadas</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre (ej. Core Producción)" className={INPUT} />
@@ -109,17 +109,17 @@ export function CleanupServersAdmin() {
           </select>
           <input value={base} onChange={(e) => setBase(e.target.value)} placeholder="Ruta base (ej. /C:/BaseCore)" className={INPUT} />
           <div className="md:col-span-2">
-            <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1">
+            <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-1">
               Rutas autorizadas (una por línea) — sin esto, todo queda bloqueado
             </label>
             <textarea value={allow} onChange={(e) => setAllow(e.target.value)} rows={3}
               placeholder={"/C:/BaseCore/Logs\n/C:/BaseCore/Respuesta\n/C:/BaseCore/Logradian"}
               className={cn(INPUT, "h-auto py-2 resize-y")} />
           </div>
-          {err && <p className="md:col-span-2 font-mono text-[11px] text-red-400/80">{err}</p>}
+          {err && <p className="md:col-span-2 font-sans text-xs text-danger">{err}</p>}
           <div className="md:col-span-2 flex justify-end">
             <button onClick={save} disabled={saving || !name.trim() || !host.trim()}
-              className="h-9 px-5 rounded-[0.5rem] bg-arcilla/15 border border-arcilla/30 font-mono text-xs text-arcilla/90 hover:bg-arcilla/25 disabled:opacity-40 transition-colors">
+              className="h-9 px-5 rounded-[0.5rem] bg-arcilla/15 border border-arcilla/30 font-sans text-xs text-arcilla/90 hover:bg-arcilla/25 disabled:opacity-40 transition-colors">
               {saving ? "Guardando…" : "Guardar servidor"}
             </button>
           </div>
@@ -127,25 +127,25 @@ export function CleanupServersAdmin() {
       </div>
 
       {/* Claves de host SSH conocidas (H-5) */}
-      <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 p-5">
+      <div className="rounded-xl bg-surface border border-musgo/20 p-5">
         <div className="flex items-center gap-2 mb-1.5">
           <KeyRound size={13} className="text-arcilla/70" />
-          <span className="font-sans text-sm font-medium text-crema/75">Claves de host SSH conocidas</span>
+          <span className="font-sans text-sm font-medium text-crema">Claves de host SSH conocidas</span>
         </div>
-        <p className="font-mono text-[10px] text-crema/30 mb-3 leading-relaxed">
+        <p className="font-sans text-xs text-subtle mb-3 leading-relaxed">
           Se fijan en la primera conexión. Si la clave de un host cambia, la conexión se bloquea (posible MITM).
           &ldquo;Olvidar&rdquo; re-autoriza el host en la próxima conexión.
         </p>
         {hostKeys.length === 0 ? (
-          <p className="font-mono text-[10px] text-crema/25">Aún no hay claves fijadas.</p>
+          <p className="font-sans text-xs text-subtle">Aún no hay claves fijadas.</p>
         ) : (
           <div className="space-y-1">
             {hostKeys.map((k) => (
               <div key={k.host} className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-[0.5rem] bg-musgo/5 border border-musgo/15">
-                <span className="font-mono text-[10px] text-crema/60 truncate shrink-0">{k.host}</span>
-                <span className="font-mono text-[9px] text-crema/25 truncate flex-1 text-right">SHA256:{k.fingerprint.slice(0, 20)}…</span>
+                <span className="font-sans text-xs text-muted truncate shrink-0">{k.host}</span>
+                <span className="font-sans text-xs text-subtle truncate flex-1 text-right">SHA256:{k.fingerprint.slice(0, 20)}…</span>
                 <button onClick={() => forgetKey(k.host)}
-                  className="font-mono text-[9px] text-crema/40 hover:text-red-400 transition-colors shrink-0">Olvidar</button>
+                  className="font-sans text-xs text-muted hover:text-danger transition-colors shrink-0">Olvidar</button>
               </div>
             ))}
           </div>

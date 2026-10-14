@@ -10,14 +10,14 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, icon, rightElement, ...props }, ref) => (
     <div className="relative flex items-center">
       {icon && (
-        <span className="absolute left-4 text-crema/30 pointer-events-none">
+        <span className="absolute left-4 text-subtle pointer-events-none">
           {icon}
         </span>
       )}
       <input
         ref={ref}
         className={cn(
-          "w-full h-12 bg-carbon/60 border border-musgo/50 rounded-pill text-crema placeholder:text-crema/30 text-sm",
+          "w-full h-12 bg-inset/60 border border-musgo/25 rounded-lg text-crema placeholder:text-subtle text-sm",
           "focus:outline-none focus:border-arcilla/70 focus:ring-1 focus:ring-arcilla/40",
           "transition-all duration-200",
           icon ? "pl-11 pr-4" : "px-5",
@@ -27,7 +27,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {...props}
       />
       {rightElement && (
-        <span className="absolute right-4 text-crema/30">{rightElement}</span>
+        <span className="absolute right-4 text-subtle">{rightElement}</span>
       )}
     </div>
   )

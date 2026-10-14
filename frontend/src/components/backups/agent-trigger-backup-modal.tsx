@@ -43,15 +43,15 @@ function BakBatchProgress({ records }: { records: BackupRecord[] }) {
     <div className="rounded-[1rem] border border-arcilla/20 bg-arcilla/[0.05] p-4">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-crema/30">Progreso general</p>
-          <p className={failed ? "mt-1 text-sm text-red-400" : completed ? "mt-1 text-sm text-green-400" : "mt-1 text-sm text-crema/75"}>{label}</p>
+          <p className="font-sans text-xs uppercase tracking-[0.14em] text-subtle">Progreso general</p>
+          <p className={failed ? "mt-1 text-sm text-danger" : completed ? "mt-1 text-sm text-success" : "mt-1 text-sm text-crema"}>{label}</p>
         </div>
-        <span className={failed ? "font-mono text-lg tabular-nums text-red-400" : completed ? "font-mono text-lg tabular-nums text-green-400" : "font-mono text-lg tabular-nums text-arcilla"}>{Math.min(100, Math.max(0, percent))}%</span>
+        <span className={failed ? "font-sans text-lg tabular-nums text-danger" : completed ? "font-sans text-lg tabular-nums text-success" : "font-sans text-lg tabular-nums text-arcilla"}>{Math.min(100, Math.max(0, percent))}%</span>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-musgo/20">
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface">
         <div className={failed ? "h-full rounded-full bg-red-500 transition-[width] duration-700" : completed ? "h-full rounded-full bg-green-500 transition-[width] duration-700" : "h-full rounded-full bg-arcilla transition-[width] duration-700"} style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
       </div>
-      <div className="mt-2 flex justify-between gap-3 font-mono text-[9px] text-crema/30">
+      <div className="mt-2 flex justify-between gap-3 font-sans text-xs text-subtle">
         <span>{ready} de {records.length} bases validadas</span>
         <span>RESTORE VERIFYONLY</span>
       </div>
@@ -79,22 +79,22 @@ function BackupRunRow({ status }: { status: BackupRecord }) {
   const delivery = status.deliveryStatus ?? "pending";
   const direct = status.origin?.destinationProfile?.type === "smb_direct";
   return (
-    <div className="rounded-[0.875rem] border border-musgo/20 bg-musgo/[0.05] p-3.5">
+    <div className="rounded-[0.875rem] border border-musgo/20 bg-surface p-3.5">
       <div className="flex items-center justify-between gap-3">
-        <span className="truncate font-mono text-xs text-crema/75">{status.databaseName}</span>
-        {ready ? <CheckCircle2 size={14} className="text-green-400" /> : failed ? <XCircle size={14} className="text-red-400" /> : <Loader2 size={14} className="animate-spin text-arcilla" />}
+        <span className="truncate font-sans text-xs text-crema">{status.databaseName}</span>
+        {ready ? <CheckCircle2 size={14} className="text-success" /> : failed ? <XCircle size={14} className="text-danger" /> : <Loader2 size={14} className="animate-spin text-arcilla" />}
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-musgo/20"><div style={{ width: `${progress}%` }} className={failed ? "h-full bg-red-500 transition-[width]" : ready ? "h-full bg-green-500 transition-[width]" : "h-full bg-arcilla transition-[width]"} /></div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px]">
-        <span className={failed ? "text-red-400" : ready ? "text-green-400" : "text-arcilla"}>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface"><div style={{ width: `${progress}%` }} className={failed ? "h-full bg-red-500 transition-[width]" : ready ? "h-full bg-green-500 transition-[width]" : "h-full bg-arcilla transition-[width]"} /></div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className={failed ? "text-danger" : ready ? "text-success" : "text-arcilla"}>
           {failed ? "Backup fallido" : ready ? ".BAK creado y validado" : status.phase === "validating_bak" ? "Validando con RESTORE VERIFYONLY" : "Creando .BAK"}
         </span>
-        {status.fileSizeBytes ? <span className="text-crema/35">{formatBytes(status.fileSizeBytes)}</span> : null}
+        {status.fileSizeBytes ? <span className="text-subtle">{formatBytes(status.fileSizeBytes)}</span> : null}
       </div>
       {ready ? (
-        <div className="mt-2 flex items-center gap-2 border-t border-musgo/15 pt-2 text-[10px]">
-          {delivery === "delivered" || delivery === "local_ready" ? <PackageCheck size={12} className="text-green-400" /> : delivery === "failed" ? <XCircle size={12} className="text-amber-400" /> : <Send size={12} className="text-arcilla" />}
-          <span className={delivery === "failed" ? "text-amber-400" : delivery === "delivered" || delivery === "local_ready" ? "text-green-400/80" : "text-crema/40"}>
+        <div className="mt-2 flex items-center gap-2 border-t border-musgo/15 pt-2 text-xs">
+          {delivery === "delivered" || delivery === "local_ready" ? <PackageCheck size={12} className="text-success" /> : delivery === "failed" ? <XCircle size={12} className="text-warning" /> : <Send size={12} className="text-arcilla" />}
+          <span className={delivery === "failed" ? "text-warning" : delivery === "delivered" || delivery === "local_ready" ? "text-success" : "text-muted"}>
             {delivery === "delivered" ? direct ? "Directo y validado" : "Entregado y verificado" : delivery === "local_ready" ? "ZIP local listo" : delivery === "failed" ? `Backup listo · entrega fallida${status.deliveryErrorMessage ? `: ${status.deliveryErrorMessage}` : ""}` : direct ? "Publicando en el destino…" : status.deliveryPhase === "transferring" ? "Enviando en segundo plano…" : "Preparando ZIP en segundo plano…"}
           </span>
         </div>
@@ -224,18 +224,18 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4">
       <button type="button" aria-label="Cerrar" className="absolute inset-0 bg-carbon/85 backdrop-blur-sm" onClick={close} />
-      <section className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-[1.25rem] border border-musgo/30 bg-carbon">
+      <section className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-musgo/30 bg-carbon">
         <header className="flex items-start justify-between border-b border-musgo/20 px-6 py-5">
-          <div><p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-arcilla">Agente del servidor</p><h2 className="text-xl font-medium text-crema">Nuevo backup</h2></div>
-          <button type="button" onClick={close} className="text-crema/30 hover:text-crema"><X size={17} /></button>
+          <div><p className="mb-1 font-sans text-xs uppercase tracking-[0.18em] text-arcilla">Agente del servidor</p><h2 className="text-xl font-medium text-crema">Nuevo backup</h2></div>
+          <button type="button" onClick={close} className="text-subtle hover:text-crema"><X size={17} /></button>
         </header>
         <div className="overflow-y-auto p-6">
           {records.length ? (
             <div className="space-y-3">
               <BakBatchProgress records={liveRecords} />
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-[0.75rem] border border-green-500/20 bg-green-500/[0.04] px-3 py-2.5"><p className="font-mono text-[9px] uppercase tracking-wider text-green-300/60">1 · .BAK + validación</p><p className="mt-1 text-xs text-crema/55">Progreso principal</p></div>
-                <div className="rounded-[0.75rem] border border-musgo/20 bg-musgo/[0.04] px-3 py-2.5"><p className="font-mono text-[9px] uppercase tracking-wider text-crema/30">{directDelivery ? "2 · Entrega directa" : "2 · ZIP + envío"}</p><p className="mt-1 truncate text-xs text-crema/55">{deliveryLabel(job, liveRecords, directDelivery)}</p></div>
+                <div className="rounded-[0.75rem] border border-green-500/20 bg-green-500/[0.04] px-3 py-2.5"><p className="font-sans text-xs uppercase tracking-wider text-success">1 · .BAK + validación</p><p className="mt-1 text-xs text-muted">Progreso principal</p></div>
+                <div className="rounded-[0.75rem] border border-musgo/20 bg-musgo/[0.04] px-3 py-2.5"><p className="font-sans text-xs uppercase tracking-wider text-subtle">{directDelivery ? "2 · Entrega directa" : "2 · ZIP + envío"}</p><p className="mt-1 truncate text-xs text-muted">{deliveryLabel(job, liveRecords, directDelivery)}</p></div>
               </div>
               <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
                 {liveRecords.map((record) => <BackupRunRow key={record.id} status={record} />)}
@@ -245,17 +245,17 @@ export function AgentTriggerBackupModal({ open, onClose, agentId }: Props) {
           ) : (
             <div className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1.5"><span className="text-[10px] uppercase tracking-wider text-crema/35">Instancia SQL</span><select value={sqlProfileId} onChange={(event) => setSqlProfileId(event.target.value)} className="h-10 w-full rounded-[0.625rem] border border-musgo/25 bg-musgo/10 px-3 text-xs text-crema/70 outline-none"><option value="">Seleccionar</option>{profiles.data?.sqlInstances.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-                <label className="space-y-1.5"><span className="text-[10px] uppercase tracking-wider text-crema/35">Entrega</span><select value={destinationProfileId} onChange={(event) => setDestinationProfileId(event.target.value)} className="h-10 w-full rounded-[0.625rem] border border-musgo/25 bg-musgo/10 px-3 text-xs text-crema/70 outline-none"><option value="">Sólo almacenamiento local</option>{profiles.data?.backupDestinations.map((item) => <option key={item.id} value={item.id}>{item.label}{item.type === "smb_direct" ? " · Directo" : ""}</option>)}</select></label>
+                <label className="space-y-1.5"><span className="text-xs uppercase tracking-wider text-subtle">Instancia SQL</span><select value={sqlProfileId} onChange={(event) => setSqlProfileId(event.target.value)} className="h-10 w-full rounded-[0.625rem] border border-musgo/25 bg-surface px-3 text-xs text-crema outline-none"><option value="">Seleccionar</option>{profiles.data?.sqlInstances.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+                <label className="space-y-1.5"><span className="text-xs uppercase tracking-wider text-subtle">Entrega</span><select value={destinationProfileId} onChange={(event) => setDestinationProfileId(event.target.value)} className="h-10 w-full rounded-[0.625rem] border border-musgo/25 bg-surface px-3 text-xs text-crema outline-none"><option value="">Sólo almacenamiento local</option>{profiles.data?.backupDestinations.map((item) => <option key={item.id} value={item.id}>{item.label}{item.type === "smb_direct" ? " · Directo" : ""}</option>)}</select></label>
               </div>
-              <div><p className="mb-2 text-[10px] uppercase tracking-wider text-crema/35">Tipo</p><div className="grid grid-cols-3 gap-2">{([['full','Full'],['differential','Diferencial'],['log','Log']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setBackupType(value)} className={backupType === value ? "h-9 rounded-[0.625rem] border border-arcilla/35 bg-arcilla/10 text-xs text-arcilla" : "h-9 rounded-[0.625rem] border border-musgo/20 text-xs text-crema/40"}>{label}</button>)}</div></div>
+              <div><p className="mb-2 text-xs uppercase tracking-wider text-subtle">Tipo</p><div className="grid grid-cols-3 gap-2">{([['full','Full'],['differential','Diferencial'],['log','Log']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setBackupType(value)} className={backupType === value ? "h-9 rounded-[0.625rem] border border-arcilla/35 bg-arcilla/10 text-xs text-arcilla" : "h-9 rounded-[0.625rem] border border-musgo/20 text-xs text-muted"}>{label}</button>)}</div></div>
               {directDelivery ? <p className="rounded-[0.625rem] border border-blue-400/20 bg-blue-400/[0.05] px-3 py-2 text-xs text-blue-200/75">SQL Server escribirá el .BAK comprimido directamente en el destino. No se creará ZIP ni temporal local.</p> : null}
               <div>
-                <div className="mb-2 flex items-center justify-between"><p className="text-[10px] uppercase tracking-wider text-crema/35">Bases de datos</p><button type="button" onClick={loadDatabases} disabled={!sqlProfileId || Boolean(catalogJobId && catalog.data && !["completed","failed","cancelled"].includes(catalog.data.status))} className="flex items-center gap-1.5 text-[10px] text-arcilla disabled:opacity-35">{catalogJobId && catalog.data?.status !== "completed" && catalog.data?.status !== "failed" ? <Loader2 size={11} className="animate-spin" /> : <Database size={11} />} Consultar agente</button></div>
-                {databases.length ? <div className="overflow-hidden rounded-[0.75rem] border border-musgo/20"><div className="flex items-center gap-2 border-b border-musgo/15 px-3"><Search size={12} className="text-crema/25" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar…" className="h-9 flex-1 bg-transparent text-xs text-crema/65 outline-none" /></div><div className="max-h-48 overflow-y-auto p-1">{filtered.map((database) => { const checked = selected.includes(database); return <button type="button" key={database} onClick={() => setSelected(checked ? selected.filter((item) => item !== database) : [...selected, database])} className="flex w-full items-center gap-2 rounded-[0.5rem] px-3 py-2 text-left font-mono text-xs text-crema/60 hover:bg-musgo/10"><span className={checked ? "grid h-3.5 w-3.5 place-items-center rounded-sm bg-arcilla text-carbon" : "h-3.5 w-3.5 rounded-sm border border-musgo/35"}>{checked ? <Check size={9} /> : null}</span>{database}</button>; })}</div></div> : <div className="rounded-[0.75rem] border border-musgo/15 p-4 text-xs text-crema/30">Seleccione una instancia y consulte las bases del agente.</div>}
+                <div className="mb-2 flex items-center justify-between"><p className="text-xs uppercase tracking-wider text-subtle">Bases de datos</p><button type="button" onClick={loadDatabases} disabled={!sqlProfileId || Boolean(catalogJobId && catalog.data && !["completed","failed","cancelled"].includes(catalog.data.status))} className="flex items-center gap-1.5 text-xs text-arcilla disabled:opacity-35">{catalogJobId && catalog.data?.status !== "completed" && catalog.data?.status !== "failed" ? <Loader2 size={11} className="animate-spin" /> : <Database size={11} />} Consultar agente</button></div>
+                {databases.length ? <div className="overflow-hidden rounded-[0.75rem] border border-musgo/20"><div className="flex items-center gap-2 border-b border-musgo/15 px-3"><Search size={12} className="text-subtle" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar…" className="h-9 flex-1 bg-transparent text-xs text-muted outline-none" /></div><div className="max-h-48 overflow-y-auto p-1">{filtered.map((database) => { const checked = selected.includes(database); return <button type="button" key={database} onClick={() => setSelected(checked ? selected.filter((item) => item !== database) : [...selected, database])} className="flex w-full items-center gap-2 rounded-[0.5rem] px-3 py-2 text-left font-sans text-xs text-muted hover:bg-musgo/10"><span className={checked ? "grid h-3.5 w-3.5 place-items-center rounded-sm bg-arcilla text-carbon" : "h-3.5 w-3.5 rounded-sm border border-musgo/35"}>{checked ? <Check size={9} /> : null}</span>{database}</button>; })}</div></div> : <div className="rounded-[0.75rem] border border-musgo/15 p-4 text-xs text-subtle">Seleccione una instancia y consulte las bases del agente.</div>}
               </div>
-              {catalog.data?.status === "failed" ? <p className="text-xs text-red-400">{catalog.data.error}</p> : null}
-              {localError ? <p className="text-xs text-red-400">{localError}</p> : null}
+              {catalog.data?.status === "failed" ? <p className="text-xs text-danger">{catalog.data.error}</p> : null}
+              {localError ? <p className="text-xs text-danger">{localError}</p> : null}
               <button type="button" onClick={submit} disabled={!selected.length || trigger.isPending} className="flex h-10 w-full items-center justify-center gap-2 rounded-[0.625rem] bg-arcilla text-xs font-medium text-carbon disabled:opacity-35">{trigger.isPending ? <Loader2 size={13} className="animate-spin" /> : <Database size={13} />} Iniciar {selected.length > 1 ? `${selected.length} backups` : "backup"}</button>
             </div>
           )}

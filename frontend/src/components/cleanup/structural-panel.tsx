@@ -11,13 +11,13 @@ import type {
 } from "@/types/remote-cleanup";
 
 const INPUT =
-  "w-full h-9 bg-musgo/10 border border-musgo/25 rounded-[0.5rem] px-3 font-mono text-xs text-crema/75 placeholder:text-crema/25 focus:outline-none focus:border-arcilla/40 transition-colors";
+  "w-full h-9 bg-surface border border-musgo/25 rounded-[0.5rem] px-3 font-sans text-xs text-crema placeholder:text-subtle focus:outline-none focus:border-arcilla/40 transition-colors";
 
 function Stat({ label, value, accent }: { label: string; value: number | string; accent?: boolean }) {
   return (
     <div className="rounded-[0.5rem] bg-carbon/40 border border-musgo/15 px-2.5 py-1.5">
-      <p className={cn("text-lg font-semibold tabular-nums", accent ? "text-arcilla" : "text-crema/85")}>{value}</p>
-      <p className="text-[9px] text-crema/35 uppercase tracking-wider">{label}</p>
+      <p className={cn("text-lg font-semibold tabular-nums", accent ? "text-arcilla" : "text-crema")}>{value}</p>
+      <p className="text-xs text-subtle uppercase tracking-wider">{label}</p>
     </div>
   );
 }
@@ -208,37 +208,37 @@ export function StructuralPanel({
   const porPropiedad = report ? Object.entries(report.porPropiedad).sort((a, b) => b[1] - a[1]) : [];
 
   return (
-    <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 p-5 space-y-4">
+    <div className="rounded-xl bg-surface border border-musgo/20 p-5 space-y-4">
       <div className="flex items-center gap-2">
         <Boxes size={14} className="text-arcilla/70" />
-        <span className="font-sans text-sm font-medium text-crema/75">Limpieza estructural (por propiedad)</span>
+        <span className="font-sans text-sm font-medium text-crema">Limpieza estructural (por propiedad)</span>
       </div>
-      <p className="font-mono text-[10px] text-crema/35 leading-relaxed">
-        Recorre cada propiedad bajo <span className="text-crema/70">{server.rutaBase || "la raíz"}</span>, entra a{" "}
+      <p className="font-sans text-xs text-subtle leading-relaxed">
+        Recorre cada propiedad bajo <span className="text-crema">{server.rutaBase || "la raíz"}</span>, entra a{" "}
         <span className="text-arcilla/80">{contenedora || "core"}</span> y vacía las carpetas indicadas + borra los
-        archivos indicados. <span className="text-green-400/70">La simulación no borra nada.</span>
+        archivos indicados. <span className="text-success">La simulación no borra nada.</span>
       </p>
 
       {/* Configuración de la regla */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="md:col-span-2">
-          <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1">
+          <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-1">
             Carpetas a vaciar (separadas por coma) — se conserva la carpeta, se borra su contenido
           </label>
           <input value={carpetas} onChange={(e) => setCarpetas(e.target.value)} disabled={isAgent} className={INPUT}
             placeholder="Log, LogSec, LogsRadian, Respuesta" />
         </div>
         <div>
-          <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1">Archivos a borrar</label>
+          <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-1">Archivos a borrar</label>
           <input value={archivos} onChange={(e) => setArchivos(e.target.value)} disabled={isAgent} className={INPUT} placeholder="BD_log.txt" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1">Carpeta contenedora</label>
+            <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-1">Carpeta contenedora</label>
             <input value={contenedora} onChange={(e) => setCont(e.target.value)} className={INPUT} placeholder="core" />
           </div>
           <div>
-            <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1" title="0 = todas las propiedades">
+            <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-1" title="0 = todas las propiedades">
               Límite propiedades
             </label>
             <input type="number" min={0} value={maxProps} onChange={(e) => setMaxProps(Number(e.target.value))} className={INPUT} />
@@ -247,52 +247,52 @@ export function StructuralPanel({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1">Máximo de archivos</label>
+          <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-1">Máximo de archivos</label>
           <input type="number" min={0} max={200000} value={maxFiles}
             onChange={(e) => setMaxFiles(Math.max(0, Number(e.target.value)))} className={INPUT} />
         </div>
         <div>
-          <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider block mb-1">Máximo por ejecución (GB)</label>
+          <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-1">Máximo por ejecución (GB)</label>
           <input type="number" min={0} max={1024} step={1} value={maxGb}
             onChange={(e) => setMaxGb(Math.max(0, Number(e.target.value)))} className={INPUT} />
         </div>
       </div>
-      <p className="font-mono text-[9px] text-crema/30 -mt-1">
-        Límite de propiedades: <span className="text-crema/50">0 = todas</span>. Pon un número (ej. 5) para probar en pocas
-        mientras afinas las reglas. En archivos y GB, <span className="text-crema/50">0 = sin límite</span>.
+      <p className="font-sans text-xs text-subtle -mt-1">
+        Límite de propiedades: <span className="text-muted">0 = todas</span>. Pon un número (ej. 5) para probar en pocas
+        mientras afinas las reglas. En archivos y GB, <span className="text-muted">0 = sin límite</span>.
       </p>
 
       <button onClick={run} disabled={loading || executing}
-        className="w-full h-9 rounded-[0.5rem] bg-arcilla/15 border border-arcilla/30 font-mono text-xs text-arcilla/90 hover:bg-arcilla/25 disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+        className="w-full h-9 rounded-[0.5rem] bg-arcilla/15 border border-arcilla/30 font-sans text-xs text-arcilla/90 hover:bg-arcilla/25 disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
         {loading ? <><Loader2 size={12} className="animate-spin" /> Simulando…</> : <><FlaskConical size={12} /> Simular</>}
       </button>
 
       {/* Progreso del job en segundo plano */}
       {progress && (
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between font-mono text-[10px] text-crema/50">
+          <div className="flex items-center justify-between font-sans text-xs text-muted">
             <span className="capitalize">{progress.fase}… {progress.proc}/{progress.total || "?"} propiedades</span>
             <span>{progress.enc} archivo(s)</span>
           </div>
-          <div className="h-1.5 bg-musgo/20 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-surface rounded-full overflow-hidden">
             <div className="h-full bg-arcilla transition-all"
               style={{ width: `${progress.total ? Math.min(100, (progress.proc / progress.total) * 100) : 5}%` }} />
           </div>
           {!isAgent && <button onClick={cancel}
-            className="flex items-center gap-1 font-mono text-[10px] text-crema/40 hover:text-red-400 transition-colors">
+            className="flex items-center gap-1 font-sans text-xs text-muted hover:text-danger transition-colors">
             <XCircle size={11} /> Cancelar
           </button>}
         </div>
       )}
 
-      {error && <p className="font-mono text-[11px] text-red-400/80">{error}</p>}
+      {error && <p className="font-sans text-xs text-danger">{error}</p>}
 
       {report && (
         <div className="pt-2 border-t border-musgo/15 space-y-3">
-          <span className="inline-block font-mono text-[9px] text-green-400/80 border border-green-800/40 bg-green-900/10 rounded-full px-2 py-0.5">
+          <span className="inline-block font-sans text-xs text-success border border-green-800/40 bg-success/10 rounded-full px-2 py-0.5">
             SIMULACIÓN — no se eliminó nada
           </span>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 font-mono text-[11px]">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 font-sans text-xs">
             <Stat label="Encontrados" value={report.encontrados} />
             <Stat label="Elegibles" value={report.elegiblesCount} accent />
             <Stat label="Se liberaría" value={formatBytes(report.espacioLiberadoBytes)} accent />
@@ -302,25 +302,25 @@ export function StructuralPanel({
           </div>
 
           {report.truncated && (
-            <p className="font-mono text-[10px] text-orange-400/80 flex items-center gap-1">
+            <p className="font-sans text-xs text-warning flex items-center gap-1">
               <AlertTriangle size={11} /> Recorrido truncado — usa el límite de propiedades para revisar por lotes.
             </p>
           )}
           {report.warnings?.map((w, i) => (
-            <p key={i} className="font-mono text-[10px] text-orange-400/70">⚠ {w}</p>
+            <p key={i} className="font-sans text-xs text-warning">⚠ {w}</p>
           ))}
 
           {/* Desglose por propiedad */}
           {porPropiedad.length > 0 && (
             <details className="mt-1">
-              <summary className="font-mono text-[10px] text-crema/40 cursor-pointer hover:text-crema/70">
+              <summary className="font-sans text-xs text-muted cursor-pointer hover:text-crema">
                 Ver desglose por propiedad ({porPropiedad.length})
               </summary>
               <div className="mt-1.5 max-h-44 overflow-y-auto space-y-0.5">
                 {porPropiedad.map(([prop, n]) => (
-                  <div key={prop} className="font-mono text-[10px] text-crema/50 flex justify-between gap-2 px-1">
+                  <div key={prop} className="font-sans text-xs text-muted flex justify-between gap-2 px-1">
                     <span className="truncate">{prop}</span>
-                    <span className="text-crema/30 shrink-0">{n} archivo(s)</span>
+                    <span className="text-subtle shrink-0">{n} archivo(s)</span>
                   </div>
                 ))}
               </div>
@@ -329,14 +329,14 @@ export function StructuralPanel({
 
           {report.protegidos?.length > 0 && (
             <details>
-              <summary className="font-mono text-[10px] text-crema/40 cursor-pointer hover:text-crema/70">
+              <summary className="font-sans text-xs text-muted cursor-pointer hover:text-crema">
                 Ver protegidos ({report.protegidos.length}) — no se borrarán
               </summary>
               <div className="mt-1.5 max-h-32 overflow-y-auto space-y-1">
                 {report.protegidos.slice(0, 100).map((x, i) => (
-                  <div key={i} className="font-mono text-[9px] text-crema/40 flex justify-between gap-2">
+                  <div key={i} className="font-sans text-xs text-muted flex justify-between gap-2">
                     <span className="truncate">{x.path.split("/").pop()}</span>
-                    <span className="text-crema/25 shrink-0">{x.reason}</span>
+                    <span className="text-subtle shrink-0">{x.reason}</span>
                   </div>
                 ))}
               </div>
@@ -348,26 +348,26 @@ export function StructuralPanel({
             <div className="pt-3 mt-1 border-t border-musgo/15 space-y-2.5">
               {/* Los servidores por agente eliminan logs directamente. El modo heredado conserva ambas opciones. */}
               {!isAgent && <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px] text-crema/40 uppercase tracking-wider">Modo:</span>
+                <span className="font-sans text-xs text-muted uppercase tracking-wider">Modo:</span>
                 <div className="flex rounded-[0.5rem] border border-musgo/25 overflow-hidden">
                   <button onClick={() => { setModo("cuarentena"); setConfirm(""); }}
-                    className={cn("px-3 py-1 font-mono text-[10px] transition-colors flex items-center gap-1",
-                      modo === "cuarentena" ? "bg-arcilla/15 text-arcilla/80" : "text-crema/35 hover:text-crema/55")}>
+                    className={cn("px-3 py-1 font-sans text-xs transition-colors flex items-center gap-1",
+                      modo === "cuarentena" ? "bg-arcilla/15 text-arcilla/80" : "text-subtle hover:text-muted")}>
                     <Archive size={10} /> Cuarentena
                   </button>
                   <button onClick={() => { if (!isAgent) setModo("directo"); setConfirm(""); }} disabled={isAgent}
-                    className={cn("px-3 py-1 font-mono text-[10px] transition-colors flex items-center gap-1",
-                      modo === "directo" ? "bg-red-900/40 text-red-200" : "text-crema/35 hover:text-crema/55", isAgent && "opacity-30")}>
+                    className={cn("px-3 py-1 font-sans text-xs transition-colors flex items-center gap-1",
+                      modo === "directo" ? "bg-red-900/40 text-red-200" : "text-subtle hover:text-muted", isAgent && "opacity-30")}>
                     <Trash2 size={10} /> Directo
                   </button>
                 </div>
               </div>}
-              {!isAgent && <p className="font-mono text-[10px] text-crema/45 leading-relaxed">
+              {!isAgent && <p className="font-sans text-xs text-muted leading-relaxed">
                 {modo === "cuarentena" ? (
                   <>Mover <span className="text-arcilla/80">{report.elegiblesCount}</span> archivo(s) a cuarentena
-                    (reversible). Escribe <span className="text-crema/85 font-bold">MOVER</span> para confirmar:</>
+                    (reversible). Escribe <span className="text-crema font-bold">MOVER</span> para confirmar:</>
                 ) : (
-                  <span className="text-red-300/90">Borrar <span className="font-bold">{report.elegiblesCount}</span> archivo(s)
+                  <span className="text-danger">Borrar <span className="font-bold">{report.elegiblesCount}</span> archivo(s)
                     de forma <span className="font-bold">DEFINITIVA</span> (sin vuelta atrás) en{" "}
                     {report.propiedadesAfectadas} propiedad(es). Escribe <span className="font-bold">BORRAR</span> para confirmar:</span>
                 )}
@@ -375,7 +375,7 @@ export function StructuralPanel({
               {!isAgent && <input value={confirmText} onChange={(e) => setConfirm(e.target.value)} placeholder={confirmWord} className={INPUT} />}
               <button onClick={execute} disabled={executing || (!isAgent && confirmText.trim().toUpperCase() !== confirmWord)}
                 className={cn(
-                  "w-full h-9 rounded-[0.5rem] border font-mono text-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-30",
+                  "w-full h-9 rounded-[0.5rem] border font-sans text-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-30",
                   modo === "directo"
                     ? "bg-red-900/30 border-red-800/50 text-red-200 hover:bg-red-900/50"
                     : "bg-arcilla/15 border-arcilla/30 text-arcilla/90 hover:bg-arcilla/25",
@@ -390,7 +390,7 @@ export function StructuralPanel({
       )}
 
       {execMsg && (
-        <p className="font-mono text-[11px] text-green-400/80 flex items-center gap-1.5 pt-1">
+        <p className="font-sans text-xs text-success flex items-center gap-1.5 pt-1">
           <ArrowRight size={11} /> {execMsg}
         </p>
       )}

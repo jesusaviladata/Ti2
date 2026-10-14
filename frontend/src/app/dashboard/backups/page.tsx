@@ -21,10 +21,10 @@ function BackupStats() {
   };
 
   const cards = [
-    { label: "Total backups", value: stats.total,     icon: Database,      color: "text-crema/60",  bg: "bg-musgo/30" },
-    { label: "Completados",   value: stats.completed, icon: CheckCircle2,  color: "text-green-400", bg: "bg-green-900/20" },
+    { label: "Total backups", value: stats.total,     icon: Database,      color: "text-muted",  bg: "bg-surface" },
+    { label: "Completados",   value: stats.completed, icon: CheckCircle2,  color: "text-success", bg: "bg-success/10" },
     { label: "En ejecución",  value: stats.running,   icon: Clock,         color: "text-arcilla",   bg: "bg-arcilla/10" },
-    { label: "Fallidos",      value: stats.failed,    icon: XCircle,       color: "text-red-400",   bg: "bg-red-900/20" },
+    { label: "Fallidos",      value: stats.failed,    icon: XCircle,       color: "text-danger",   bg: "bg-danger/10" },
   ];
 
   return (
@@ -32,13 +32,13 @@ function BackupStats() {
       {cards.map(({ label, value, icon: Icon, color, bg }) => (
         <div
           key={label}
-          className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 p-4 hover:border-musgo/30 transition-colors"
+          className="rounded-xl bg-surface border border-musgo/20 p-4 hover:border-musgo/30 transition-colors"
         >
           <div className={`w-8 h-8 rounded-[0.65rem] ${bg} flex items-center justify-center mb-3`}>
             <Icon size={15} className={color} />
           </div>
-          <p className="text-3xl font-semibold tabular-nums text-crema/90">{value}</p>
-          <p className="font-mono text-[11px] text-crema/35 mt-0.5">{label}</p>
+          <p className="text-3xl font-semibold tabular-nums text-crema">{value}</p>
+          <p className="font-sans text-xs text-subtle mt-0.5">{label}</p>
         </div>
       ))}
     </div>
@@ -57,8 +57,8 @@ export default function BackupsPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Módulo</p>
-          <h1 className="font-title text-4xl font-semibold text-crema">
+          <p className="font-sans text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Módulo</p>
+          <h1 className="font-title text-[28px] font-semibold text-crema">
             Backups
           </h1>
         </div>
@@ -80,7 +80,7 @@ export default function BackupsPage() {
       <BackupAutomationList onNew={() => setAutomationModalOpen(true)} />
 
       {/* Historial */}
-      <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 overflow-hidden">
+      <div className="rounded-xl bg-surface border border-musgo/20 overflow-hidden">
         <BackupList />
       </div>
 

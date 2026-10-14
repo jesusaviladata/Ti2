@@ -53,10 +53,10 @@ function timeAgo(iso: string) {
 
 function statusDot(status: string) {
   switch (status) {
-    case "completed": return "text-green-400";
-    case "failed":    return "text-red-400";
+    case "completed": return "text-success";
+    case "failed":    return "text-danger";
     case "active":    return "text-blue-400";
-    default:          return "text-crema/35";
+    default:          return "text-subtle";
   }
 }
 
@@ -80,24 +80,24 @@ function SearchPanel({
   return (
     <div
       id="global-search-results"
-      className="absolute left-0 top-full mt-2 w-full min-w-[420px] z-[60] rounded-[1rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden"
+      className="absolute left-0 top-full mt-2 w-full min-w-0 z-[60] rounded-[1rem] bg-surface border border-musgo/30 shadow-2xl overflow-hidden"
     >
       {/* Loading / empty */}
       {status === "loading" && (
         <div className="px-4 py-5 text-center">
-          <p role="status" className="font-mono text-xs text-crema/40">Buscando…</p>
+          <p role="status" className="font-sans text-xs text-muted">Buscando…</p>
         </div>
       )}
       {status === "error" && (
         <div className="px-4 py-5 text-center">
-          <p role="alert" className="font-mono text-xs text-red-300/80">
+          <p role="alert" className="font-sans text-xs text-danger">
             No se pudo realizar la búsqueda. Inténtalo nuevamente.
           </p>
         </div>
       )}
       {status === "success" && !hasAny && (
         <div className="px-4 py-5 text-center">
-          <p className="font-mono text-xs text-crema/25">Sin resultados para &ldquo;{query}&rdquo;</p>
+          <p className="font-sans text-xs text-subtle">Sin resultados para &ldquo;{query}&rdquo;</p>
         </div>
       )}
 
@@ -105,8 +105,8 @@ function SearchPanel({
       {hasBackups && (
         <div>
           <div className="flex items-center gap-2 px-4 pt-3 pb-1.5">
-            <Database size={10} className="text-crema/30" />
-            <span className="font-mono text-[9px] text-crema/30 uppercase tracking-widest">Backups</span>
+            <Database size={10} className="text-subtle" />
+            <span className="font-sans text-xs text-subtle uppercase tracking-widest">Backups</span>
           </div>
           {backups.map((item) => (
             <button
@@ -115,8 +115,8 @@ function SearchPanel({
               onClick={() => onSelect(item.href)}
               className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-musgo/10 transition-colors focus-visible:outline-none focus-visible:bg-musgo/15"
             >
-              <p className="flex-1 min-w-0 font-sans text-sm text-crema/80 truncate">{item.title}</p>
-              <span className={cn("font-mono text-[10px] shrink-0", statusDot(item.subtitle))}>
+              <p className="flex-1 min-w-0 font-sans text-sm text-crema truncate">{item.title}</p>
+              <span className={cn("font-sans text-xs shrink-0", statusDot(item.subtitle))}>
                 {item.subtitle}
               </span>
             </button>
@@ -128,8 +128,8 @@ function SearchPanel({
       {hasAccess && (
         <div className={hasBackups ? "border-t border-musgo/15" : ""}>
           <div className="flex items-center gap-2 px-4 pt-3 pb-1.5">
-            <Monitor size={10} className="text-crema/30" />
-            <span className="font-mono text-[9px] text-crema/30 uppercase tracking-widest">Acceso Remoto</span>
+            <Monitor size={10} className="text-subtle" />
+            <span className="font-sans text-xs text-subtle uppercase tracking-widest">Acceso Remoto</span>
           </div>
           {access.map((item) => (
             <button
@@ -139,9 +139,9 @@ function SearchPanel({
               className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-musgo/10 transition-colors focus-visible:outline-none focus-visible:bg-musgo/15"
             >
               <div className="flex-1 min-w-0">
-                <p className="font-sans text-sm text-crema/80 truncate">{item.title}</p>
+                <p className="font-sans text-sm text-crema truncate">{item.title}</p>
                 {item.subtitle && (
-                  <p className="font-mono text-[10px] text-crema/35 truncate">{item.subtitle}</p>
+                  <p className="font-sans text-xs text-subtle truncate">{item.subtitle}</p>
                 )}
               </div>
             </button>
@@ -151,10 +151,10 @@ function SearchPanel({
 
       {/* Footer */}
       <div className="border-t border-musgo/15 px-4 py-2 flex items-center justify-between">
-        <span className="font-mono text-[9px] text-crema/20">Esc para cerrar</span>
+        <span className="font-sans text-xs text-subtle">Esc para cerrar</span>
         <button
           onClick={onClose}
-          className="text-crema/25 hover:text-crema/60 transition-colors"
+          className="text-subtle hover:text-muted transition-colors"
         >
           <X size={12} />
         </button>
@@ -173,21 +173,21 @@ function NotificationsPanel({
   clearing: boolean;
 }) {
   return (
-    <div className="absolute right-0 top-full mt-2 w-[300px] z-[60] rounded-[1rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden">
+    <div className="absolute right-0 top-full mt-2 w-[300px] z-[60] rounded-[1rem] bg-surface border border-musgo/30 shadow-2xl overflow-hidden">
       <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-musgo/15">
-        <span className="font-sans text-sm font-medium text-crema/70">Notificaciones</span>
+        <span className="font-sans text-sm font-medium text-crema">Notificaciones</span>
         <div className="flex items-center gap-2">
           {notifications.length > 0 && (
             <button
               type="button"
               onClick={onClear}
               disabled={clearing}
-              className="flex items-center gap-1 font-mono text-[9px] text-crema/30 transition-colors hover:text-red-300 disabled:opacity-40"
+              className="flex items-center gap-1 font-sans text-xs text-subtle transition-colors hover:text-danger disabled:opacity-40"
             >
               <Trash2 size={11} /> {clearing ? "Limpiando…" : "Limpiar"}
             </button>
           )}
-          <button onClick={onClose} className="text-crema/25 hover:text-crema/60 transition-colors">
+          <button onClick={onClose} className="text-subtle hover:text-muted transition-colors">
             <X size={13} />
           </button>
         </div>
@@ -195,8 +195,8 @@ function NotificationsPanel({
 
       {notifications.length === 0 ? (
         <div className="px-4 py-8 text-center space-y-2">
-          <CheckCircle2 size={20} className="text-crema/15 mx-auto" />
-          <p className="font-mono text-xs text-crema/25">Sin notificaciones</p>
+          <CheckCircle2 size={20} className="text-subtle mx-auto" />
+          <p className="font-sans text-xs text-subtle">Sin notificaciones</p>
         </div>
       ) : (
         <div className="max-h-[320px] overflow-y-auto">
@@ -206,15 +206,15 @@ function NotificationsPanel({
               className="flex items-start gap-3 px-4 py-3 hover:bg-musgo/10 transition-colors border-b border-musgo/10 last:border-0"
             >
               <div className="mt-0.5 shrink-0">
-                {n.kind === "backup_fail" && <AlertTriangle size={13} className="text-red-400/80" />}
-                {n.kind === "backup_success" && <CheckCircle2 size={13} className="text-green-400/80" />}
-                {n.kind !== "backup_fail" && n.kind !== "backup_success" && <ShieldAlert size={13} className="text-orange-400/80" />}
+                {n.kind === "backup_fail" && <AlertTriangle size={13} className="text-danger" />}
+                {n.kind === "backup_success" && <CheckCircle2 size={13} className="text-success" />}
+                {n.kind !== "backup_fail" && n.kind !== "backup_success" && <ShieldAlert size={13} className="text-warning" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-sans text-xs font-medium text-crema/80">{n.title}</p>
-                <p className="font-mono text-[10px] text-crema/40 mt-0.5 truncate">{n.body}</p>
+                <p className="font-sans text-xs font-medium text-crema">{n.title}</p>
+                <p className="font-sans text-xs text-muted mt-0.5 truncate">{n.body}</p>
               </div>
-              <span className="font-mono text-[9px] text-crema/25 shrink-0 mt-0.5">
+              <span className="font-sans text-xs text-subtle shrink-0 mt-0.5">
                 {timeAgo(n.ts)}
               </span>
             </div>
@@ -238,17 +238,17 @@ function ProfileDropdown({
     : "??";
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-[210px] z-[60] rounded-[1rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden">
+    <div className="absolute right-0 top-full mt-2 w-[210px] z-[60] rounded-[1rem] bg-surface border border-musgo/30 shadow-2xl overflow-hidden">
       <div className="px-4 py-4 border-b border-musgo/15">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-musgo border border-musgo/60 flex items-center justify-center shrink-0">
-            <span className="font-mono text-sm text-crema/70">{initials}</span>
+          <div className="w-9 h-9 rounded-full bg-arcilla/10 border border-musgo/60 flex items-center justify-center shrink-0">
+            <span className="font-sans text-sm text-crema">{initials}</span>
           </div>
           <div className="min-w-0">
-            <p className="font-sans text-sm font-medium text-crema/90 truncate">
+            <p className="font-sans text-sm font-medium text-crema truncate">
               {user?.fullName ?? "Usuario"}
             </p>
-            <p className="font-mono text-[10px] text-crema/40 truncate">
+            <p className="font-sans text-xs text-muted truncate">
               {user?.email ?? ""}
             </p>
           </div>
@@ -256,13 +256,13 @@ function ProfileDropdown({
       </div>
 
       <div className="p-2">
-        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-[0.5rem] text-crema/55 hover:bg-musgo/15 hover:text-crema/90 transition-colors text-sm font-sans">
+        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-[0.5rem] text-muted hover:bg-musgo/15 hover:text-crema transition-colors text-sm font-sans">
           <User size={14} />
           Mi perfil
         </button>
         <button
           onClick={() => { onClose(); onLogout(); }}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-[0.5rem] text-red-400/70 hover:bg-red-900/15 hover:text-red-400 transition-colors text-sm font-sans mt-0.5"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-[0.5rem] text-danger hover:bg-danger/10 hover:text-danger transition-colors text-sm font-sans mt-0.5"
         >
           <LogOut size={14} />
           Cerrar sesión
@@ -297,7 +297,7 @@ export function Topbar() {
   const [profileOpen,  setProfileOpen]  = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  // ── Keyboard shortcut Ctrl+K / ⌘K ──────────────────────────────────────────
+  // ── Keyboard shortcut Ctrl+K / Ctrl K ──────────────────────────────────────────
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -418,32 +418,32 @@ export function Topbar() {
     : "??";
 
   return (
-    <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b border-musgo/20 px-6">
+    <header className="de-topbar relative z-40 flex h-16 shrink-0 items-center gap-3 border-b border-musgo/20 bg-surface px-6">
       {/* ── Search ─────────────────────────────────────────────────────────── */}
       <div ref={searchRef} className="relative flex min-w-0 w-full max-w-sm items-center">
-        <Search size={14} className="absolute left-3 text-crema/30 z-10 pointer-events-none" />
+        <Search size={14} className="absolute left-3 text-subtle z-10 pointer-events-none" />
         <input
           type="text"
-          placeholder="Buscar..."
+          placeholder="Buscar copias y sesiones…"
           aria-label="Buscar backups y sesiones de acceso"
           aria-controls="global-search-results"
           aria-expanded={searchOpen && query.trim().length >= 2}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
           onFocus={() => setSearchOpen(true)}
-          className="w-full h-9 bg-musgo/10 border border-musgo/20 rounded-pill pl-9 pr-10 text-sm text-crema placeholder:text-crema/25 focus:outline-none focus:border-musgo/50 transition-colors"
+          className="w-full h-9 bg-surface border border-musgo/20 rounded-lg pl-9 pr-10 text-sm text-crema placeholder:text-subtle focus:outline-none focus:border-musgo/50 transition-colors"
         />
         {query ? (
           <button
             onClick={closeSearch}
             aria-label="Limpiar búsqueda"
-            className="absolute right-3 text-crema/30 hover:text-crema/60 transition-colors"
+            className="absolute right-3 text-subtle hover:text-muted transition-colors"
           >
             <X size={13} />
           </button>
         ) : (
-          <kbd className="absolute right-3 font-mono text-[10px] text-crema/20 border border-musgo/20 rounded px-1 pointer-events-none">
-            ⌘K
+          <kbd className="absolute right-3 font-sans text-xs text-subtle border border-musgo/20 rounded px-1 pointer-events-none">
+            Ctrl K
           </kbd>
         )}
 
@@ -459,7 +459,7 @@ export function Topbar() {
       </div>
 
       {/* ── Agent storage ─────────────────────────────────────────────────── */}
-      <StorageHealthIndicator />
+      <div className="de-storage"><StorageHealthIndicator /></div>
 
       {/* ── Right actions ──────────────────────────────────────────────────── */}
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -468,7 +468,7 @@ export function Topbar() {
           onClick={toggleTheme}
           title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
           aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-          className="w-9 h-9 rounded-[0.75rem] flex items-center justify-center text-crema/40 hover:bg-musgo/20 hover:text-crema/80 transition-all"
+          className="w-9 h-9 rounded-[0.75rem] flex items-center justify-center text-muted hover:bg-musgo/20 hover:text-crema transition-all"
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
@@ -484,12 +484,12 @@ export function Topbar() {
             aria-label={`Notificaciones${unread > 0 ? ` (${unread} sin leer)` : ""}`}
             aria-haspopup="menu"
             aria-expanded={notifOpen}
-            className="relative w-9 h-9 rounded-[0.75rem] flex items-center justify-center text-crema/40 hover:bg-musgo/20 hover:text-crema/80 transition-all"
+            className="relative w-9 h-9 rounded-[0.75rem] flex items-center justify-center text-muted hover:bg-musgo/20 hover:text-crema transition-all"
           >
             <Bell size={16} />
             {unread > 0 && (
               <span className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] bg-arcilla rounded-full flex items-center justify-center px-0.5">
-                <span className="font-mono text-[8px] text-crema leading-none">
+                <span className="font-sans text-xs text-crema leading-none">
                   {unread > 9 ? "9+" : unread}
                 </span>
               </span>
@@ -512,9 +512,9 @@ export function Topbar() {
             aria-label="Menú de perfil"
             aria-haspopup="menu"
             aria-expanded={profileOpen}
-            className="w-8 h-8 rounded-full bg-musgo border border-musgo/60 flex items-center justify-center cursor-pointer hover:border-arcilla/50 transition-colors"
+            className="w-8 h-8 rounded-full bg-arcilla/10 border border-musgo/60 flex items-center justify-center cursor-pointer hover:border-arcilla/50 transition-colors"
           >
-            <span className="font-mono text-xs text-crema/60">{initials}</span>
+            <span className="font-sans text-xs text-muted">{initials}</span>
           </button>
           {profileOpen && (
             <ProfileDropdown

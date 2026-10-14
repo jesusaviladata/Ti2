@@ -9,15 +9,24 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        "on-accent": "rgb(var(--color-on-accent) / <alpha-value>)",
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        inset: "rgb(var(--color-inset) / <alpha-value>)",
+        muted: "rgb(var(--color-muted) / <alpha-value>)",
+        subtle: "rgb(var(--color-subtle) / <alpha-value>)",
+        success: "rgb(var(--color-success) / <alpha-value>)",
+        danger: "rgb(var(--color-danger) / <alpha-value>)",
+        warning: "rgb(var(--color-warning) / <alpha-value>)",
+
         musgo: "rgb(var(--color-musgo) / <alpha-value>)",
         arcilla: "rgb(var(--color-arcilla) / <alpha-value>)",
         crema: "rgb(var(--color-crema) / <alpha-value>)",
         carbon: "rgb(var(--color-carbon) / <alpha-value>)",
       },
       fontFamily: {
-        sans: ["Inter", "Segoe UI", "Arial", "sans-serif"],
+        sans: ["Segoe UI", "Arial", "sans-serif"],
         display: ["Georgia", "Times New Roman", "serif"],
-        title: ["Arial", "Helvetica", "Segoe UI", "sans-serif"],
+        title: ["Segoe UI", "Arial", "sans-serif"],
         mono: ["Cascadia Code", "Consolas", "Courier New", "monospace"],
       },
       borderRadius: {

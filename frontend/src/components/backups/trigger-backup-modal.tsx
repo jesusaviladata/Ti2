@@ -84,25 +84,25 @@ function DbMultiSearchDropdown({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "w-full min-h-11 bg-musgo/10 border rounded-[0.75rem] px-4 py-2.5 text-sm text-left flex items-center justify-between gap-2 transition-colors",
+          "w-full min-h-11 bg-surface border rounded-[0.75rem] px-4 py-2.5 text-sm text-left flex items-center justify-between gap-2 transition-colors",
           open ? "border-arcilla/50" : "border-musgo/30 hover:border-musgo/50",
         )}
       >
-        <span className={cn("flex-1 font-mono text-xs", selected.length ? "text-crema" : "text-crema/35")}>
+        <span className={cn("flex-1 font-sans text-xs", selected.length ? "text-crema" : "text-subtle")}>
           {selected.length === 0
             ? "Selecciona una o más bases de datos…"
             : selected.length === 1
             ? selected[0]
             : `${selected.length} bases de datos seleccionadas`}
         </span>
-        <ChevronDown size={14} className={cn("text-crema/30 shrink-0 transition-transform", open && "rotate-180")} />
+        <ChevronDown size={14} className={cn("text-subtle shrink-0 transition-transform", open && "rotate-180")} />
       </button>
 
       {/* Selected chips */}
       {selected.length > 1 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
           {selected.map((db) => (
-            <span key={db} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-arcilla/10 border border-arcilla/25 font-mono text-[10px] text-arcilla/80">
+            <span key={db} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-arcilla/10 border border-arcilla/25 font-sans text-xs text-arcilla/80">
               {db}
               <button type="button" onClick={() => toggle(db)} className="text-arcilla/40 hover:text-arcilla ml-0.5">×</button>
             </span>
@@ -115,17 +115,17 @@ function DbMultiSearchDropdown({
         <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-[0.875rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden">
           {/* Search */}
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-musgo/20">
-            <Search size={13} className="text-crema/30 shrink-0" />
+            <Search size={13} className="text-subtle shrink-0" />
             <input
               ref={inputRef}
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar base de datos…"
-              className="flex-1 bg-transparent text-xs font-mono text-crema/70 placeholder-crema/25 outline-none"
+              className="flex-1 bg-transparent text-xs font-sans text-crema placeholder-crema/25 outline-none"
             />
             {search && (
-              <button type="button" onClick={() => setSearch("")} className="text-crema/25 hover:text-crema/50 text-xs">✕</button>
+              <button type="button" onClick={() => setSearch("")} className="text-subtle hover:text-muted text-xs">✕</button>
             )}
           </div>
 
@@ -134,7 +134,7 @@ function DbMultiSearchDropdown({
             <button
               type="button"
               onClick={toggleAll}
-              className="w-full text-left px-4 py-2 font-mono text-[10px] text-crema/40 hover:text-crema/60 hover:bg-musgo/10 transition-colors border-b border-musgo/10 flex items-center gap-2"
+              className="w-full text-left px-4 py-2 font-sans text-xs text-muted hover:text-muted hover:bg-musgo/10 transition-colors border-b border-musgo/10 flex items-center gap-2"
             >
               <div className={cn(
                 "w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0",
@@ -151,7 +151,7 @@ function DbMultiSearchDropdown({
           {/* List */}
           <div className="max-h-48 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <p className="font-mono text-xs text-crema/25 px-4 py-3">Sin resultados para "{search}"</p>
+              <p className="font-sans text-xs text-subtle px-4 py-3">Sin resultados para "{search}"</p>
             ) : (
               filtered.map((db) => {
                 const isSelected = selected.includes(db);
@@ -161,8 +161,8 @@ function DbMultiSearchDropdown({
                     type="button"
                     onClick={() => toggle(db)}
                     className={cn(
-                      "w-full text-left px-4 py-2 font-mono text-xs flex items-center gap-3 transition-colors",
-                      isSelected ? "bg-arcilla/8 text-crema" : "text-crema/60 hover:bg-musgo/10 hover:text-crema/80"
+                      "w-full text-left px-4 py-2 font-sans text-xs flex items-center gap-3 transition-colors",
+                      isSelected ? "bg-arcilla/8 text-crema" : "text-muted hover:bg-musgo/10 hover:text-crema"
                     )}
                   >
                     <div className={cn(
@@ -180,11 +180,11 @@ function DbMultiSearchDropdown({
 
           {/* Footer */}
           <div className="border-t border-musgo/15 px-3 py-1.5 flex items-center justify-between">
-            <span className="font-mono text-[10px] text-crema/20">
+            <span className="font-sans text-xs text-subtle">
               {filtered.length} de {databases.length} bases de datos
             </span>
             {selected.length > 0 && (
-              <span className="font-mono text-[10px] text-arcilla/60">
+              <span className="font-sans text-xs text-arcilla/60">
                 {selected.length} seleccionada{selected.length !== 1 ? "s" : ""}
               </span>
             )}
@@ -199,8 +199,8 @@ function DbMultiSearchDropdown({
 const INPUT = [
   "w-full h-9 rounded-[0.625rem]",
   "bg-carbon border border-musgo/30",
-  "px-3 font-mono text-xs text-crema/75",
-  "placeholder:text-crema/20",
+  "px-3 font-sans text-xs text-crema",
+  "placeholder:text-subtle",
   "focus:outline-none focus:border-arcilla/50",
   "transition-colors duration-150",
 ].join(" ");
@@ -214,7 +214,7 @@ function CredField({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="font-mono text-[10px] text-crema/35 uppercase tracking-wider">{label}</p>
+      <p className="font-sans text-xs text-subtle uppercase tracking-wider">{label}</p>
       {children}
     </div>
   );
@@ -238,9 +238,9 @@ function DestinationCredentials({
   return (
     <div className="rounded-[1rem] border border-musgo/25 overflow-hidden">
       {/* Section header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-musgo/15 border-b border-musgo/20">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-surface border-b border-musgo/20">
         <span className="w-1.5 h-1.5 rounded-full bg-arcilla/60 shrink-0" />
-        <p className="font-mono text-[10px] text-crema/40 uppercase tracking-widest">
+        <p className="font-sans text-xs text-muted uppercase tracking-widest">
           {isNas ? "Credenciales NAS / Red" : "Credenciales Servidor Secundario"}
         </p>
       </div>
@@ -301,7 +301,7 @@ function DestinationCredentials({
               <button
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-crema/25 hover:text-crema/55 transition-colors"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors"
               >
                 {showPw ? <EyeOff size={12} /> : <Eye size={12} />}
               </button>
@@ -372,17 +372,17 @@ function MultiBackupProgress({
       <div className="rounded-[1rem] border border-musgo/25 bg-musgo/5 p-5 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="font-mono text-[10px] text-crema/30 uppercase tracking-wider">Progreso general</p>
-            <p className={cn("font-sans text-sm mt-1", failed ? "text-red-400" : completed ? "text-green-400" : "text-crema/80")}>
+            <p className="font-sans text-xs text-subtle uppercase tracking-wider">Progreso general</p>
+            <p className={cn("font-sans text-sm mt-1", failed ? "text-danger" : completed ? "text-success" : "text-crema")}>
               {starting && !job ? "Preparando el proceso…" : progress.label}
             </p>
           </div>
-          <span className={cn("font-mono text-xl tabular-nums", failed ? "text-red-400" : completed ? "text-green-400" : "text-arcilla")}>
+          <span className={cn("font-sans text-xl tabular-nums", failed ? "text-danger" : completed ? "text-success" : "text-arcilla")}>
             {progress.percent}%
           </span>
         </div>
 
-        <div className="h-3 rounded-full bg-musgo/20 overflow-hidden">
+        <div className="h-3 rounded-full bg-surface overflow-hidden">
           <div
             className={cn(
               "h-full rounded-full transition-[width] duration-700 ease-out",
@@ -392,19 +392,19 @@ function MultiBackupProgress({
           />
         </div>
 
-        <div className="flex items-center justify-between gap-3 font-mono text-[10px] text-crema/30">
+        <div className="flex items-center justify-between gap-3 font-sans text-xs text-subtle">
           <span>{databaseNames.length} base{databaseNames.length !== 1 ? "s" : ""} seleccionada{databaseNames.length !== 1 ? "s" : ""}</span>
           {!failed && !completed && <span>No cierres el agente</span>}
         </div>
 
-        {job?.error && <p className="font-mono text-[10px] text-red-400/80 break-words">{job.error}</p>}
+        {job?.error && <p className="font-sans text-xs text-danger break-words">{job.error}</p>}
       </div>
 
       <div className="rounded-[0.875rem] border border-musgo/20 bg-musgo/5 p-4">
-        <p className="font-mono text-[10px] text-crema/30 uppercase tracking-wider mb-2">Bases incluidas</p>
+        <p className="font-sans text-xs text-subtle uppercase tracking-wider mb-2">Bases incluidas</p>
         <div className="flex flex-wrap gap-1.5">
           {databaseNames.map((name) => (
-            <span key={name} className="px-2 py-1 rounded-md bg-musgo/15 border border-musgo/20 font-mono text-[10px] text-crema/55">
+            <span key={name} className="px-2 py-1 rounded-md bg-surface border border-musgo/20 font-sans text-xs text-muted">
               {name}
             </span>
           ))}
@@ -588,15 +588,15 @@ export function TriggerBackupModal({ open, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-musgo/20 shrink-0">
           <div>
-            <p className="font-mono text-xs text-arcilla uppercase tracking-widest mb-0.5">Módulo Backups</p>
+            <p className="font-sans text-xs text-arcilla uppercase tracking-widest mb-0.5">Módulo Backups</p>
             <h2 className="font-display text-2xl italic font-light text-crema">
               Nuevo Backup
             </h2>
             {activeConn && (
-              <p className="font-mono text-[10px] text-crema/30 mt-0.5">→ {activeConn.label}</p>
+              <p className="font-sans text-xs text-subtle mt-0.5">→ {activeConn.label}</p>
             )}
           </div>
-          <button onClick={handleClose} className="text-crema/30 hover:text-crema transition-colors">
+          <button onClick={handleClose} className="text-subtle hover:text-crema transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -606,7 +606,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
           {!showProgress ? (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="font-mono text-xs text-crema/40 uppercase tracking-wider block mb-2">
+                <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-2">
                   Ejecucion
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -615,7 +615,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                     onClick={() => { setExecutionMode("agent"); setSelectedDbs([]); }}
                     className={cn(
                       "h-10 rounded-[0.75rem] border text-xs font-sans transition-colors",
-                      executionMode === "agent" ? "bg-arcilla/10 border-arcilla/40 text-crema" : "bg-musgo/10 border-musgo/20 text-crema/40",
+                      executionMode === "agent" ? "bg-arcilla/10 border-arcilla/40 text-crema" : "bg-surface border-musgo/20 text-muted",
                     )}
                   >
                     Agente del servidor
@@ -625,7 +625,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                     onClick={() => { setExecutionMode("direct"); setSelectedDbs([]); }}
                     className={cn(
                       "h-10 rounded-[0.75rem] border text-xs font-sans transition-colors",
-                      executionMode === "direct" ? "bg-arcilla/10 border-arcilla/40 text-crema" : "bg-musgo/10 border-musgo/20 text-crema/40",
+                      executionMode === "direct" ? "bg-arcilla/10 border-arcilla/40 text-crema" : "bg-surface border-musgo/20 text-muted",
                     )}
                   >
                     Conexion directa
@@ -636,7 +636,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
               {executionMode === "agent" && (
                 <div className="rounded-[1rem] border border-musgo/25 bg-musgo/5 p-4 space-y-3">
                   <div>
-                    <label className="font-mono text-[10px] text-crema/35 uppercase tracking-wider block mb-1.5">
+                    <label className="font-sans text-xs text-subtle uppercase tracking-wider block mb-1.5">
                       Servidor / Agente
                     </label>
                     <select value={agentId} onChange={(event) => setAgentId(event.target.value)} className={INPUT}>
@@ -649,7 +649,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                     </select>
                   </div>
                   <div>
-                    <label className="font-mono text-[10px] text-crema/35 uppercase tracking-wider block mb-1.5">
+                    <label className="font-sans text-xs text-subtle uppercase tracking-wider block mb-1.5">
                       Instancia SQL
                     </label>
                     <select value={sqlProfileId} onChange={(event) => setSqlProfileId(event.target.value)} className={INPUT}>
@@ -659,9 +659,9 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                       ))}
                     </select>
                   </div>
-                  {loadingAgents && <p className="font-mono text-[10px] text-crema/30">Consultando agentes…</p>}
+                  {loadingAgents && <p className="font-sans text-xs text-subtle">Consultando agentes…</p>}
                   {agentsUnavailable && (
-                    <p className="font-mono text-[10px] text-red-400/70">
+                    <p className="font-sans text-xs text-danger">
                       El modulo de agentes no esta disponible en Railway. Active el modulo o use conexion directa.
                     </p>
                   )}
@@ -669,9 +669,9 @@ export function TriggerBackupModal({ open, onClose }: Props) {
               )}
 
               {executionMode === "direct" && !activeConn && (
-                <div className="flex items-center gap-2 rounded-[0.75rem] bg-musgo/10 border border-musgo/20 px-4 py-3">
+                <div className="flex items-center gap-2 rounded-[0.75rem] bg-surface border border-musgo/20 px-4 py-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-crema/20 shrink-0" />
-                  <span className="font-mono text-xs text-crema/35">
+                  <span className="font-sans text-xs text-subtle">
                     Usando conexión por defecto (variables de entorno)
                   </span>
                 </div>
@@ -679,29 +679,29 @@ export function TriggerBackupModal({ open, onClose }: Props) {
 
               {/* Database selector */}
               <div>
-                <label className="font-mono text-xs text-crema/40 uppercase tracking-wider block mb-2">
+                <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-2">
                   Bases de datos
                 </label>
                 {loadingDbs ? (
-                  <div className="h-11 rounded-[0.75rem] bg-musgo/10 border border-musgo/20 flex items-center px-4 gap-2">
-                    <Loader2 size={14} className="animate-spin text-crema/30" />
-                    <span className="font-mono text-xs text-crema/30">Conectando a SQL Server…</span>
+                  <div className="h-11 rounded-[0.75rem] bg-surface border border-musgo/20 flex items-center px-4 gap-2">
+                    <Loader2 size={14} className="animate-spin text-subtle" />
+                    <span className="font-sans text-xs text-subtle">Conectando a SQL Server…</span>
                   </div>
                 ) : !dbData?.connected ? (
-                  <div className="rounded-[0.75rem] bg-red-900/10 border border-red-800/30 px-4 py-3 space-y-0.5">
+                  <div className="rounded-[0.75rem] bg-danger/10 border border-red-800/30 px-4 py-3 space-y-0.5">
                     <div className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                      <span className="font-mono text-xs text-red-400 font-medium">
+                      <span className="font-sans text-xs text-danger font-medium">
                         {activeConn ? "No se pudo conectar al servidor SQL" : "Sin conexión SQL Server configurada"}
                       </span>
                     </div>
-                    <p className="font-mono text-[10px] text-red-400/50 pl-3.5">
+                    <p className="font-sans text-xs text-danger pl-3.5">
                       {activeConn
                         ? "Verifica que el servidor esté encendido y accesible en la red."
                         : "Ve a Configuración → Conexiones para agregar un servidor."}
                     </p>
                     {activeConn && (dbData as any)?.error && (
-                      <p className="font-mono text-[10px] text-red-400/70 pl-3.5 break-all">
+                      <p className="font-sans text-xs text-danger pl-3.5 break-all">
                         Detalle: {(dbData as any).error}
                       </p>
                     )}
@@ -717,7 +717,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
 
               {/* Backup type */}
               <div>
-                <label className="font-mono text-xs text-crema/40 uppercase tracking-wider block mb-2">
+                <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-2">
                   Tipo de backup
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -730,11 +730,11 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                         "p-3 rounded-[0.75rem] border text-left transition-all duration-150",
                         backupType === value
                           ? "bg-arcilla/10 border-arcilla/40 text-crema"
-                          : "bg-musgo/10 border-musgo/20 text-crema/50 hover:border-musgo/40"
+                          : "bg-surface border-musgo/20 text-muted hover:border-musgo/40"
                       )}
                     >
                       <p className="font-sans text-xs font-medium">{label}</p>
-                      <p className="font-mono text-[10px] mt-0.5 leading-tight opacity-60">{desc}</p>
+                      <p className="font-sans text-xs mt-0.5 leading-tight opacity-60">{desc}</p>
                     </button>
                   ))}
                 </div>
@@ -742,7 +742,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
 
               {/* Destination */}
               <div>
-                <label className="font-mono text-xs text-crema/40 uppercase tracking-wider block mb-2">
+                <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-2">
                   Destino
                 </label>
                 {executionMode === "agent" && (
@@ -753,7 +753,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                         <option key={profile.id} value={profile.id}>{profile.label}</option>
                       ))}
                     </select>
-                    <p className="font-mono text-[10px] text-crema/25 leading-relaxed">
+                    <p className="font-sans text-xs text-subtle leading-relaxed">
                       El agente crea la carpeta fechada, verifica los .bak y genera el ZIP antes de transferirlo.
                     </p>
                   </div>
@@ -768,7 +768,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                         "flex-1 h-9 rounded-[0.75rem] border text-xs font-sans transition-all duration-150",
                         destination === value
                           ? "bg-musgo/40 border-musgo/60 text-crema"
-                          : "bg-musgo/10 border-musgo/20 text-crema/40 hover:border-musgo/40"
+                          : "bg-surface border-musgo/20 text-muted hover:border-musgo/40"
                       )}
                     >
                       {label}
@@ -779,9 +779,9 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                 {/* Local path config */}
                 {executionMode === "direct" && destination === "local" && (
                   <div className="mt-3 rounded-[1rem] border border-musgo/25 overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-2.5 bg-musgo/15 border-b border-musgo/20">
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-surface border-b border-musgo/20">
                       <FolderOpen size={12} className="text-arcilla/60 shrink-0" />
-                      <p className="font-mono text-[10px] text-crema/40 uppercase tracking-widest">
+                      <p className="font-sans text-xs text-muted uppercase tracking-widest">
                         Ruta de destino local
                       </p>
                     </div>
@@ -793,7 +793,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
                         placeholder={`D:\\${new Date().toISOString().slice(0, 10)}\\`}
                         className={INPUT}
                       />
-                      <p className="font-mono text-[10px] text-crema/25 leading-relaxed">
+                      <p className="font-sans text-xs text-subtle leading-relaxed">
                         El archivo .bak se guardará dentro de esta carpeta. Si no existe, se creará automáticamente.
                       </p>
                     </div>
@@ -813,7 +813,7 @@ export function TriggerBackupModal({ open, onClose }: Props) {
               </div>
 
               {(trigger.isError || triggerAgent.isError) && (
-                <p className="font-mono text-xs text-red-400 bg-red-900/10 border border-red-800/20 rounded-[0.75rem] px-4 py-3">
+                <p className="font-sans text-xs text-danger bg-danger/10 border border-red-800/20 rounded-[0.75rem] px-4 py-3">
                   {((triggerAgent.error ?? trigger.error) as any)?.response?.data?.detail ?? "Error al iniciar backup"}
                 </p>
               )}

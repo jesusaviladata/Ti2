@@ -135,19 +135,19 @@ export function FilePanel({ side, conn, onLog, onQueue, onOpDone }: Props) {
   return (
     <div className="flex flex-col h-full min-h-0 border border-musgo/20 rounded-[1rem] overflow-hidden bg-carbon">
       {/* Panel header */}
-      <div className="flex items-center gap-1.5 px-3 py-2 bg-musgo/10 border-b border-musgo/20 shrink-0">
-        <span className="font-mono text-[10px] text-crema/30 uppercase tracking-widest mr-1">
+      <div className="flex items-center gap-1.5 px-3 py-2 bg-surface border-b border-musgo/20 shrink-0">
+        <span className="font-sans text-xs text-subtle uppercase tracking-widest mr-1">
           {side === "local" ? "Local" : "Remoto"}
         </span>
         <div className="flex-1 flex items-center gap-1 bg-carbon/60 border border-musgo/20 rounded-[0.5rem] px-2 py-1 min-w-0">
-          <span className="font-mono text-[10px] text-crema/50 truncate">{path}</span>
+          <span className="font-sans text-xs text-muted truncate">{path}</span>
         </div>
         <button onClick={navigateUp} disabled={!loaded || loading}
-          className="w-6 h-6 flex items-center justify-center rounded text-crema/30 hover:text-crema/70 disabled:opacity-30 transition-colors">
+          className="w-6 h-6 flex items-center justify-center rounded text-subtle hover:text-crema disabled:opacity-30 transition-colors">
           <ArrowUp size={12} />
         </button>
         <button onClick={() => load(path)} disabled={loading}
-          className="w-6 h-6 flex items-center justify-center rounded text-crema/30 hover:text-crema/70 disabled:opacity-30 transition-colors">
+          className="w-6 h-6 flex items-center justify-center rounded text-subtle hover:text-crema disabled:opacity-30 transition-colors">
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
@@ -158,13 +158,13 @@ export function FilePanel({ side, conn, onLog, onQueue, onOpDone }: Props) {
           <button
             onClick={deleteSelected}
             disabled={!selected.size}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-[0.5rem] font-mono text-[10px] bg-red-900/15 border border-red-800/25 text-red-400/70 hover:text-red-400 disabled:opacity-30 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-[0.5rem] font-sans text-xs bg-danger/10 border border-red-800/25 text-danger hover:text-danger disabled:opacity-30 transition-colors"
           >
             <Trash2 size={10} /> Eliminar{selected.size > 0 ? ` (${selected.size})` : ""}
           </button>
           <span className="flex-1" />
           {selected.size > 0 && (
-            <span className="font-mono text-[10px] text-crema/25">
+            <span className="font-sans text-xs text-subtle">
               {selected.size} seleccionado{selected.size !== 1 ? "s" : ""}
             </span>
           )}
@@ -175,29 +175,29 @@ export function FilePanel({ side, conn, onLog, onQueue, onOpDone }: Props) {
       <div className="flex-1 overflow-y-auto min-h-0">
         {!isConnected && !loaded ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center p-6">
-            <span className="font-mono text-xs text-crema/20">Sin conexión remota</span>
-            <span className="font-mono text-[10px] text-crema/15">Conecta un servidor en la barra superior</span>
+            <span className="font-sans text-xs text-subtle">Sin conexión remota</span>
+            <span className="font-sans text-xs text-subtle">Conecta un servidor en la barra superior</span>
           </div>
         ) : !loaded ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <button
               onClick={() => load(path)}
-              className="px-4 py-2 rounded-[0.75rem] bg-musgo/20 border border-musgo/30 font-mono text-xs text-crema/50 hover:text-crema/80 hover:border-musgo/50 transition-colors"
+              className="px-4 py-2 rounded-[0.75rem] bg-surface border border-musgo/30 font-sans text-xs text-muted hover:text-crema hover:border-musgo/50 transition-colors"
             >
               {side === "local" ? "Explorar servidor" : "Explorar remoto"}
             </button>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 p-6 text-center">
-            <AlertCircle size={18} className="text-red-400/60" />
-            <span className="font-mono text-xs text-red-400/70">{error}</span>
-            <button onClick={() => load(path)} className="font-mono text-[10px] text-crema/30 hover:text-crema/60 underline">
+            <AlertCircle size={18} className="text-danger" />
+            <span className="font-sans text-xs text-danger">{error}</span>
+            <button onClick={() => load(path)} className="font-sans text-xs text-subtle hover:text-muted underline">
               Reintentar
             </button>
           </div>
         ) : entries.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <span className="font-mono text-xs text-crema/20">Carpeta vacía</span>
+            <span className="font-sans text-xs text-subtle">Carpeta vacía</span>
           </div>
         ) : (
           <table className="w-full text-left">
@@ -208,9 +208,9 @@ export function FilePanel({ side, conn, onLog, onQueue, onOpDone }: Props) {
                     onChange={toggleAll}
                     className="w-3 h-3 accent-arcilla rounded cursor-pointer" />
                 </th>
-                <th className="font-mono text-[9px] text-crema/25 uppercase tracking-wider py-2 pr-2">Nombre</th>
-                <th className="font-mono text-[9px] text-crema/25 uppercase tracking-wider py-2 pr-2 text-right w-20">Tamaño</th>
-                <th className="font-mono text-[9px] text-crema/25 uppercase tracking-wider py-2 pr-3 text-right w-28 hidden md:table-cell">Modificado</th>
+                <th className="font-sans text-xs text-subtle uppercase tracking-wider py-2 pr-2">Nombre</th>
+                <th className="font-sans text-xs text-subtle uppercase tracking-wider py-2 pr-2 text-right w-20">Tamaño</th>
+                <th className="font-sans text-xs text-subtle uppercase tracking-wider py-2 pr-3 text-right w-28 hidden md:table-cell">Modificado</th>
                 <th className="w-8" />
               </tr>
             </thead>
@@ -234,16 +234,16 @@ export function FilePanel({ side, conn, onLog, onQueue, onOpDone }: Props) {
                     <div className="flex items-center gap-2">
                       {entry.isDir
                         ? <Folder size={13} className="text-arcilla/60 shrink-0" />
-                        : <FileText size={13} className="text-crema/30 shrink-0" />
+                        : <FileText size={13} className="text-subtle shrink-0" />
                       }
-                      <span className="font-mono text-xs text-crema/75 truncate">{entry.name}</span>
-                      {entry.isDir && <ChevronRight size={10} className="text-crema/20 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                      <span className="font-sans text-xs text-crema truncate">{entry.name}</span>
+                      {entry.isDir && <ChevronRight size={10} className="text-subtle shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />}
                     </div>
                   </td>
-                  <td className="py-2 pr-2 text-right font-mono text-[10px] text-crema/35 tabular-nums">
+                  <td className="py-2 pr-2 text-right font-sans text-xs text-subtle tabular-nums">
                     {entry.isDir ? "—" : formatBytes(entry.size)}
                   </td>
-                  <td className="py-2 pr-3 text-right font-mono text-[10px] text-crema/25 hidden md:table-cell">
+                  <td className="py-2 pr-3 text-right font-sans text-xs text-subtle hidden md:table-cell">
                     {entry.modified ? new Date(entry.modified * 1000).toLocaleDateString("es", { dateStyle: "short" }) : "—"}
                   </td>
                   <td className="pr-2" onClick={(e) => e.stopPropagation()}>
@@ -251,7 +251,7 @@ export function FilePanel({ side, conn, onLog, onQueue, onOpDone }: Props) {
                       <button
                         onClick={() => deleteContents(entry)}
                         title="Vaciar carpeta"
-                        className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded text-crema/25 hover:text-red-400 transition-all"
+                        className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded text-subtle hover:text-danger transition-all"
                       >
                         <Trash2 size={10} />
                       </button>
@@ -267,7 +267,7 @@ export function FilePanel({ side, conn, onLog, onQueue, onOpDone }: Props) {
       {/* Footer */}
       {loaded && (
         <div className="px-3 py-1.5 border-t border-musgo/15 shrink-0">
-          <span className="font-mono text-[10px] text-crema/20">
+          <span className="font-sans text-xs text-subtle">
             {entries.length} elemento{entries.length !== 1 ? "s" : ""}
           </span>
         </div>

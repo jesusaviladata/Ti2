@@ -70,17 +70,17 @@ export function NewRuleModal({ open, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-musgo/20 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-[0.65rem] bg-musgo/30 flex items-center justify-center">
-              <Tag size={15} className="text-crema/60" />
+            <div className="w-8 h-8 rounded-[0.65rem] bg-surface flex items-center justify-center">
+              <Tag size={15} className="text-muted" />
             </div>
             <div>
-              <p className="font-mono text-xs text-arcilla uppercase tracking-widest mb-0.5">Limpieza</p>
+              <p className="font-sans text-xs text-arcilla uppercase tracking-widest mb-0.5">Limpieza</p>
               <h2 className="font-display text-xl italic font-light text-crema">
                 Nueva regla BCK
               </h2>
             </div>
           </div>
-          <button onClick={onClose} className="text-crema/30 hover:text-crema"><X size={18} /></button>
+          <button onClick={onClose} className="text-subtle hover:text-crema"><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
@@ -113,10 +113,10 @@ export function NewRuleModal({ open, onClose }: Props) {
                   key={p} type="button"
                   onClick={() => !patterns.includes(p) && setPatterns([...patterns, p])}
                   className={cn(
-                    "px-2.5 py-0.5 rounded-md font-mono text-[10px] border transition-colors",
+                    "px-2.5 py-0.5 rounded-md font-sans text-xs border transition-colors",
                     patterns.includes(p)
                       ? "bg-arcilla/15 border-arcilla/35 text-arcilla/80"
-                      : "bg-musgo/10 border-musgo/25 text-crema/40 hover:border-musgo/45"
+                      : "bg-surface border-musgo/25 text-muted hover:border-musgo/45"
                   )}
                 >
                   {p}
@@ -132,14 +132,14 @@ export function NewRuleModal({ open, onClose }: Props) {
                 className={cn(INPUT_CLS, "flex-1")}
               />
               <button type="button" onClick={addPattern}
-                className="w-9 h-9 rounded-[0.625rem] bg-musgo/20 border border-musgo/30 text-crema/40 hover:text-crema flex items-center justify-center">
+                className="w-9 h-9 rounded-[0.625rem] bg-surface border border-musgo/30 text-muted hover:text-crema flex items-center justify-center">
                 <Plus size={13} />
               </button>
             </div>
             {patterns.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {patterns.map((p) => (
-                  <span key={p} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-arcilla/10 border border-arcilla/25 font-mono text-[10px] text-arcilla/70">
+                  <span key={p} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-arcilla/10 border border-arcilla/25 font-sans text-xs text-arcilla/70">
                     {p}
                     <button type="button" onClick={() => setPatterns(patterns.filter((x) => x !== p))} className="text-arcilla/40 hover:text-arcilla ml-0.5">×</button>
                   </span>
@@ -159,16 +159,16 @@ export function NewRuleModal({ open, onClose }: Props) {
                 className={cn(INPUT_CLS, "flex-1")}
               />
               <button type="button" onClick={addExtension}
-                className="w-9 h-9 rounded-[0.625rem] bg-musgo/20 border border-musgo/30 text-crema/40 hover:text-crema flex items-center justify-center">
+                className="w-9 h-9 rounded-[0.625rem] bg-surface border border-musgo/30 text-muted hover:text-crema flex items-center justify-center">
                 <Plus size={13} />
               </button>
             </div>
             {extensions.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {extensions.map((e) => (
-                  <span key={e} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-musgo/20 border border-musgo/30 font-mono text-[10px] text-crema/50">
+                  <span key={e} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface border border-musgo/30 font-sans text-xs text-muted">
                     {e}
-                    <button type="button" onClick={() => setExtensions(extensions.filter((x) => x !== e))} className="text-crema/30 hover:text-crema ml-0.5">×</button>
+                    <button type="button" onClick={() => setExtensions(extensions.filter((x) => x !== e))} className="text-subtle hover:text-crema ml-0.5">×</button>
                   </span>
                 ))}
               </div>
@@ -186,22 +186,22 @@ export function NewRuleModal({ open, onClose }: Props) {
                     "p-3 rounded-[0.75rem] border text-left transition-all duration-150",
                     keep === value
                       ? "bg-arcilla/10 border-arcilla/40 text-crema"
-                      : "bg-musgo/10 border-musgo/20 text-crema/50 hover:border-musgo/40"
+                      : "bg-surface border-musgo/20 text-muted hover:border-musgo/40"
                   )}
                 >
                   <p className="font-sans text-xs font-medium">{label}</p>
-                  <p className="font-mono text-[10px] mt-0.5 opacity-60 leading-tight">{desc}</p>
+                  <p className="font-sans text-xs mt-0.5 opacity-60 leading-tight">{desc}</p>
                 </button>
               ))}
             </div>
             {keep === "latest_n" && (
               <div className="mt-2 flex items-center gap-3">
-                <label className="font-mono text-[10px] text-crema/35">Conservar últimos:</label>
+                <label className="font-sans text-xs text-subtle">Conservar últimos:</label>
                 <input
                   type="number" min={1} max={100}
                   value={keepN}
                   onChange={(e) => setKeepN(+e.target.value)}
-                  className="w-20 h-8 bg-musgo/10 border border-musgo/30 rounded-[0.5rem] px-3 font-mono text-xs text-crema/70 focus:outline-none focus:border-arcilla/50"
+                  className="w-20 h-8 bg-surface border border-musgo/30 rounded-[0.5rem] px-3 font-sans text-xs text-crema focus:outline-none focus:border-arcilla/50"
                 />
               </div>
             )}
@@ -214,9 +214,9 @@ export function NewRuleModal({ open, onClose }: Props) {
                 type="number" min={0} max={365}
                 value={minAge}
                 onChange={(e) => setMinAge(+e.target.value)}
-                className="w-20 h-9 bg-musgo/10 border border-musgo/30 rounded-[0.75rem] px-3 font-mono text-xs text-crema/70 focus:outline-none focus:border-arcilla/50"
+                className="w-20 h-9 bg-surface border border-musgo/30 rounded-[0.75rem] px-3 font-sans text-xs text-crema focus:outline-none focus:border-arcilla/50"
               />
-              <span className="font-mono text-xs text-crema/35">días (0 = sin restricción)</span>
+              <span className="font-sans text-xs text-subtle">días (0 = sin restricción)</span>
             </div>
           </Field>
 
@@ -235,12 +235,12 @@ export function NewRuleModal({ open, onClose }: Props) {
   );
 }
 
-const INPUT_CLS = "w-full h-9 bg-musgo/10 border border-musgo/30 rounded-[0.75rem] px-3 font-mono text-xs text-crema/75 placeholder-crema/20 focus:outline-none focus:border-arcilla/50 transition-colors";
+const INPUT_CLS = "w-full h-9 bg-surface border border-musgo/30 rounded-[0.75rem] px-3 font-sans text-xs text-crema placeholder-crema/20 focus:outline-none focus:border-arcilla/50 transition-colors";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <p className="font-mono text-[10px] text-crema/40 uppercase tracking-wider">{label}</p>
+      <p className="font-sans text-xs text-muted uppercase tracking-wider">{label}</p>
       {children}
     </div>
   );

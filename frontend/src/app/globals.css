@@ -3,43 +3,76 @@
 @tailwind utilities;
 
 @layer base {
-  /* Paleta Data Express — azules corporativos. Los nombres de token se conservan
-     (musgo/arcilla/crema/carbon) para no tocar cada componente; solo cambian los
-     valores. Rol de cada uno: carbon = fondo, musgo = superficies/bordes (slate azul),
-     arcilla = acento (azul Data Express), crema = texto. */
-
-  /* Dark theme (default) — RGB tuples for Tailwind opacity modifier support */
-  :root {
-    --color-musgo:   12 51 80;    /* #0C3350 — azul marino institucional */
-    --color-arcilla: 54 169 224;  /* #36A9E0 — azul claro institucional */
-    --color-crema:   233 240 247; /* #E9F0F7 — texto blanco frío */
-    --color-carbon:  7 24 39;     /* #071827 — fondo azul noche */
+  :root, [data-theme="light"] {
+    color-scheme: light;
+    --color-carbon: 245 247 250;
+    --color-crema: 20 43 64;
+    --color-musgo: 113 130 145;
+    --color-arcilla: 21 120 180;
+    --color-on-accent: 255 255 255;
+    --color-surface: 255 255 255;
+    --color-inset: 241 245 249;
+    --color-muted: 75 96 115;
+    --color-subtle: 98 115 131;
+    --color-success: 21 121 88;
+    --color-danger: 185 48 65;
+    --color-warning: 145 91 14;
   }
-
-  /* Light theme */
-  [data-theme="light"] {
-    --color-carbon:  237 242 248; /* #EDF2F8 — fondo claro frío */
-    --color-crema:   15 27 45;    /* #0F1B2D — texto azul oscuro */
-    --color-musgo:   12 51 80;
-    --color-arcilla: 54 169 224;
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --color-carbon: 15 24 35;
+    --color-crema: 230 237 245;
+    --color-musgo: 134 154 175;
+    --color-arcilla: 89 185 231;
+    --color-on-accent: 15 24 35;
+    --color-surface: 22 34 48;
+    --color-inset: 29 43 59;
+    --color-muted: 185 199 215;
+    --color-subtle: 151 171 191;
+    --color-success: 87 210 162;
+    --color-danger: 255 139 150;
+    --color-warning: 239 191 100;
   }
-
-  html {
-    scroll-behavior: smooth;
-  }
-
-  body {
-    @apply bg-carbon text-crema font-sans antialiased;
-  }
+  body { @apply bg-carbon text-crema font-sans antialiased; }
+  button, input, select, textarea { font: inherit; }
+  :focus-visible { outline: 2px solid rgb(var(--color-arcilla)); outline-offset: 3px; }
+  input::placeholder, textarea::placeholder { color: rgb(var(--color-subtle)); }
+  h1 { letter-spacing: -.035em; }
+}
+@layer components {
+  .de-panel { @apply rounded-xl border border-musgo/20 bg-surface; }
+  .de-section-heading { @apply text-base font-semibold text-crema; }
+  .de-empty { @apply flex flex-col items-center justify-center gap-2 px-5 py-10 text-center text-sm text-muted; }
+  .de-badge { @apply inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium; }
+  .de-table { @apply w-full text-left text-sm; }
+  .de-table th { @apply whitespace-nowrap bg-inset/60 px-5 py-3 text-xs font-medium text-muted; }
+  .de-table td { @apply border-t border-musgo/15 px-5 py-4; }
+  .de-table tbody tr:hover { @apply bg-inset/40; }
+  .de-filter { @apply rounded-md border border-musgo/25 bg-surface px-3 py-2 text-xs font-medium text-muted transition-colors hover:bg-inset; }
+  .de-filter[aria-pressed="true"] { @apply border-arcilla/35 bg-arcilla/10 text-arcilla; }
+  .de-page-heading { @apply flex flex-wrap items-end justify-between gap-4; }
+  .de-page-title { @apply text-[28px] font-semibold leading-tight text-crema; }
+  .de-eyebrow { @apply mb-2 text-xs font-medium text-subtle; }
+}
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .btn-magnetic { @apply transition-colors duration-150; }
+}
+@media (max-width: 767px) {
+  .de-sidebar { width: 64px; }
+  .de-sidebar .de-nav-label, .de-sidebar .de-brand-label, .de-sidebar .de-collapse { display: none; }
+  .de-sidebar nav a, .de-sidebar .de-sidebar-bottom a, .de-sidebar .de-user { justify-content: center; padding-left: 0; padding-right: 0; }
+  .de-sidebar .de-brand { justify-content: center; padding: 0; }
+  .de-topbar { padding-left: 16px; padding-right: 16px; gap: 8px; }
+  .de-topbar .de-storage, .de-topbar kbd { display: none; }
+  .de-content { padding: 20px 16px; }
+  .de-content > div > div:first-child:has(h1) { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  /* Magnetic button scale — from design system */
-  .btn-magnetic {
-    @apply transition-transform duration-200 ease-power3-out hover:scale-[1.03];
-  }
+@media (pointer: coarse) {
+  .de-filter, .de-topbar button { min-height: 44px; }
+  .de-content input, .de-content select, .de-topbar input { font-size: 16px; }
 }

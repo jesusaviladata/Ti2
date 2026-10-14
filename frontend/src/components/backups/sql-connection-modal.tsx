@@ -146,17 +146,17 @@ export function SqlConnectionModal({ open, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-musgo/20">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-[0.65rem] bg-musgo/30 flex items-center justify-center">
-              <Server size={15} className="text-crema/60" />
+            <div className="w-8 h-8 rounded-[0.65rem] bg-surface flex items-center justify-center">
+              <Server size={15} className="text-muted" />
             </div>
             <div>
-              <p className="font-mono text-xs text-arcilla uppercase tracking-widest mb-0.5">SQL Server</p>
+              <p className="font-sans text-xs text-arcilla uppercase tracking-widest mb-0.5">SQL Server</p>
               <h2 id="sqlconn-title" className="font-display text-xl italic font-light text-crema">
                 Nueva conexión
               </h2>
             </div>
           </div>
-          <button onClick={handleClose} aria-label="Cerrar" className="text-crema/30 hover:text-crema transition-colors">
+          <button onClick={handleClose} aria-label="Cerrar" className="text-subtle hover:text-crema transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -168,10 +168,10 @@ export function SqlConnectionModal({ open, onClose }: Props) {
               key={t}
               onClick={() => setTab(t)}
               className={cn(
-                "flex-1 py-2.5 font-mono text-xs tracking-wide transition-colors border-b-2 -mb-px",
+                "flex-1 py-2.5 font-sans text-xs tracking-wide transition-colors border-b-2 -mb-px",
                 tab === t
                   ? "border-arcilla text-crema"
-                  : "border-transparent text-crema/35 hover:text-crema/55"
+                  : "border-transparent text-subtle hover:text-muted"
               )}
             >
               {t === "properties" ? "Propiedades" : "Cadena de conexión"}
@@ -230,7 +230,7 @@ export function SqlConnectionModal({ open, onClose }: Props) {
                         type="button"
                         onClick={() => setShowPw((v) => !v)}
                         aria-label={showPw ? "Ocultar contraseña" : "Mostrar contraseña"}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-crema/30 hover:text-crema/60 transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors"
                       >
                         {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
@@ -268,17 +268,17 @@ export function SqlConnectionModal({ open, onClose }: Props) {
                     onChange={(e) => setTrustCert(e.target.checked)}
                     className="accent-arcilla"
                   />
-                  <span className="font-mono text-[11px] text-crema/35">Confiar en el certificado del servidor</span>
+                  <span className="font-sans text-xs text-subtle">Confiar en el certificado del servidor</span>
                 </label>
               </Field>
 
               {/* Test result */}
               {testResult && (
                 <div className={cn(
-                  "flex items-start gap-2.5 rounded-[0.75rem] border px-4 py-3 font-mono text-xs",
+                  "flex items-start gap-2.5 rounded-[0.75rem] border px-4 py-3 font-sans text-xs",
                   testResult.ok
-                    ? "bg-green-900/10 border-green-800/30 text-green-400"
-                    : "bg-red-900/10 border-red-800/30 text-red-400"
+                    ? "bg-success/10 border-green-800/30 text-success"
+                    : "bg-danger/10 border-red-800/30 text-danger"
                 )}>
                   {testResult.ok
                     ? <CheckCircle2 size={13} className="shrink-0 mt-0.5" />
@@ -290,11 +290,11 @@ export function SqlConnectionModal({ open, onClose }: Props) {
             </div>
           ) : (
             /* Connection String tab */
-            <div className="rounded-[0.75rem] bg-musgo/10 border border-musgo/20 p-4">
-              <p className="font-mono text-[11px] text-crema/50 leading-relaxed break-all select-all">
+            <div className="rounded-[0.75rem] bg-surface border border-musgo/20 p-4">
+              <p className="font-sans text-xs text-muted leading-relaxed break-all select-all">
                 {connString}
               </p>
-              <p className="font-mono text-[10px] text-crema/20 mt-3">
+              <p className="font-sans text-xs text-subtle mt-3">
                 (La contraseña se oculta — se guardará de forma segura en el almacén local)
               </p>
             </div>
@@ -338,7 +338,7 @@ export function SqlConnectionModal({ open, onClose }: Props) {
           border: 1px solid rgb(46 64 54 / 0.3);
           border-radius: 0.75rem;
           padding: 0 1rem;
-          font-family: var(--font-mono);
+          font-family: var(--font-sans);
           font-size: 0.75rem;
           color: rgb(242 240 233 / 0.8);
           transition: border-color 0.15s;
@@ -358,7 +358,7 @@ export function SqlConnectionModal({ open, onClose }: Props) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="font-mono text-[11px] text-crema/40 uppercase tracking-wider block mb-1.5">
+      <label className="font-sans text-xs text-muted uppercase tracking-wider block mb-1.5">
         {label}
       </label>
       {children}

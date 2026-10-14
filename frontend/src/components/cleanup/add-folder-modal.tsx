@@ -35,17 +35,17 @@ export function AddFolderModal({ open, onClose }: Props) {
       <div className="relative z-10 w-full max-w-md rounded-[1.5rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-5 border-b border-musgo/20">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-[0.65rem] bg-musgo/30 flex items-center justify-center">
-              <FolderOpen size={15} className="text-crema/60" />
+            <div className="w-8 h-8 rounded-[0.65rem] bg-surface flex items-center justify-center">
+              <FolderOpen size={15} className="text-muted" />
             </div>
             <div>
-              <p className="font-mono text-xs text-arcilla uppercase tracking-widest mb-0.5">Limpieza</p>
+              <p className="font-sans text-xs text-arcilla uppercase tracking-widest mb-0.5">Limpieza</p>
               <h2 className="font-display text-xl italic font-light text-crema">
                 Añadir carpeta
               </h2>
             </div>
           </div>
-          <button onClick={onClose} className="text-crema/30 hover:text-crema transition-colors">
+          <button onClick={onClose} className="text-subtle hover:text-crema transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -53,14 +53,14 @@ export function AddFolderModal({ open, onClose }: Props) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Quick paths */}
           <div>
-            <p className="font-mono text-[10px] text-crema/30 uppercase tracking-wider mb-2">Rutas frecuentes</p>
+            <p className="font-sans text-xs text-subtle uppercase tracking-wider mb-2">Rutas frecuentes</p>
             <div className="flex flex-wrap gap-2">
               {QUICK_PATHS.map(({ label: l, path: p }) => (
                 <button
                   key={p}
                   type="button"
                   onClick={() => { setPath(p); setLabel(l); }}
-                  className="px-3 py-1 rounded-[0.5rem] bg-musgo/15 border border-musgo/25 font-mono text-[10px] text-crema/45 hover:border-musgo/50 hover:text-crema/65 transition-colors"
+                  className="px-3 py-1 rounded-[0.5rem] bg-surface border border-musgo/25 font-sans text-xs text-muted hover:border-musgo/50 hover:text-muted transition-colors"
                 >
                   {l}
                 </button>
@@ -70,7 +70,7 @@ export function AddFolderModal({ open, onClose }: Props) {
 
           {/* Path input */}
           <div className="space-y-1.5">
-            <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider">
+            <label className="font-sans text-xs text-muted uppercase tracking-wider">
               Ruta de la carpeta *
             </label>
             <input
@@ -79,13 +79,13 @@ export function AddFolderModal({ open, onClose }: Props) {
               onChange={(e) => setPath(e.target.value)}
               placeholder="C:\Ruta\a\la\carpeta"
               required
-              className="w-full h-10 bg-musgo/10 border border-musgo/30 rounded-[0.75rem] px-4 font-mono text-sm text-crema/75 placeholder-crema/20 focus:outline-none focus:border-arcilla/50 transition-colors"
+              className="w-full h-10 bg-surface border border-musgo/30 rounded-[0.75rem] px-4 font-sans text-sm text-crema placeholder-crema/20 focus:outline-none focus:border-arcilla/50 transition-colors"
             />
           </div>
 
           {/* Label input */}
           <div className="space-y-1.5">
-            <label className="font-mono text-[10px] text-crema/40 uppercase tracking-wider">
+            <label className="font-sans text-xs text-muted uppercase tracking-wider">
               Etiqueta (opcional)
             </label>
             <input
@@ -93,12 +93,12 @@ export function AddFolderModal({ open, onClose }: Props) {
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Nombre descriptivo"
-              className="w-full h-10 bg-musgo/10 border border-musgo/30 rounded-[0.75rem] px-4 font-mono text-sm text-crema/75 placeholder-crema/20 focus:outline-none focus:border-arcilla/50 transition-colors"
+              className="w-full h-10 bg-surface border border-musgo/30 rounded-[0.75rem] px-4 font-sans text-sm text-crema placeholder-crema/20 focus:outline-none focus:border-arcilla/50 transition-colors"
             />
           </div>
 
           {addFolder.isError && (
-            <p className="font-mono text-xs text-red-400 bg-red-900/10 border border-red-800/20 rounded-[0.75rem] px-4 py-3">
+            <p className="font-sans text-xs text-danger bg-danger/10 border border-red-800/20 rounded-[0.75rem] px-4 py-3">
               Error al añadir carpeta
             </p>
           )}

@@ -17,8 +17,8 @@ const KEEP_LABELS: Record<KeepPolicy, string> = {
 const KEEP_COLOR: Record<KeepPolicy, string> = {
   latest:   "text-arcilla/80 bg-arcilla/10 border-arcilla/25",
   latest_n: "text-yellow-400/80 bg-yellow-900/10 border-yellow-800/25",
-  none:     "text-red-400/80 bg-red-900/10 border-red-800/25",
-  all:      "text-green-400/80 bg-green-900/10 border-green-800/25",
+  none:     "text-danger bg-danger/10 border-red-800/25",
+  all:      "text-success bg-success/10 border-green-800/25",
 };
 
 export function BckRulesPanel({ onNewRule }: { onNewRule: () => void }) {
@@ -29,11 +29,11 @@ export function BckRulesPanel({ onNewRule }: { onNewRule: () => void }) {
   if (!rules.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-12 h-12 rounded-[0.75rem] bg-musgo/20 flex items-center justify-center mb-3">
-          <ShieldCheck size={20} className="text-crema/20" />
+        <div className="w-12 h-12 rounded-[0.75rem] bg-surface flex items-center justify-center mb-3">
+          <ShieldCheck size={20} className="text-subtle" />
         </div>
-        <p className="font-sans text-sm text-crema/40">Sin reglas configuradas</p>
-        <p className="font-mono text-xs text-crema/20 mt-1 mb-4">
+        <p className="font-sans text-sm text-muted">Sin reglas configuradas</p>
+        <p className="font-sans text-xs text-subtle mt-1 mb-4">
           Crea reglas para definir qué archivos limpiar automáticamente
         </p>
         <Button variant="outline" onClick={onNewRule} className="text-xs gap-2">
@@ -62,15 +62,15 @@ export function BckRulesPanel({ onNewRule }: { onNewRule: () => void }) {
 
 function RuleCard({ rule, onDelete }: { rule: CleanupRule; onDelete: () => void }) {
   return (
-    <div className="rounded-[1rem] bg-musgo/10 border border-musgo/20 hover:border-musgo/30 transition-colors p-4">
+    <div className="rounded-[1rem] bg-surface border border-musgo/20 hover:border-musgo/30 transition-colors p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-[0.65rem] bg-musgo/30 flex items-center justify-center shrink-0">
-            <Tag size={14} className="text-crema/50" />
+          <div className="w-8 h-8 rounded-[0.65rem] bg-surface flex items-center justify-center shrink-0">
+            <Tag size={14} className="text-muted" />
           </div>
           <div className="min-w-0">
-            <p className="font-sans text-sm text-crema/80 font-medium">{rule.name}</p>
-            <p className="font-mono text-[10px] text-crema/30 mt-0.5">
+            <p className="font-sans text-sm text-crema font-medium">{rule.name}</p>
+            <p className="font-sans text-xs text-subtle mt-0.5">
               {rule.folderId ? "Carpeta específica" : "Todas las carpetas"}
             </p>
           </div>
@@ -78,8 +78,8 @@ function RuleCard({ rule, onDelete }: { rule: CleanupRule; onDelete: () => void 
 
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={cn(
-            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono border",
-            rule.enabled ? "bg-green-900/15 text-green-400/70 border-green-800/25" : "bg-musgo/20 text-crema/30 border-musgo/30"
+            "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-sans border",
+            rule.enabled ? "bg-success/10 text-success border-green-800/25" : "bg-surface text-subtle border-musgo/30"
           )}>
             <span className={cn("w-1.5 h-1.5 rounded-full mr-1.5", rule.enabled ? "bg-green-400" : "bg-crema/20")} />
             {rule.enabled ? "activa" : "inactiva"}
@@ -87,7 +87,7 @@ function RuleCard({ rule, onDelete }: { rule: CleanupRule; onDelete: () => void 
 
           <button
             onClick={onDelete}
-            className="w-7 h-7 rounded-[0.5rem] flex items-center justify-center text-crema/20 hover:bg-red-900/20 hover:text-red-400 transition-colors"
+            className="w-7 h-7 rounded-[0.5rem] flex items-center justify-center text-subtle hover:bg-danger/10 hover:text-danger transition-colors"
           >
             <Trash2 size={12} />
           </button>
@@ -97,18 +97,18 @@ function RuleCard({ rule, onDelete }: { rule: CleanupRule; onDelete: () => void 
       {/* Details */}
       <div className="mt-3 pt-3 border-t border-musgo/15 flex flex-wrap gap-2">
         {rule.patterns.map((p) => (
-          <span key={p} className="px-2 py-0.5 rounded-md bg-musgo/20 border border-musgo/30 font-mono text-[10px] text-crema/50">
+          <span key={p} className="px-2 py-0.5 rounded-md bg-surface border border-musgo/30 font-sans text-xs text-muted">
             {p}
           </span>
         ))}
         {rule.extensions.map((e) => (
-          <span key={e} className="px-2 py-0.5 rounded-md bg-arcilla/5 border border-arcilla/20 font-mono text-[10px] text-arcilla/60">
+          <span key={e} className="px-2 py-0.5 rounded-md bg-arcilla/5 border border-arcilla/20 font-sans text-xs text-arcilla/60">
             {e}
           </span>
         ))}
 
         <span className={cn(
-          "ml-auto px-2.5 py-0.5 rounded-full text-[10px] font-mono border",
+          "ml-auto px-2.5 py-0.5 rounded-full text-xs font-sans border",
           KEEP_COLOR[rule.keep]
         )}>
           {KEEP_LABELS[rule.keep]}
@@ -117,7 +117,7 @@ function RuleCard({ rule, onDelete }: { rule: CleanupRule; onDelete: () => void 
       </div>
 
       {rule.minAgeDays > 0 && (
-        <p className="font-mono text-[10px] text-crema/25 mt-2">
+        <p className="font-sans text-xs text-subtle mt-2">
           Mínimo {rule.minAgeDays} día{rule.minAgeDays !== 1 ? "s" : ""} de antigüedad para eliminar
         </p>
       )}

@@ -10,30 +10,30 @@ import type { AgentVolumeState } from "@/types/agent-storage";
 const stateStyles = {
   healthy: {
     bar: "bg-emerald-500",
-    text: "text-emerald-300",
+    text: "text-success",
     border: "border-emerald-500/20",
     surface: "bg-emerald-500/[0.04]",
     label: "Saludable",
   },
   warning: {
     bar: "bg-amber-400",
-    text: "text-amber-300",
+    text: "text-warning",
     border: "border-amber-400/25",
     surface: "bg-amber-400/[0.05]",
     label: "Poco espacio",
   },
   critical: {
     bar: "bg-red-500",
-    text: "text-red-300",
+    text: "text-danger",
     border: "border-red-500/30",
     surface: "bg-red-500/[0.05]",
     label: "Espacio crítico",
   },
   unknown: {
     bar: "bg-crema/20",
-    text: "text-crema/35",
+    text: "text-subtle",
     border: "border-musgo/25",
-    surface: "bg-musgo/[0.05]",
+    surface: "bg-surface",
     label: "Sin lectura",
   },
 } as const;
@@ -70,10 +70,10 @@ function CompactVolume({ item }: { item: AgentVolumeState }) {
       <HardDrive size={14} className={cn("shrink-0", styles.text)} />
       <span className="min-w-0 flex-1 text-left">
         <span className="flex items-center justify-between gap-2">
-          <span className="truncate font-sans text-[11px] font-medium text-crema/75">
+          <span className="truncate font-sans text-xs font-medium text-crema">
             {volumeName(item)}
           </span>
-          <span className={cn("shrink-0 font-mono text-[9px] tabular-nums", styles.text)}>
+          <span className={cn("shrink-0 font-sans text-xs tabular-nums", styles.text)}>
             {compactCapacityText(item)}
           </span>
         </span>
@@ -97,8 +97,8 @@ function VolumeDetail({ item }: { item: AgentVolumeState }) {
       <div className="flex min-w-0 items-center gap-2.5">
         <HardDrive size={16} className={cn("shrink-0", styles.text)} />
         <div className="min-w-0">
-          <p className="truncate text-xs font-medium text-crema/80">{volumeName(item)}</p>
-          <p className="truncate font-mono text-[9px] text-crema/30">
+          <p className="truncate text-xs font-medium text-crema">{volumeName(item)}</p>
+          <p className="truncate font-sans text-xs text-subtle">
             {item.agentName} · {ageText(item.observedAt)}
           </p>
         </div>
@@ -118,15 +118,15 @@ function VolumeDetail({ item }: { item: AgentVolumeState }) {
             style={{ width: `${used}%` }}
           />
         </div>
-        <p className={cn("mt-1 font-mono text-[9px] tabular-nums", styles.text)}>
+        <p className={cn("mt-1 font-sans text-xs tabular-nums", styles.text)}>
           {capacityText(item)}
         </p>
       </div>
       <div className="flex items-center justify-between gap-3 sm:block sm:text-right">
-        <p className={cn("font-mono text-[9px] uppercase tracking-wider", styles.text)}>
+        <p className={cn("font-sans text-xs uppercase tracking-wider", styles.text)}>
           {styles.label}
         </p>
-        <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-crema/25">
+        <p className="mt-0.5 font-sans text-xs uppercase tracking-wider text-subtle">
           {item.roles.length > 0 ? item.roles.join(" · ") : "Sin rol"}
         </p>
       </div>
@@ -164,7 +164,7 @@ export function StorageHealthIndicator() {
   if (isLoading) {
     return (
       <div
-        className="h-9 w-9 shrink-0 animate-pulse rounded-[0.75rem] border border-musgo/15 bg-musgo/[0.06] lg:h-10 lg:w-full lg:max-w-[15rem] xl:max-w-[30rem]"
+        className="h-9 w-9 shrink-0 animate-pulse rounded-[0.75rem] border border-musgo/15 bg-surface lg:h-10 lg:w-full lg:max-w-[15rem] xl:max-w-[30rem]"
         aria-label="Cargando capacidad de almacenamiento"
       />
     );
@@ -175,11 +175,11 @@ export function StorageHealthIndicator() {
       <button
         type="button"
         onClick={() => refetch()}
-        className="flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-[0.75rem] border border-musgo/20 text-crema/35 transition-colors hover:border-musgo/40 hover:text-crema/70 lg:w-auto lg:px-3"
+        className="flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-[0.75rem] border border-musgo/20 text-subtle transition-colors hover:border-musgo/40 hover:text-crema lg:w-auto lg:px-3"
         aria-label="Actualizar telemetría de almacenamiento"
       >
         <RefreshCw size={13} className={isFetching ? "animate-spin" : ""} />
-        <span className="hidden font-mono text-[9px] xl:inline">
+        <span className="hidden font-sans text-xs xl:inline">
           {isError ? "Espacio no disponible" : "Sin telemetría"}
         </span>
       </button>
@@ -211,8 +211,8 @@ export function StorageHealthIndicator() {
           <CompactVolume item={summary} />
         </span>
 
-        <span className="hidden shrink-0 items-center gap-1 border-l border-musgo/20 px-2 text-crema/30 lg:flex">
-          {summary.state === "critical" ? <TriangleAlert size={11} className="text-red-400" /> : null}
+        <span className="hidden shrink-0 items-center gap-1 border-l border-musgo/20 px-2 text-subtle lg:flex">
+          {summary.state === "critical" ? <TriangleAlert size={11} className="text-danger" /> : null}
           <ChevronDown size={12} className={cn("transition-transform", expanded && "rotate-180")} />
         </span>
       </button>
@@ -225,22 +225,22 @@ export function StorageHealthIndicator() {
         >
           <div className="flex items-center justify-between border-b border-musgo/20 px-4 py-2.5">
             <div>
-              <p className="font-sans text-xs font-medium text-crema/75">Almacenamiento de agentes</p>
-              <p className="font-mono text-[9px] text-crema/30">
+              <p className="font-sans text-xs font-medium text-crema">Almacenamiento de agentes</p>
+              <p className="font-sans text-xs text-subtle">
                 {data.total} {data.total === 1 ? "unidad supervisada" : "unidades supervisadas"}
               </p>
             </div>
             <button
               type="button"
               onClick={() => refetch()}
-              className="flex h-7 w-7 items-center justify-center rounded-[0.5rem] text-crema/30 transition-colors hover:bg-musgo/15 hover:text-crema/70"
+              className="flex h-7 w-7 items-center justify-center rounded-[0.5rem] text-subtle transition-colors hover:bg-musgo/15 hover:text-crema"
               aria-label="Actualizar almacenamiento"
             >
               <RefreshCw size={12} className={isFetching ? "animate-spin" : ""} />
             </button>
           </div>
           {data.preference.mode === "configured" && !data.preference.available ? (
-            <div className="flex items-center gap-2 border-b border-amber-400/20 bg-amber-400/[0.05] px-4 py-2 text-[10px] text-amber-200/65">
+            <div className="flex items-center gap-2 border-b border-amber-400/20 bg-amber-400/[0.05] px-4 py-2 text-xs text-amber-200/65">
               <TriangleAlert size={12} /> Unidad principal sin telemetría; se muestra la de mayor riesgo.
             </div>
           ) : null}

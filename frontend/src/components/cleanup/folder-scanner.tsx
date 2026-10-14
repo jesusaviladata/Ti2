@@ -48,11 +48,11 @@ export function FolderScanner({ onAddFolder }: { onAddFolder: () => void }) {
   if (!folders?.items.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-12 h-12 rounded-[0.75rem] bg-musgo/20 flex items-center justify-center mb-3">
-          <FolderOpen size={20} className="text-crema/20" />
+        <div className="w-12 h-12 rounded-[0.75rem] bg-surface flex items-center justify-center mb-3">
+          <FolderOpen size={20} className="text-subtle" />
         </div>
-        <p className="font-sans text-sm text-crema/40">Sin carpetas configuradas</p>
-        <p className="font-mono text-xs text-crema/20 mt-1 mb-4">Añade una carpeta para empezar a escanear</p>
+        <p className="font-sans text-sm text-muted">Sin carpetas configuradas</p>
+        <p className="font-sans text-xs text-subtle mt-1 mb-4">Añade una carpeta para empezar a escanear</p>
         <Button variant="outline" onClick={onAddFolder} className="text-xs gap-2">
           <FolderOpen size={13} /> Añadir carpeta
         </Button>
@@ -67,7 +67,7 @@ export function FolderScanner({ onAddFolder }: { onAddFolder: () => void }) {
         <select
           value={selectedFolder ?? ""}
           onChange={(e) => { setSelectedFolder(e.target.value || undefined); setScanEnabled(false); }}
-          className="h-9 bg-musgo/10 border border-musgo/30 rounded-[0.75rem] px-3 font-mono text-xs text-crema/70 focus:outline-none focus:border-arcilla/50 transition-colors"
+          className="h-9 bg-surface border border-musgo/30 rounded-[0.75rem] px-3 font-sans text-xs text-crema focus:outline-none focus:border-arcilla/50 transition-colors"
         >
           <option value="">Todas las carpetas</option>
           {folders.items.map((f) => (
@@ -83,7 +83,7 @@ export function FolderScanner({ onAddFolder }: { onAddFolder: () => void }) {
         </Button>
 
         {scan && (
-          <Button variant="ghost" onClick={() => refetch()} className="h-9 px-2 text-crema/30 hover:text-crema">
+          <Button variant="ghost" onClick={() => refetch()} className="h-9 px-2 text-subtle hover:text-crema">
             <RefreshCw size={13} />
           </Button>
         )}
@@ -92,7 +92,7 @@ export function FolderScanner({ onAddFolder }: { onAddFolder: () => void }) {
           <Button
             onClick={handleCleanup}
             disabled={execute.isPending}
-            className="gap-2 text-xs h-9 bg-red-900/30 border border-red-800/40 text-red-300 hover:bg-red-900/50 ml-auto"
+            className="gap-2 text-xs h-9 bg-red-900/30 border border-red-800/40 text-danger hover:bg-red-900/50 ml-auto"
           >
             {execute.isPending
               ? <><Loader2 size={13} className="animate-spin" />Moviendo…</>
@@ -104,16 +104,16 @@ export function FolderScanner({ onAddFolder }: { onAddFolder: () => void }) {
 
       {/* Results summary */}
       {scan && (
-        <div className="flex items-center gap-4 px-4 py-2.5 rounded-[0.75rem] bg-musgo/10 border border-musgo/20">
-          <span className="font-mono text-xs text-crema/50">
-            <span className="text-crema/80 font-medium">{scan.total}</span> archivo{scan.total !== 1 ? "s" : ""} candidatos
+        <div className="flex items-center gap-4 px-4 py-2.5 rounded-[0.75rem] bg-surface border border-musgo/20">
+          <span className="font-sans text-xs text-muted">
+            <span className="text-crema font-medium">{scan.total}</span> archivo{scan.total !== 1 ? "s" : ""} candidatos
           </span>
-          <span className="text-crema/20">·</span>
-          <span className="font-mono text-xs text-crema/50">
+          <span className="text-subtle">·</span>
+          <span className="font-sans text-xs text-muted">
             <span className="text-arcilla font-medium">{formatBytes(scan.totalBytes)}</span> recuperables
           </span>
-          <span className="text-crema/20">·</span>
-          <span className="font-mono text-[10px] text-crema/25">
+          <span className="text-subtle">·</span>
+          <span className="font-sans text-xs text-subtle">
             Escaneado {new Date(scan.scannedAt).toLocaleTimeString("es")}
           </span>
         </div>
@@ -123,11 +123,11 @@ export function FolderScanner({ onAddFolder }: { onAddFolder: () => void }) {
       {files.length > 0 && (
         <div className="rounded-[1rem] border border-musgo/20 overflow-hidden">
           {/* Header */}
-          <div className="grid grid-cols-[32px_1fr_90px_100px_110px_80px] gap-2 px-4 py-2 text-[10px] font-mono text-crema/25 uppercase tracking-wider bg-musgo/10 border-b border-musgo/15">
+          <div className="grid grid-cols-[32px_1fr_90px_100px_110px_80px] gap-2 px-4 py-2 text-xs font-sans text-subtle uppercase tracking-wider bg-surface border-b border-musgo/15">
             <button type="button" onClick={toggleAll} className="flex items-center justify-center">
               {allSelected
                 ? <CheckSquare size={13} className="text-arcilla" />
-                : <Square      size={13} className="text-crema/30" />
+                : <Square      size={13} className="text-subtle" />
               }
             </button>
             <span>Nombre</span>
@@ -152,18 +152,18 @@ export function FolderScanner({ onAddFolder }: { onAddFolder: () => void }) {
 
       {scan && files.length === 0 && (
         <div className="flex flex-col items-center py-12 text-center">
-          <CheckSquare size={24} className="text-green-400/40 mb-2" />
-          <p className="font-sans text-sm text-crema/40">Sin archivos para limpiar</p>
-          <p className="font-mono text-xs text-crema/20 mt-1">Las reglas configuradas no encontraron candidatos</p>
+          <CheckSquare size={24} className="text-success mb-2" />
+          <p className="font-sans text-sm text-muted">Sin archivos para limpiar</p>
+          <p className="font-sans text-xs text-subtle mt-1">Las reglas configuradas no encontraron candidatos</p>
         </div>
       )}
 
       {execute.isSuccess && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-[0.75rem] bg-green-900/10 border border-green-800/30 font-mono text-xs text-green-400">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-[0.75rem] bg-success/10 border border-green-800/30 font-sans text-xs text-success">
           <CheckSquare size={13} />
           {execute.data.moved} archivos movidos a papelera · {formatBytes(execute.data.bytesFreed)} liberados
           {execute.data.errors.length > 0 && (
-            <span className="text-red-400 ml-2">· {execute.data.errors.length} errores</span>
+            <span className="text-danger ml-2">· {execute.data.errors.length} errores</span>
           )}
         </div>
       )}
@@ -189,30 +189,30 @@ function FileRow({
       <div className="flex items-center justify-center">
         {checked
           ? <CheckSquare size={13} className="text-arcilla" />
-          : <Square      size={13} className="text-crema/20" />
+          : <Square      size={13} className="text-subtle" />
         }
       </div>
 
       <div className="min-w-0">
-        <p className="font-sans text-xs text-crema/80 truncate">{file.name}</p>
-        <p className="font-mono text-[10px] text-crema/25 truncate">{file.relativePath}</p>
+        <p className="font-sans text-xs text-crema truncate">{file.name}</p>
+        <p className="font-sans text-xs text-subtle truncate">{file.relativePath}</p>
       </div>
 
-      <span className="font-mono text-xs text-crema/40">{formatBytes(file.sizeBytes)}</span>
+      <span className="font-sans text-xs text-muted">{formatBytes(file.sizeBytes)}</span>
 
       <span className={cn(
-        "font-mono text-xs",
-        file.ageDays > 90 ? "text-red-400/70" :
-        file.ageDays > 30 ? "text-yellow-500/60" : "text-crema/35"
+        "font-sans text-xs",
+        file.ageDays > 90 ? "text-danger" :
+        file.ageDays > 30 ? "text-yellow-500/60" : "text-subtle"
       )}>
         {file.ageDays < 1 ? "< 1 día" : `${Math.floor(file.ageDays)}d`}
       </span>
 
-      <span className="font-mono text-[10px] text-crema/25">
+      <span className="font-sans text-xs text-subtle">
         {new Date(file.modifiedAt).toLocaleDateString("es", { dateStyle: "short" })}
       </span>
 
-      <span className="font-mono text-[10px] text-arcilla/60 truncate">{file.ruleName}</span>
+      <span className="font-sans text-xs text-arcilla/60 truncate">{file.ruleName}</span>
     </div>
   );
 }

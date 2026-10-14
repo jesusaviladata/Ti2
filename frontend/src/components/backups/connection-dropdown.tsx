@@ -32,23 +32,23 @@ export function ConnectionDropdown({ onNewConnection }: Props) {
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "flex items-center gap-2 h-9 px-3 rounded-[0.75rem] border transition-all duration-150 text-left",
-          "font-mono text-xs",
+          "font-sans text-xs",
           active
-            ? "bg-musgo/20 border-musgo/40 text-crema/70 hover:border-musgo/60"
-            : "bg-musgo/10 border-musgo/20 text-crema/35 hover:border-musgo/40"
+            ? "bg-surface border-musgo/40 text-crema hover:border-musgo/60"
+            : "bg-surface border-musgo/20 text-subtle hover:border-musgo/40"
         )}
       >
         {active ? (
-          <Wifi size={13} className="text-green-400 shrink-0" />
+          <Wifi size={13} className="text-success shrink-0" />
         ) : (
-          <WifiOff size={13} className="text-crema/25 shrink-0" />
+          <WifiOff size={13} className="text-subtle shrink-0" />
         )}
         <span className="max-w-[160px] truncate">
           {active ? active.label : "Sin conexión"}
         </span>
         <ChevronDown
           size={12}
-          className={cn("text-crema/30 transition-transform shrink-0", open && "rotate-180")}
+          className={cn("text-subtle transition-transform shrink-0", open && "rotate-180")}
         />
       </button>
 
@@ -61,7 +61,7 @@ export function ConnectionDropdown({ onNewConnection }: Props) {
           {connections.length > 0 && (
             <>
               <div className="px-3 pt-3 pb-1">
-                <p className="font-mono text-[10px] text-crema/25 uppercase tracking-widest">
+                <p className="font-sans text-xs text-subtle uppercase tracking-widest">
                   Instancias guardadas
                 </p>
               </div>
@@ -71,29 +71,29 @@ export function ConnectionDropdown({ onNewConnection }: Props) {
                     key={conn.id}
                     className={cn(
                       "flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors group",
-                      conn.id === activeId ? "bg-musgo/20" : "hover:bg-musgo/10"
+                      conn.id === activeId ? "bg-surface" : "hover:bg-musgo/10"
                     )}
                     onClick={() => { setActive(conn.id); setOpen(false); }}
                   >
-                    <div className="w-6 h-6 rounded-md bg-musgo/30 flex items-center justify-center shrink-0">
-                      <Server size={11} className="text-crema/50" />
+                    <div className="w-6 h-6 rounded-md bg-surface flex items-center justify-center shrink-0">
+                      <Server size={11} className="text-muted" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs text-crema/70 truncate">{conn.label}</p>
-                      <p className="font-mono text-[10px] text-crema/30 truncate">
+                      <p className="font-sans text-xs text-crema truncate">{conn.label}</p>
+                      <p className="font-sans text-xs text-subtle truncate">
                         {conn.authMode === "sql" ? conn.username : "Windows Auth"}
                         {conn.database !== "<default>" ? ` · ${conn.database}` : ""}
                       </p>
                     </div>
                     {conn.id === activeId && (
-                      <Check size={13} className="text-green-400 shrink-0" />
+                      <Check size={13} className="text-success shrink-0" />
                     )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         removeConnection(conn.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-crema/25 hover:text-red-400 p-1 rounded shrink-0"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-subtle hover:text-danger p-1 rounded shrink-0"
                     >
                       <Trash2 size={11} />
                     </button>
@@ -112,7 +112,7 @@ export function ConnectionDropdown({ onNewConnection }: Props) {
             <div className="w-6 h-6 rounded-md bg-arcilla/10 flex items-center justify-center shrink-0">
               <Plus size={11} className="text-arcilla" />
             </div>
-            <span className="font-mono text-xs text-crema/50 hover:text-crema/70 transition-colors">
+            <span className="font-sans text-xs text-muted hover:text-crema transition-colors">
               Nueva conexión…
             </span>
           </button>

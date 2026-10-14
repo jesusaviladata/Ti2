@@ -79,10 +79,10 @@ export function BackupBackgroundIndicator({ collapsed }: { collapsed: boolean })
           className="flex h-10 items-center justify-center rounded-[0.75rem] border border-arcilla/20 bg-arcilla/10"
         >
           {progress.done && !progress.failed
-            ? <Check size={16} className="text-green-400" />
-            : <Database size={16} className={progress.failed ? "text-red-400" : "text-arcilla"} />}
+            ? <Check size={16} className="text-success" />
+            : <Database size={16} className={progress.failed ? "text-danger" : "text-arcilla"} />}
         </Link>
-        <div className="mt-1 h-1 overflow-hidden rounded-full bg-musgo/25">
+        <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface">
           <div
             className={cn("h-full transition-[width] duration-700", progress.failed ? "bg-red-500" : progress.done ? "bg-green-500" : "bg-arcilla")}
             style={{ width: `${progress.percent}%` }}
@@ -96,24 +96,24 @@ export function BackupBackgroundIndicator({ collapsed }: { collapsed: boolean })
     <div className="mb-2 rounded-[0.85rem] border border-arcilla/20 bg-arcilla/[0.07] p-3">
       <div className="mb-2 flex items-start gap-2">
         <Link href="/dashboard/backups" className="min-w-0 flex-1">
-          <p className="font-mono text-[9px] uppercase tracking-wider text-crema/30">Backup en segundo plano</p>
-          <p className={cn("mt-0.5 truncate text-xs", progress.failed ? "text-red-400" : progress.done ? "text-green-400" : "text-crema/75")}>{progress.label}</p>
+          <p className="font-sans text-xs uppercase tracking-wider text-subtle">Backup en segundo plano</p>
+          <p className={cn("mt-0.5 truncate text-xs", progress.failed ? "text-danger" : progress.done ? "text-success" : "text-crema")}>{progress.label}</p>
         </Link>
         {progress.done ? (
-          <button type="button" onClick={dismiss} aria-label="Ocultar progreso" className="text-crema/30 hover:text-crema">
+          <button type="button" onClick={dismiss} aria-label="Ocultar progreso" className="text-subtle hover:text-crema">
             <X size={13} />
           </button>
         ) : (
-          <span className="font-mono text-[10px] tabular-nums text-arcilla">{progress.percent}%</span>
+          <span className="font-sans text-xs tabular-nums text-arcilla">{progress.percent}%</span>
         )}
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-musgo/25">
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface">
         <div
           className={cn("h-full rounded-full transition-[width] duration-700", progress.failed ? "bg-red-500" : progress.done ? "bg-green-500" : "bg-arcilla")}
           style={{ width: `${progress.percent}%` }}
         />
       </div>
-      <p className="mt-1.5 truncate font-mono text-[9px] text-crema/25">
+      <p className="mt-1.5 truncate font-sans text-xs text-subtle">
         {batch.submissionError ?? `${batch.databaseNames.length} base${batch.databaseNames.length !== 1 ? "s" : ""}`}
       </p>
     </div>

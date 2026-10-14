@@ -28,17 +28,17 @@ const ROLE_LABEL: Record<string, string> = {
 function Row({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3 border-b border-musgo/10 py-3 last:border-0">
-      <Icon size={15} className="shrink-0 text-crema/35" />
-      <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wider text-crema/40">{label}</span>
-      <span className="truncate text-sm text-crema/80">{value || "—"}</span>
+      <Icon size={15} className="shrink-0 text-subtle" />
+      <span className="w-28 shrink-0 font-sans text-xs uppercase tracking-wider text-muted">{label}</span>
+      <span className="truncate text-sm text-crema">{value || "—"}</span>
     </div>
   );
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-[1.1rem] border border-musgo/25 bg-musgo/[0.07] p-5">
-      <p className="mb-3 text-sm font-medium text-crema/70">{title}</p>
+    <div className="rounded-xl border border-musgo/25 bg-surface p-5">
+      <p className="mb-3 text-sm font-medium text-crema">{title}</p>
       {children}
     </div>
   );
@@ -63,8 +63,8 @@ export default function SettingsPage() {
   return (
     <div className="max-w-6xl space-y-6">
       <div>
-        <p className="mb-1 font-mono text-xs uppercase tracking-[0.18em] text-arcilla">Cuenta</p>
-        <h1 className="font-title text-4xl font-semibold text-crema">
+        <p className="mb-1 font-sans text-xs uppercase tracking-[0.18em] text-arcilla">Cuenta</p>
+        <h1 className="font-title text-[28px] font-semibold text-crema">
           Configuración
         </h1>
       </div>
@@ -78,10 +78,10 @@ export default function SettingsPage() {
             aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
             className={cn(
-              "flex h-9 items-center gap-2 rounded-full border px-4 font-mono text-xs transition-colors",
+              "flex h-9 items-center gap-2 rounded-full border px-4 font-sans text-xs transition-colors",
               tab === item.id
                 ? "border-arcilla/30 bg-arcilla/15 text-arcilla"
-                : "border-transparent text-crema/40 hover:bg-musgo/10 hover:text-crema/70",
+                : "border-transparent text-muted hover:bg-musgo/10 hover:text-crema",
             )}
           >
             <item.icon size={13} />
@@ -103,7 +103,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={logout}
-              className="flex w-full items-center gap-3 rounded-[0.65rem] px-3 py-2.5 text-sm text-red-400/80 transition-colors hover:bg-red-900/15 hover:text-red-400"
+              className="flex w-full items-center gap-3 rounded-[0.65rem] px-3 py-2.5 text-sm text-danger transition-colors hover:bg-danger/10 hover:text-danger"
             >
               <LogOut size={15} />
               Cerrar sesión

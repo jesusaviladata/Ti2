@@ -73,28 +73,28 @@ export function BackupTypewriter({ backupId }: { backupId: string }) {
 
   return (
     <>
-    <div className="rounded-[1rem] bg-black/40 border border-musgo/30 p-4 font-mono text-xs text-crema/70 min-h-[140px] max-h-64 overflow-y-auto">
+    <div className="rounded-[1rem] bg-black/40 border border-musgo/30 p-4 font-sans text-xs text-crema min-h-[140px] max-h-64 overflow-y-auto">
       <div className="flex items-center gap-2 mb-3 pb-2 border-b border-musgo/20">
         <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
         <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
         <span className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-        <span className="ml-2 text-crema/30 text-[10px]">infra-platform — backup log</span>
+        <span className="ml-2 text-subtle text-xs">infra-platform — backup log</span>
       </div>
 
       {lines.map((line, i) => (
         <div key={i} className={cn(
           "leading-relaxed",
-          line.startsWith("Error")       ? "text-red-400" :
+          line.startsWith("Error")       ? "text-danger" :
           line.startsWith("Guardado en") ? "text-yellow-300/90" :
-          line.startsWith("SHA") || line.startsWith("Tamaño") || line.startsWith("Duración") ? "text-green-400/80" :
-          "text-crema/60"
+          line.startsWith("SHA") || line.startsWith("Tamaño") || line.startsWith("Duración") ? "text-success" :
+          "text-muted"
         )}>
           <span className="text-arcilla/60 select-none">$ </span>{line}
         </div>
       ))}
 
       {(backup?.status === "pending" || backup?.status === "running") && (
-        <div className="text-crema/40">
+        <div className="text-muted">
           <span className="text-arcilla/60 select-none">$ </span>
           <span className={cursor ? "opacity-100" : "opacity-0"}>▋</span>
         </div>
@@ -104,17 +104,17 @@ export function BackupTypewriter({ backupId }: { backupId: string }) {
     </div>
 
     {backup?.status === "completed" && backup.filePath && (
-      <div className="mt-3 rounded-[0.875rem] border border-green-700/40 bg-green-900/15 px-4 py-3 flex items-start gap-3">
-        <CheckCircle2 size={15} className="text-green-400 shrink-0 mt-0.5" />
+      <div className="mt-3 rounded-[0.875rem] border border-green-700/40 bg-success/10 px-4 py-3 flex items-start gap-3">
+        <CheckCircle2 size={15} className="text-success shrink-0 mt-0.5" />
         <div className="min-w-0">
-          <p className="font-mono text-[10px] text-green-400/70 uppercase tracking-wider mb-1">
+          <p className="font-sans text-xs text-success uppercase tracking-wider mb-1">
             Backup guardado en el servidor
           </p>
-          <p className="font-mono text-xs text-green-300/90 break-all leading-relaxed">
+          <p className="font-sans text-xs text-success break-all leading-relaxed">
             {backup.filePath}
           </p>
         </div>
-        <FolderOpen size={14} className="text-green-400/40 shrink-0 mt-0.5" />
+        <FolderOpen size={14} className="text-success shrink-0 mt-0.5" />
       </div>
     )}
     </>

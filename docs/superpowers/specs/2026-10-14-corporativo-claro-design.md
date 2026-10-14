@@ -19,3 +19,10 @@ El administrador necesita identificar servidores sin conexión, revisar fallos y
 4. Publicar en la rama que Railway ya despliega y comprobar el panel.
 
 Revisión: el alcance corresponde a la propuesta aprobada; los porcentajes provienen de cada registro SQL y las listas limitadas se identifican como recientes. No se añaden operaciones destructivas ni cambios de permisos.
+
+## Comprobaciones realizadas
+- Compilación de producción de Next.js y verificación de TypeScript satisfactorias.
+- Prueba local aislada con agentes conectado/desconectado/ocupado y copias completada/fallida/en ejecución. Filtros de incidencias y ejecución, búsqueda combinada y resultado vacío correctos; progreso accesible de 68% mostrado desde el registro.
+- Simulación de respuestas 503: métricas desconocidas con guion, mensajes de error visibles y recuperación mediante Actualizar. Respuestas vacías: indicadores en cero y enlaces de inicio, sin calendario vacío dominante.
+- Revisión visual de escritorio y móvil de 390 px en claro y oscuro. Ancho del documento de 390 px, con desplazamiento contenido únicamente en tablas.
+- Los datos de estas pruebas viven fuera del repositorio desplegado; el panel utiliza los servicios existentes.

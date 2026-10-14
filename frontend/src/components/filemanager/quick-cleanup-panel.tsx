@@ -85,18 +85,18 @@ export function QuickCleanupPanel({ conn, basePath, onLog, onQueue, onOpDone }: 
     setAdding(false);
   }
 
-  const INPUT = "w-full h-8 bg-musgo/10 border border-musgo/25 rounded-[0.5rem] px-2.5 font-mono text-xs text-crema/70 placeholder:text-crema/20 focus:outline-none focus:border-arcilla/40 transition-colors";
+  const INPUT = "w-full h-8 bg-surface border border-musgo/25 rounded-[0.5rem] px-2.5 font-sans text-xs text-crema placeholder:text-subtle focus:outline-none focus:border-arcilla/40 transition-colors";
 
   return (
     <div className="flex flex-col h-full border border-musgo/20 rounded-[1rem] overflow-hidden bg-carbon">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 bg-musgo/10 border-b border-musgo/20 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2.5 bg-surface border-b border-musgo/20 shrink-0">
         <div className="flex items-center gap-2">
           <Zap size={13} className="text-arcilla/70" />
-          <span className="font-mono text-[10px] text-crema/50 uppercase tracking-widest">Limpieza rápida</span>
+          <span className="font-sans text-xs text-muted uppercase tracking-widest">Limpieza rápida</span>
         </div>
         <button onClick={() => setAdding((v) => !v)}
-          className="w-5 h-5 flex items-center justify-center rounded text-crema/30 hover:text-crema/70 transition-colors">
+          className="w-5 h-5 flex items-center justify-center rounded text-subtle hover:text-crema transition-colors">
           <Plus size={12} />
         </button>
       </div>
@@ -109,8 +109,8 @@ export function QuickCleanupPanel({ conn, basePath, onLog, onQueue, onOpDone }: 
           <div className="grid grid-cols-2 gap-2">
             {(["contents", "pattern"] as const).map((t) => (
               <button key={t} type="button" onClick={() => setNewType(t)}
-                className={cn("h-7 rounded-[0.5rem] border font-mono text-[10px] transition-colors",
-                  newType === t ? "bg-arcilla/10 border-arcilla/35 text-arcilla/80" : "bg-musgo/10 border-musgo/20 text-crema/35 hover:border-musgo/40")}>
+                className={cn("h-7 rounded-[0.5rem] border font-sans text-xs transition-colors",
+                  newType === t ? "bg-arcilla/10 border-arcilla/35 text-arcilla/80" : "bg-surface border-musgo/20 text-subtle hover:border-musgo/40")}>
                 {t === "contents" ? "Vaciar carpeta" : "Por patrón"}
               </button>
             ))}
@@ -119,11 +119,11 @@ export function QuickCleanupPanel({ conn, basePath, onLog, onQueue, onOpDone }: 
             <input value={newPattern} onChange={(e) => setNewPattern(e.target.value)} placeholder="Nombre de archivo (ej. BD_log.txt)" className={INPUT} />
           )}
           <div className="flex gap-2">
-            <button onClick={() => setAdding(false)} className="flex-1 h-7 rounded-[0.5rem] border border-musgo/25 font-mono text-[10px] text-crema/35 hover:text-crema/60 transition-colors">
+            <button onClick={() => setAdding(false)} className="flex-1 h-7 rounded-[0.5rem] border border-musgo/25 font-sans text-xs text-subtle hover:text-muted transition-colors">
               Cancelar
             </button>
             <button onClick={handleAdd} disabled={!newLabel.trim()}
-              className="flex-1 h-7 rounded-[0.5rem] bg-arcilla/10 border border-arcilla/30 font-mono text-[10px] text-arcilla/80 hover:bg-arcilla/15 disabled:opacity-30 transition-colors">
+              className="flex-1 h-7 rounded-[0.5rem] bg-arcilla/10 border border-arcilla/30 font-sans text-xs text-arcilla/80 hover:bg-arcilla/15 disabled:opacity-30 transition-colors">
               Guardar
             </button>
           </div>
@@ -133,7 +133,7 @@ export function QuickCleanupPanel({ conn, basePath, onLog, onQueue, onOpDone }: 
       {/* Rules list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
         {!conn && (
-          <p className="font-mono text-[10px] text-crema/20 text-center py-4">
+          <p className="font-sans text-xs text-subtle text-center py-4">
             Conecta un servidor para ejecutar reglas
           </p>
         )}
@@ -143,23 +143,23 @@ export function QuickCleanupPanel({ conn, basePath, onLog, onQueue, onOpDone }: 
             <div key={rule.id}
               className={cn(
                 "group flex items-center gap-2 rounded-[0.625rem] border px-3 py-2.5 transition-colors",
-                state === "done"    ? "border-green-700/30 bg-green-900/10" :
-                state === "error"   ? "border-red-700/30 bg-red-900/10" :
+                state === "done"    ? "border-green-700/30 bg-success/10" :
+                state === "error"   ? "border-red-700/30 bg-danger/10" :
                 state === "running" ? "border-arcilla/30 bg-arcilla/5" :
                 "border-musgo/20 bg-musgo/5 hover:border-musgo/35"
               )}>
               {/* Icon */}
               <div className="shrink-0">
                 {state === "running" && <Loader2 size={12} className="text-arcilla/70 animate-spin" />}
-                {state === "done"    && <CheckCircle2 size={12} className="text-green-400" />}
-                {state === "error"   && <AlertCircle size={12} className="text-red-400" />}
+                {state === "done"    && <CheckCircle2 size={12} className="text-success" />}
+                {state === "error"   && <AlertCircle size={12} className="text-danger" />}
                 {state === "idle"    && <Zap size={12} className="text-arcilla/40" />}
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <p className="font-mono text-[10px] text-crema/70 truncate">{rule.label}</p>
-                <p className="font-mono text-[9px] text-crema/25 truncate">
+                <p className="font-sans text-xs text-crema truncate">{rule.label}</p>
+                <p className="font-sans text-xs text-subtle truncate">
                   {rule.type === "contents" ? `Vaciar: ${rule.path || "(ruta actual)"}` : `Eliminar: ${rule.pattern}`}
                 </p>
               </div>
@@ -169,13 +169,13 @@ export function QuickCleanupPanel({ conn, basePath, onLog, onQueue, onOpDone }: 
                 <button
                   onClick={() => runRule(rule)}
                   disabled={!conn || state === "running"}
-                  className="h-6 px-2 rounded-[0.375rem] bg-arcilla/10 border border-arcilla/25 font-mono text-[9px] text-arcilla/70 hover:bg-arcilla/20 disabled:opacity-30 transition-colors"
+                  className="h-6 px-2 rounded-[0.375rem] bg-arcilla/10 border border-arcilla/25 font-sans text-xs text-arcilla/70 hover:bg-arcilla/20 disabled:opacity-30 transition-colors"
                 >
                   Ejecutar
                 </button>
                 <button
                   onClick={() => removeQuickRule(rule.id)}
-                  className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded text-crema/20 hover:text-red-400 transition-all"
+                  className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded text-subtle hover:text-danger transition-all"
                 >
                   <X size={10} />
                 </button>

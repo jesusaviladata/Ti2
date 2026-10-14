@@ -22,11 +22,11 @@ export function TrashPanel() {
   if (!items.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-12 h-12 rounded-[0.75rem] bg-musgo/20 flex items-center justify-center mb-3">
-          <Package size={20} className="text-crema/20" />
+        <div className="w-12 h-12 rounded-[0.75rem] bg-surface flex items-center justify-center mb-3">
+          <Package size={20} className="text-subtle" />
         </div>
-        <p className="font-sans text-sm text-crema/40">Papelera vacía</p>
-        <p className="font-mono text-xs text-crema/20 mt-1">Los archivos eliminados aparecerán aquí</p>
+        <p className="font-sans text-sm text-muted">Papelera vacía</p>
+        <p className="font-sans text-xs text-subtle mt-1">Los archivos eliminados aparecerán aquí</p>
       </div>
     );
   }
@@ -34,14 +34,14 @@ export function TrashPanel() {
   return (
     <div className="space-y-4">
       {/* Summary bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 rounded-[0.75rem] bg-musgo/10 border border-musgo/20">
-        <span className="font-mono text-xs text-crema/50">
-          <span className="text-crema/80">{items.length}</span> archivo{items.length !== 1 ? "s" : ""} en papelera ·{" "}
+      <div className="flex items-center justify-between px-4 py-2.5 rounded-[0.75rem] bg-surface border border-musgo/20">
+        <span className="font-sans text-xs text-muted">
+          <span className="text-crema">{items.length}</span> archivo{items.length !== 1 ? "s" : ""} en papelera ·{" "}
           <span className="text-arcilla">{formatBytes(totalBytes)}</span>
         </span>
         <button
           onClick={() => setEmptyConfirm(true)}
-          className="font-mono text-[10px] text-red-400/60 hover:text-red-400 transition-colors"
+          className="font-sans text-xs text-danger hover:text-danger transition-colors"
         >
           Vaciar papelera
         </button>
@@ -58,7 +58,7 @@ export function TrashPanel() {
       />
 
       {/* Table header */}
-      <div className="grid grid-cols-[1fr_90px_110px_160px] gap-3 px-4 py-2 text-[10px] font-mono text-crema/25 uppercase tracking-wider border-b border-musgo/15">
+      <div className="grid grid-cols-[1fr_90px_110px_160px] gap-3 px-4 py-2 text-xs font-sans text-subtle uppercase tracking-wider border-b border-musgo/15">
         <span>Archivo</span>
         <span>Tamaño</span>
         <span>Eliminado</span>
@@ -95,33 +95,33 @@ function TrashRow({
   return (
     <div className={cn(
       "grid grid-cols-[1fr_90px_110px_160px] gap-3 px-4 py-3.5 items-center",
-      confirming ? "bg-red-900/10" : "hover:bg-musgo/5",
+      confirming ? "bg-danger/10" : "hover:bg-musgo/5",
       "transition-colors"
     )}>
       <div className="min-w-0">
-        <p className="font-sans text-xs text-crema/75 truncate">{item.name}</p>
-        <p className="font-mono text-[10px] text-crema/25 truncate mt-0.5">{item.originalPath}</p>
+        <p className="font-sans text-xs text-crema truncate">{item.name}</p>
+        <p className="font-sans text-xs text-subtle truncate mt-0.5">{item.originalPath}</p>
       </div>
 
-      <span className="font-mono text-xs text-crema/40">{formatBytes(item.sizeBytes)}</span>
+      <span className="font-sans text-xs text-muted">{formatBytes(item.sizeBytes)}</span>
 
-      <span className="font-mono text-[10px] text-crema/30">
+      <span className="font-sans text-xs text-subtle">
         {new Date(item.deletedAt).toLocaleString("es", { dateStyle: "short", timeStyle: "short" })}
       </span>
 
       <div className="flex items-center gap-1.5 justify-end">
         {confirming ? (
           <>
-            <span className="font-mono text-[10px] text-red-400/70 mr-1">¿Confirmar?</span>
+            <span className="font-sans text-xs text-danger mr-1">¿Confirmar?</span>
             <button
               onClick={onDelete}
-              className="px-2.5 py-1 rounded-[0.5rem] bg-red-900/30 border border-red-800/40 text-red-300 font-mono text-[10px] hover:bg-red-900/50 transition-colors"
+              className="px-2.5 py-1 rounded-[0.5rem] bg-red-900/30 border border-red-800/40 text-danger font-sans text-xs hover:bg-red-900/50 transition-colors"
             >
               Eliminar
             </button>
             <button
               onClick={onCancel}
-              className="px-2.5 py-1 rounded-[0.5rem] bg-musgo/20 border border-musgo/30 text-crema/40 font-mono text-[10px] hover:text-crema/60 transition-colors"
+              className="px-2.5 py-1 rounded-[0.5rem] bg-surface border border-musgo/30 text-muted font-sans text-xs hover:text-muted transition-colors"
             >
               Cancelar
             </button>
@@ -131,14 +131,14 @@ function TrashRow({
             <button
               onClick={onRestore}
               title="Restaurar"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-[0.5rem] bg-musgo/20 border border-musgo/30 text-crema/40 font-mono text-[10px] hover:text-crema/70 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-[0.5rem] bg-surface border border-musgo/30 text-muted font-sans text-xs hover:text-crema transition-colors"
             >
               <RotateCcw size={11} /> Restaurar
             </button>
             <button
               onClick={onConfirm}
               title="Eliminar definitivamente"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-[0.5rem] bg-red-900/15 border border-red-800/25 text-red-400/60 font-mono text-[10px] hover:text-red-300 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-[0.5rem] bg-danger/10 border border-red-800/25 text-danger font-sans text-xs hover:text-danger transition-colors"
             >
               <Trash2 size={11} /> Eliminar
             </button>

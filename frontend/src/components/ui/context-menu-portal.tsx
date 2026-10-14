@@ -51,10 +51,10 @@ export function ContextMenuPortal({ x, y, items, onClose }: Props) {
           key={i}
           onClick={() => { item.onClick(); onClose(); }}
           className={cn(
-            "w-full flex items-center gap-2.5 px-3 py-2 font-mono text-xs transition-colors text-left",
+            "w-full flex items-center gap-2.5 px-3 py-2 font-sans text-xs transition-colors text-left",
             item.danger
-              ? "text-red-400/70 hover:bg-red-900/20 hover:text-red-400"
-              : "text-crema/60 hover:bg-musgo/15 hover:text-crema/90"
+              ? "text-danger hover:bg-danger/10 hover:text-danger"
+              : "text-muted hover:bg-musgo/15 hover:text-crema"
           )}
         >
           {item.icon && <span className="shrink-0">{item.icon}</span>}
