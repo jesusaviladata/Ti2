@@ -383,7 +383,7 @@ class AgentCommandService:
             )
             run.phase = run.status.value
             run.progress_percent = 100
-            run.summary = dict(result)
+            run.summary = {**dict(run.summary or {}), **dict(result)}
             run.checkpoint_ref = str(result.get("checkpointRef") or "")[:1024] or None
             summary = result.get("summary") if isinstance(result.get("summary"), dict) else {}
             run.files_processed = self._nonnegative_int(

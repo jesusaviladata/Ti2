@@ -90,8 +90,14 @@ class AgentProfileService:
         if profile_type == "destination":
             destination_type = str(public_config.get("type") or "").lower()
             path = str(public_config.get("path") or "").strip()
-            if destination_type not in {"smb", "smb_direct", "sftp"} or not path:
+            if destination_type not in {"local", "smb", "smb_direct", "sftp"} or not path:
                 raise DomainError("AGENT_PROFILE_CONFIG_INVALID", "Indique tipo y ruta del destino", 422)
+            if destination_type == 'local':
+                from app.schemas.file_backup import _absolute_windows_path
+                try:
+                    _absolute_windows_path(path)
+                except ValueError as exc:
+                    raise DomainError('AGENT_PROFILE_CONFIG_INVALID', str(exc), 422) from exc
             if destination_type == "smb_direct" and not path.startswith(("\\\\", "//")):
                 raise DomainError(
                     "AGENT_PROFILE_CONFIG_INVALID",

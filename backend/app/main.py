@@ -16,6 +16,7 @@ from app.api.v1 import access_runtime, backups_runtime, connections, insights
 from app.services.backup_runtime_service import load_backup_schedules
 from app.services.cleanup_scheduler import load_cleanup_schedules
 from app.services.agent_backup_scheduler import load_agent_backup_plans
+from app.services.file_backup_scheduler import register_file_backup_scheduler
 
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
+    register_file_backup_scheduler()
     try:
         await load_backup_schedules()
         await load_agent_backup_plans()

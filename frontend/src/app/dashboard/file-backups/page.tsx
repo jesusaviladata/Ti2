@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from 'next/dynamic';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FILE_BACKUP_KEYS } from '@/hooks/useFileBackups';
+import { fileBackupsService } from '@/services/file-backups.service';
 import {
   AlertTriangle,
   Check,
@@ -17,10 +21,12 @@ import { formatBytes } from "@/lib/utils";
 import type { FileBackupRun, FileBackupTask } from "@/types/file-backup";
 
 const DAY = ["L", "M", "Mi", "J", "V", "S", "D"];
+const FileBackupWizard = dynamic(() => import('@/components/backups/file-backup-wizard'));
 
 export default function FileBackupsPage() {
   const tasks = useFileBackupTasks();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -30,11 +36,13 @@ export default function FileBackupsPage() {
           <h1 className="font-title text-[28px] font-semibold text-crema">Copias de carpetas</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted">Confirma qué carpetas están protegidas, dónde se guardan y si la última copia quedó verificada.</p>
         </div>
+        <button type="button" onClick={()=>setCreating(true)} className="rounded-lg border border-arcilla/40 bg-arcilla/10 px-4 py-2 text-sm text-arcilla">Proteger carpetas</button>
       </header>
 
       {tasks.isLoading ? <State icon={<Loader2 className="animate-spin" size={20} />} text="Consultando tareas del agente…" /> : null}
       {tasks.isError ? <State icon={<AlertTriangle size={20} />} text="No fue posible consultar las tareas de archivos." danger /> : null}
-      {tasks.data?.items.length === 0 ? <State icon={<FolderSync size={22} />} text="Aún no hay carpetas protegidas. La creación guiada se habilitará cuando el destino y el agente estén aplicados." /> : null}
+      {tasks.data?.items.length === 0 ? <State icon={<FolderSync size={22} />} text="Agrega una tarea para elegir tus carpetas, comprobar el destino y programar sus copias." /> : null}
+      {creating && <FileBackupWizard onClose={()=>setCreating(false)}/>}
 
       {tasks.data?.items.length ? (
         <section className="overflow-x-auto rounded-xl border border-musgo/25 bg-surface" aria-label="Tareas de protección de archivos">
@@ -58,6 +66,9 @@ export default function FileBackupsPage() {
 function TaskRow({ task, open, onToggle }: { task: FileBackupTask; open: boolean; onToggle: () => void }) {
   const runs = useFileBackupRuns(open ? task.id : undefined);
   const start = useStartFileBackup();
+  const client = useQueryClient();
+  const toggle = useMutation({mutationFn:()=>fileBackupsService.update(task.id,{isActive:!task.isActive}),onSuccess:()=>client.invalidateQueries({queryKey:FILE_BACKUP_KEYS.tasks})});
+  const [strategy, setStrategy] = useState<FileBackupTask['strategy']>(task.strategy);
   const latest = runs.data?.items[0];
   const schedule = task.schedule.weekdays.map((day) => DAY[day] ?? "?").join("/");
 
@@ -66,7 +77,7 @@ function TaskRow({ task, open, onToggle }: { task: FileBackupTask; open: boolean
       <button type="button" onClick={onToggle} aria-expanded={open} className="grid min-w-[820px] w-full grid-cols-[minmax(0,1.5fr)_minmax(180px,1fr)_150px_150px_36px] items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-musgo/[0.05] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-arcilla/70">
         <span className="min-w-0"><span className="block truncate text-sm font-medium text-crema">{task.name}</span><span className="mt-1 block truncate font-sans text-xs text-subtle">{task.sources.map((source) => source.path).join(" · ")}</span></span>
         <span className="truncate text-xs text-muted">Perfil {task.destinationProfileId.slice(0, 8)}</span>
-        <span className="text-xs text-muted">{schedule} · {task.schedule.localTime}</span>
+        <span className="text-xs text-muted">{task.isActive ? `${schedule} · ${task.schedule.localTime} CDMX` : 'Programación pausada'}</span>
         <RunState run={latest} active={task.isActive} />
         <span className="text-subtle">{open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</span>
       </button>
@@ -74,12 +85,16 @@ function TaskRow({ task, open, onToggle }: { task: FileBackupTask; open: boolean
         <div className="border-t border-musgo/15 bg-surface px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <Journey run={latest} loading={runs.isLoading} />
-            <button type="button" onClick={() => start.mutate({ taskId: task.id })} disabled={start.isPending || Boolean(latest && !["completed", "completed_with_warnings", "failed", "cancelled", "retryable"].includes(latest.status))} className="flex h-9 items-center gap-2 rounded-[0.5rem] border border-arcilla/40 px-3 text-xs text-arcilla transition-colors hover:bg-arcilla/10 disabled:cursor-not-allowed disabled:opacity-35">
+            <button type="button" disabled={toggle.isPending} onClick={()=>toggle.mutate()} className="rounded-lg border border-musgo/30 px-3 py-2 text-xs">{task.isActive?'Pausar programación':'Activar programación'}</button>
+            <label className="text-xs">Tipo de copia<select aria-label="Tipo de copia manual" value={strategy} onChange={e=>setStrategy(e.target.value as FileBackupTask['strategy'])} className="ml-2 rounded border border-musgo/25 bg-surface p-2"><option value="full">Full</option><option value="incremental">Incremental</option><option value="differential">Diferencial</option></select></label>
+            <button type="button" onClick={() => start.mutate({ taskId: task.id, strategy })} disabled={!task.isActive || start.isPending || Boolean(latest && !["completed", "completed_with_warnings", "failed", "cancelled", "retryable"].includes(latest.status))} className="flex h-9 items-center gap-2 rounded-[0.5rem] border border-arcilla/40 px-3 text-xs text-arcilla transition-colors hover:bg-arcilla/10 disabled:cursor-not-allowed disabled:opacity-35">
               {start.isPending ? <Loader2 size={13} className="animate-spin" /> : latest?.status === "retryable" ? <RotateCcw size={13} /> : <Play size={13} />}
               {latest?.status === "retryable" ? "Continuar" : "Copiar ahora"}
             </button>
           </div>
           {latest?.errorMessage ? <p className="mt-3 text-xs text-danger">{latest.errorMessage}</p> : null}
+          {start.isError || toggle.isError ? <p role="alert" className="mt-3 text-sm text-danger">No se pudo completar la acción. Revisa que el agente esté conectado.</p> : null}
+          {runs.data?.items.length ? <ol className="mt-4 space-y-2 border-t border-musgo/20 pt-3" aria-label="Historial de copias">{runs.data.items.map(run=><li key={run.id} className="flex flex-wrap justify-between gap-2 text-xs text-muted"><span>{new Date(run.createdAt).toLocaleString('es-MX',{timeZone:'America/Mexico_City'})} · {run.strategy}</span><span>{run.status} · {run.filesProcessed} archivos {run.errorMessage ? `· ${run.errorMessage}` : ''}</span></li>)}</ol> : null}
         </div>
       ) : null}
     </article>

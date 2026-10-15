@@ -22,6 +22,7 @@ export function useFileBackupTasks() {
     queryKey: FILE_BACKUP_KEYS.tasks,
     queryFn: () => fileBackupsService.listTasks(),
     staleTime: 30_000,
+    refetchInterval: 15_000,
   });
 }
 

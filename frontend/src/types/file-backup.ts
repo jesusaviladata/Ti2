@@ -53,6 +53,9 @@ export interface FileBackupRun {
   finishedAt: string | null;
 }
 
+export type FileBackupTaskInput = Pick<FileBackupTask, 'name' | 'agentId' | 'destinationProfileId' | 'sources' | 'filters' | 'strategy' | 'format' | 'schedule' | 'timezoneName' | 'retentionFullChains' | 'isActive'>;
+export interface FileSimulation { id: string; taskId: string; status: string; summary: { summary?: { filesTotal?: number; bytesTotal?: number; excludedCount?: number }; error?: string; message?: string }; }
+
 export interface FileBackupPage<T> {
   items: T[];
   total: number;

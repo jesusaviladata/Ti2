@@ -85,6 +85,17 @@ async def get_task(
     return await FileBackupService(db).get(str(current_user.tenant_id), task_id)
 
 
+@router.post('/tasks/{task_id}/destination-test')
+async def test_task_destination(
+    task_id: uuid.UUID,
+    current_user: User = Depends(run_file_backups),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await FileBackupService(db).test_destination(str(current_user.tenant_id), task_id)
+    await db.commit()
+    return result
+
+
 @router.patch("/tasks/{task_id}", response_model=FileBackupTaskResponse)
 async def update_task(
     task_id: uuid.UUID,

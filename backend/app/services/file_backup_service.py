@@ -244,6 +244,18 @@ class FileBackupService:
             raise NotFoundError("Simulación")
         return self._serialize_simulation(job, job.resource_id)
 
+    async def test_destination(self, tenant_id: str, task_id: str | uuid.UUID) -> dict:
+        task = await self._task(tenant_id, task_id)
+        await self._agent(tenant_id, task.agent_id)
+        await self._destination(tenant_id, task.agent_id, task.destination_profile_id)
+        job = await self.operations.start_managed_file_command(
+            tenant_id, str(task.agent_id), command_type='test_file_destination',
+            payload=await self._command_payload(task, file_run_id=uuid.uuid4()),
+            resource_id=task.id, idempotency_key=f'file-destination-test:{uuid.uuid4()}',
+            ttl_seconds=300,
+        )
+        return {'jobId': str(job.id)}
+
     async def list_runs(
         self,
         tenant_id: str,

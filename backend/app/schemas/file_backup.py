@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 from pathlib import PureWindowsPath
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -105,6 +106,15 @@ class FileBackupTaskCreate(FileBackupSchema):
             raise ValueError("El valor no puede quedar vacío")
         return normalized
 
+    @field_validator('timezone_name')
+    @classmethod
+    def valid_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError('La zona horaria no es válida') from exc
+        return value
+
 
 class FileBackupTaskUpdate(FileBackupSchema):
     name: str | None = Field(None, min_length=1, max_length=255)
@@ -120,6 +130,13 @@ class FileBackupTaskUpdate(FileBackupSchema):
     vss_policy: Literal["required", "preferred", "disabled"] | None = None
     verification_mode: Literal["sha256"] | None = None
     is_active: bool | None = None
+
+    @field_validator('timezone_name')
+    @classmethod
+    def valid_timezone(cls, value: str | None) -> str | None:
+        if value is not None:
+            return FileBackupTaskCreate.valid_timezone(value.strip())
+        return value
 
     @model_validator(mode="after")
     def require_change(self):
