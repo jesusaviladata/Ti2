@@ -99,6 +99,7 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
   const [fullDays, setFullDays] = useState<number[]>([0, 2, 4]);
   const [differentialDays, setDifferentialDays] = useState<number[]>([1, 3]);
   const [name, setName] = useState("Respaldos automáticos");
+  const [selectedNames, setSelectedNames] = useState<string[]>([]);
   const selectedAgent = useMemo(() => agents.find((item) => item.id === agentId), [agents, agentId]);
   const databases = useAgentDatabases(agentId, profileId, open && !!agentId && !!profileId);
   const create = useCreateAgentBackupPlan();
@@ -106,6 +107,10 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
   useEffect(() => {
     if (open && !agentId && agents[0]) setAgentId(agents[0].id);
   }, [open, agents, agentId]);
+
+  useEffect(() => {
+    setSelectedNames([]);
+  }, [agentId, profileId, open]);
 
   useEffect(() => {
     const firstProfile = selectedAgent?.sqlInstances[0]?.id ?? "";
@@ -123,6 +128,7 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
 
   if (!open) return null;
   const databaseNames = databases.data?.databases ?? [];
+  const includedNames = databaseNames.filter((database) => selectedNames.includes(database));
   const error = (create.error as any)?.response?.data?.error?.message ?? (create.error ? "No se pudo guardar el plan" : "");
 
   function toggleDay(kind: "full" | "differential", day: number) {
@@ -183,10 +189,26 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
             {databases.isLoading && <p className="mt-2 font-sans text-xs text-subtle">Consultando al agente…</p>}
             {databases.data && (
               <p className="mt-2 font-sans text-xs text-muted">
-                {databaseNames.length} bases encontradas. Se guardarán en lotes automáticos de máximo 100.
+                {includedNames.length} de {databaseNames.length} bases seleccionadas. Solo se respaldarán las que marques.
               </p>
             )}
             {databases.data?.error && <p className="mt-2 text-xs text-danger">{databases.data.error}</p>}
+            {databaseNames.length > 0 ? (
+              <fieldset className="mt-3 max-h-48 space-y-1 overflow-y-auto">
+                <legend className="sr-only">Seleccionar bases para el plan</legend>
+                {databaseNames.map((database) => (
+                  <label key={database} className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-inset">
+                    <input
+                      type="checkbox"
+                      checked={includedNames.includes(database)}
+                      onChange={(event) => setSelectedNames((current) => event.target.checked ? [...current, database] : current.filter((name) => name !== database))}
+                      className="h-4 w-4 shrink-0 accent-arcilla"
+                    />
+                    <span className="break-all">{database}</span>
+                  </label>
+                ))}
+              </fieldset>
+            ) : null}
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-musgo/20 p-4">
@@ -194,9 +216,9 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
               <span />
               {DAY_LABELS.map((day) => <span key={day} className="text-xs text-muted">{day}</span>)}
               <span className="self-center text-left text-xs text-muted">Full</span>
-              {DAY_LABELS.map((_, day) => <DayButton key={`full-${day}`} selected={fullDays.includes(day)} onClick={() => toggleDay("full", day)} />)}
+              {DAY_LABELS.map((label, day) => <DayButton key={`full-${day}`} label={`Full ${label}`} selected={fullDays.includes(day)} onClick={() => toggleDay("full", day)} />)}
               <span className="self-center text-left text-xs text-muted">Diferencial</span>
-              {DAY_LABELS.map((_, day) => <DayButton key={`differential-${day}`} selected={differentialDays.includes(day)} onClick={() => toggleDay("differential", day)} />)}
+              {DAY_LABELS.map((label, day) => <DayButton key={`differential-${day}`} label={`Diferencial ${label}`} selected={differentialDays.includes(day)} onClick={() => toggleDay("differential", day)} />)}
             </div>
           </div>
           <p className="text-xs text-muted">{fullDays.length ? scheduleSummary(fullDays, differentialDays) : "Seleccione al menos un día Full."}</p>
@@ -210,13 +232,13 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
         <div className="flex justify-end gap-3 border-t border-musgo/20 px-6 py-4">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
-            disabled={!agentId || !profileId || !name.trim() || databaseNames.length === 0 || fullDays.length === 0 || create.isPending}
+            disabled={!agentId || !profileId || !name.trim() || includedNames.length === 0 || fullDays.length === 0 || create.isPending}
             onClick={() => create.mutate({
               name: name.trim(),
               agentId,
               sqlProfileId: profileId,
               destinationProfileId: destinationId || undefined,
-              databaseNames,
+              databaseNames: includedNames,
               fullDays,
               differentialDays,
               localTime,
@@ -224,7 +246,7 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
               enabled: true,
             }, { onSuccess: onClose })}
           >
-            {create.isPending ? "Guardando…" : `Programar ${databaseNames.length} bases`}
+            {create.isPending ? "Guardando…" : `Programar ${includedNames.length} bases`}
           </Button>
         </div>
       </div>
@@ -232,10 +254,11 @@ export function BackupAutomationModal({ open, onClose }: { open: boolean; onClos
   );
 }
 
-function DayButton({ selected, onClick }: { selected: boolean; onClick: () => void }) {
+function DayButton({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
+      aria-label={label}
       aria-pressed={selected}
       onClick={onClick}
       className={selected ? "mx-auto grid h-8 w-8 place-items-center rounded-lg border border-arcilla/40 bg-arcilla/15 text-arcilla" : "mx-auto grid h-8 w-8 place-items-center rounded-lg border border-musgo/25 text-subtle hover:border-arcilla/25"}

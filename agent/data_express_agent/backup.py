@@ -195,9 +195,14 @@ def _connection_string(profile: dict[str, Any]) -> str:
     if not server or ";" in server or ";" in driver:
         raise BackupError("SQL_PROFILE_INVALID", "El perfil SQL no tiene un servidor valido")
     authentication = str(profile.get("authentication") or "windows").lower()
+    # LocalDB resolves to a local, user-owned named pipe. ODBC 17 rejects
+    # Encrypt=yes on this transport; never apply this exception to SQL hosts,
+    # TCP targets or arbitrary named pipes.
+    localdb = re.fullmatch(r"\(localdb\)\\[^\\;{}\r\n]{1,128}", server, re.IGNORECASE) is not None
+    encrypt = "no" if localdb else "yes"
     base = (
         f"DRIVER={{{driver}}};SERVER={server};DATABASE=master;"
-        "TrustServerCertificate=yes;Encrypt=yes;"
+        f"TrustServerCertificate=yes;Encrypt={encrypt};"
     )
     if authentication != "windows":
         raise BackupError(
