@@ -16,7 +16,8 @@ const BUTTON = 'rounded-lg border border-musgo/30 px-4 py-2 text-sm text-crema d
 const DAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
 function message(error: unknown) {
-  const response = (error as { response?: { data?: { message?: string; detail?: unknown } } }).response?.data;
+  const response = (error as { response?: { data?: { message?: string; detail?: unknown; error?: {message?: string} } } }).response?.data;
+  if (typeof response?.error?.message === 'string') return response.error.message;
   if (typeof response?.message === 'string') return response.message;
   if (typeof response?.detail === 'string') return response.detail;
   return 'No se pudo completar la operación. Revisa la conexión y los datos.';

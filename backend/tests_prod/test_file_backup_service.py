@@ -21,6 +21,22 @@ AGENT_ID = uuid.uuid4()
 PROFILE_ID = uuid.uuid4()
 
 
+@pytest.mark.asyncio
+async def test_parent_task_is_flushed_before_foreign_key_children():
+    service, repo = _service()
+    add_source = repo.add_source
+    add_filter = repo.add_filter
+    def checked_source(value):
+        assert service.db.flushed >= 1, 'La tarea debe persistirse antes de sus fuentes'
+        return add_source(value)
+    def checked_filter(value):
+        assert service.db.flushed >= 1, 'La tarea debe persistirse antes de sus filtros'
+        return add_filter(value)
+    repo.add_source = checked_source
+    repo.add_filter = checked_filter
+    await service.create(TENANT_ID, _payload())
+
+
 def _agent(*, status: str = "connected", capabilities=None):
     return SimpleNamespace(
         id=AGENT_ID,

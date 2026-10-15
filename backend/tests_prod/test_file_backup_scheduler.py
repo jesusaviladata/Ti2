@@ -51,3 +51,15 @@ async def test_dispatch_deduplicates_persistent_slots_and_commits_run(monkeypatc
         service.create_run.assert_awaited_once()
         assert run.summary['scheduledFor'] == '2026-10-15T16:30:00+00:00'
         db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_completion_preserves_schedule_marker_to_prevent_redispatch():
+    from app.services.agent_command_service import AgentCommandService
+    service = AgentCommandService.__new__(AgentCommandService)
+    run = SimpleNamespace(summary={'trigger':'scheduled','scheduledFor':'2026-10-15T16:30:00+00:00'},files_processed=0,bytes_processed=0,chain_id=None)
+    service._file_run_for_command = AsyncMock(return_value=run)
+    service._file_restore_for_command = AsyncMock(return_value=None)
+    await service._project_file_complete(SimpleNamespace(),{'status':'completed','summary':{'filesCopied':2,'bytesCopied':32}},datetime.now(UTC))
+    assert run.summary['scheduledFor'] == '2026-10-15T16:30:00+00:00'
+    assert run.files_processed == 2

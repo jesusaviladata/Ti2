@@ -128,6 +128,8 @@ class FileBackupService:
         sources = self._sources(task, body.sources, now)
         filters = self._filters(task, body.filters, now)
         self.repository.add_task(task)
+        # These models have foreign keys without ORM relationships for flush ordering.
+        await self.db.flush()
         for source in sources:
             self.repository.add_source(source)
         for item in filters:
@@ -306,6 +308,7 @@ class FileBackupService:
                 latest_run_at=now,
             )
             self.db.add(chain)
+            await self.db.flush()
             parent_id = None
         else:
             chain = await self.repository.get_chain(tenant_id, latest.chain_id)
