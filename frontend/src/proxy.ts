@@ -6,7 +6,8 @@ const PUBLIC_PATHS = ["/login", "/forgot-password"];
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/api/")) {
+  // La API y el canal de los agentes se autentican en FastAPI, no con la cookie del panel.
+  if (pathname.startsWith("/api/") || pathname.startsWith("/agent/")) {
     return NextResponse.next();
   }
 

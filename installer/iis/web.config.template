@@ -29,6 +29,10 @@
           <match url="^api/(.*)" />
           <action type="Rewrite" url="http://127.0.0.1:{{BACKEND_PORT}}/api/{R:1}" appendQueryString="true" />
         </rule>
+        <rule name="Gestor Agent" stopProcessing="true">
+          <match url="^agent/v1/(.*)" />
+          <action type="Rewrite" url="http://127.0.0.1:{{BACKEND_PORT}}/agent/v1/{R:1}" appendQueryString="true" />
+        </rule>
         <rule name="Gestor Health" stopProcessing="true">
           <match url="^health(?:/(.*))?$" />
           <action type="Rewrite" url="http://127.0.0.1:{{BACKEND_PORT}}/{R:0}" appendQueryString="true" />

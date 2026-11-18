@@ -60,6 +60,12 @@ Describe 'Installer Data Express' {
         $backend | Should Not Match '--host 0\.0\.0\.0'
     }
 
+    It 'publica el canal firmado de los agentes por el mismo dominio del panel' {
+        $proxy = Get-Content -LiteralPath (Join-Path $installerRoot 'iis\web.config.template') -Raw
+        $proxy | Should Match '<match url="\^agent/v1/\(\.\*\)" />'
+        $proxy | Should Match '/agent/v1/\{R:1\}'
+    }
+
     It 'exige una release frontend precompilada y no construye Next.js en produccion' {
         $installer = Get-Content -LiteralPath (Join-Path $installerRoot 'Install-GestorPrimee.ps1') -Raw
         $installer | Should Match 'frontend\\server\.js'
