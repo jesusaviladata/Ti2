@@ -44,7 +44,7 @@ function shortTime(iso: string) {
   return new Date(iso).toLocaleTimeString("es", { timeStyle: "short" });
 }
 
-type HeatmapRange = 7 | 30 | 84;
+type HeatmapRange = 7 | 30;
 
 function dayTotal(day: ChartDay) {
   return day.completed + day.failed + day.running;
@@ -100,7 +100,6 @@ function BackupActivityChart({ days }: { days: ChartDay[] }) {
         </div>
         <div className="flex w-fit rounded-[0.6rem] border border-crema/[0.08] p-0.5" role="group" aria-label="Periodo del calendario">
           {([
-            [84, "12 semanas"],
             [30, "30 días"],
             [7, "7 días"],
           ] as const).map(([value, label]) => (
@@ -135,7 +134,7 @@ function BackupActivityChart({ days }: { days: ChartDay[] }) {
           <div
             className={cn(
               "relative flex h-36 items-end border-b border-crema/15",
-              range === 84 ? "gap-px sm:gap-[2px]" : range === 30 ? "gap-[2px] sm:gap-1" : "justify-around gap-2 sm:gap-3",
+              range === 30 ? "gap-[2px] sm:gap-1" : "justify-around gap-2 sm:gap-3",
             )}
           >
             <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-crema/[0.08]" />
@@ -297,7 +296,7 @@ export default function DashboardPage() {
     try {
       const [s, c, a] = await Promise.all([
         api.get("/api/v1/dashboard/summary").then((r) => r.data),
-        api.get("/api/v1/dashboard/backup-chart", { params: { days: 84 } }).then((r) => r.data),
+        api.get("/api/v1/dashboard/backup-chart", { params: { days: 30 } }).then((r) => r.data),
         api.get("/api/v1/dashboard/activity").then((r) => r.data),
       ]);
       setSummary(s);
