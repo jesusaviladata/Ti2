@@ -2,14 +2,13 @@
 
 import Image from "next/image";
 import { useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import { AlertCircle, Eye, EyeOff, Lock, Mail, X } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const INPUT_CLASS =
-  "h-12 w-full rounded-[0.8rem] border border-white/10 bg-white/[0.055] px-11 pr-4 text-sm text-white outline-none transition-colors placeholder:text-white/25 focus:border-[#36A9E0]/70 focus:ring-2 focus:ring-[#36A9E0]/15";
+  "h-12 w-full rounded-[0.8rem] border border-white/10 bg-white/[0.055] px-11 pr-4 text-sm text-white outline-none transition-colors placeholder:text-white/45 focus:border-[#36A9E0]/70 focus:ring-2 focus:ring-[#36A9E0]/15 focus-visible:outline-none";
 
 interface FieldErrors {
   email?: string;
@@ -17,7 +16,6 @@ interface FieldErrors {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const { login, loading, error, clearError } = useAuth();
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -51,19 +49,8 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#071827] px-4 py-8">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.12]"
-        style={{
-          backgroundImage:
-            "linear-gradient(45deg, transparent 47%, #36A9E0 48%, #36A9E0 52%, transparent 53%), linear-gradient(-45deg, transparent 47%, #36A9E0 48%, #36A9E0 52%, transparent 53%)",
-          backgroundSize: "54px 54px",
-        }}
-      />
-
-      <section className="relative grid w-full max-w-[880px] overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#0C3350] shadow-[0_30px_90px_rgba(0,0,0,0.35)] md:grid-cols-[0.9fr_1.1fr]">
+      <section className="relative grid w-full max-w-[880px] overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#0C3350] shadow-[0_24px_64px_rgba(0,0,0,0.4)] md:grid-cols-[0.9fr_1.1fr]">
         <div className="relative flex min-h-[220px] flex-col items-center justify-center overflow-hidden bg-[#F7FAFC] px-8 py-10 md:min-h-[560px]">
-          <div className="absolute -left-12 -top-12 h-36 w-36 rotate-45 border-[24px] border-[#36A9E0]/10" />
-          <div className="absolute -bottom-10 -right-10 h-32 w-32 rotate-45 bg-[#1D0BB7]/[0.06]" />
           <Image
             src="/brand/data-express-logo.png"
             alt="Data Express Latinoamérica"
@@ -72,37 +59,25 @@ export default function LoginPage() {
             priority
             className="relative h-auto w-[170px] md:w-[220px]"
           />
-          <p className="relative mt-5 max-w-[260px] text-center text-xs leading-relaxed text-[#0C3350]/65">
+          <p className="relative mt-5 max-w-[260px] text-center text-sm leading-relaxed text-[#0C3350]/75">
             Operación segura de infraestructura, respaldos y acceso remoto.
           </p>
         </div>
 
         <div className="relative flex items-center px-6 py-10 sm:px-10 md:px-12">
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            aria-label="Cerrar"
-            className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full text-white/35 transition-colors hover:bg-white/10 hover:text-white"
-          >
-            <X size={15} />
-          </button>
-
           <div className="w-full">
-            <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[#36A9E0]">
-              Acceso corporativo
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight text-white">Iniciar sesión</h1>
-            <p className="mb-7 mt-2 text-sm leading-relaxed text-white/45">
+            <h1 className="text-[1.75rem] font-semibold tracking-[-0.02em] text-white">Iniciar sesión</h1>
+            <p className="mb-7 mt-2 text-sm leading-relaxed text-white/65">
               Ingresa con las credenciales proporcionadas por tu administrador.
             </p>
 
             <form onSubmit={handleLogin} noValidate className="space-y-5">
               <div>
-                <label htmlFor="login-email" className="mb-2 block text-xs font-medium text-white/70">
+                <label htmlFor="login-email" className="mb-2 block text-sm font-medium text-white/80">
                   Correo electrónico
                 </label>
                 <div className="relative">
-                  <Mail size={15} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+                  <Mail size={15} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/45" />
                   <input
                     ref={emailRef}
                     id="login-email"
@@ -129,11 +104,11 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label htmlFor="login-password" className="mb-2 block text-xs font-medium text-white/70">
+                <label htmlFor="login-password" className="mb-2 block text-sm font-medium text-white/80">
                   Contraseña
                 </label>
                 <div className="relative">
-                  <Lock size={15} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+                  <Lock size={15} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/45" />
                   <input
                     ref={passwordRef}
                     id="login-password"
@@ -154,7 +129,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
                     aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 transition-colors hover:text-white/65"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 rounded text-white/50 transition-colors hover:text-white/80"
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -174,13 +149,13 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex h-12 w-full items-center justify-center rounded-[0.8rem] bg-[#36A9E0] text-sm font-semibold text-[#071827] transition-colors hover:bg-[#5DB9E2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-wait disabled:opacity-60"
+                className="flex h-12 w-full items-center justify-center rounded-[0.8rem] bg-[#36A9E0] text-sm font-semibold text-[#071827] transition-[background-color,transform] duration-150 hover:bg-[#5DB9E2] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-wait disabled:opacity-60"
               >
                 {loading ? "Verificando acceso…" : "Iniciar sesión"}
               </button>
             </form>
 
-            <p className="mt-7 text-center font-mono text-[10px] text-white/25">
+            <p className="mt-7 text-center text-xs text-white/50">
               Acceso exclusivo para personal autorizado
             </p>
           </div>

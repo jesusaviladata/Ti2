@@ -19,3 +19,14 @@ export function formatDuration(minutes: number): string {
   const m = minutes % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
+
+/** Código de error de la API (`{ error: { code } }`) a partir de un error de Axios. */
+export function apiErrorCode(error: unknown): string | undefined {
+  const data = (error as { response?: { data?: { error?: { code?: string } } } } | null)?.response?.data;
+  return data?.error?.code;
+}
+
+/** El backend responde 503 AGENT_MODULE_DISABLED cuando el módulo de agentes Windows está apagado. */
+export function isAgentModuleDisabled(error: unknown): boolean {
+  return apiErrorCode(error) === "AGENT_MODULE_DISABLED";
+}

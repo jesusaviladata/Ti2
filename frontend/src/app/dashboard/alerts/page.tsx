@@ -64,9 +64,8 @@ export default function AlertsPage() {
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-          <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Centro de alertas</p>
-          <h1 className="font-title text-4xl font-semibold text-crema">
-            Notificaciones<span className="text-arcilla">.</span>
+          <h1 className="page-title">
+            Notificaciones
           </h1>
         </div>
         <div className="flex items-center gap-2">

@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import {
-  Database, Monitor, AlertTriangle, CheckCircle2,
-  XCircle, Clock, Wifi, RefreshCw, ShieldAlert,
+  Monitor, CheckCircle2, XCircle, Clock, Wifi, RefreshCw, ShieldAlert, ArrowUpRight,
 } from "lucide-react";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { PageHeader, SURFACE } from "@/components/ui/page-header";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Summary {
@@ -44,30 +44,25 @@ function shortTime(iso: string) {
   return new Date(iso).toLocaleTimeString("es", { timeStyle: "short" });
 }
 
-type HeatmapRange = 7 | 30 | 84;
+type HeatmapRange = 7 | 30;
 
 function dayTotal(day: ChartDay) {
   return day.completed + day.failed + day.running;
 }
 
-function heatColor(day: ChartDay, maxTotal: number) {
-  const total = dayTotal(day);
-  if (total === 0) return "rgba(242, 240, 233, 0.07)";
-  const intensity = 0.28 + (total / Math.max(maxTotal, 1)) * 0.62;
-  if (day.failed > 0) return `rgba(248, 113, 113, ${intensity})`;
-  if (day.running > 0) return `rgba(251, 191, 36, ${intensity})`;
-  return `rgba(74, 222, 128, ${intensity})`;
-}
+const SEGMENTS = [
+  { key: "completed", label: "completados", color: "bg-green-400/85" },
+  { key: "failed",    label: "fallidos",    color: "bg-red-400/90" },
+  { key: "running",   label: "en ejecución", color: "bg-amber-400/90" },
+] as const;
 
-function BackupHeatmap({ days }: { days: ChartDay[] }) {
-  const [range, setRange] = useState<HeatmapRange>(84);
+// ── Barras diarias apiladas ──────────────────────────────────────────────────
+function BackupActivityChart({ days }: { days: ChartDay[] }) {
+  const [range, setRange] = useState<HeatmapRange>(30);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const visibleDays = useMemo(() => days.slice(-range), [days, range]);
   const selected = visibleDays.find((day) => day.date === selectedDate) ?? null;
-  const leadingEmpty = visibleDays.length
-    ? (new Date(`${visibleDays[0].date}T00:00:00`).getDay() + 6) % 7
-    : 0;
 
   const totals = useMemo(() => visibleDays.reduce(
     (acc, day) => {
@@ -81,28 +76,32 @@ function BackupHeatmap({ days }: { days: ChartDay[] }) {
   ), [visibleDays]);
   const backupTotal = totals.completed + totals.failed + totals.running;
   const finishedTotal = totals.completed + totals.failed;
-  const successRate = finishedTotal > 0 ? Math.round((totals.completed / finishedTotal) * 100) : 0;
+  const successRate = finishedTotal > 0 ? Math.round((totals.completed / finishedTotal) * 100) : null;
   const maxTotal = visibleDays.reduce((max, day) => Math.max(max, dayTotal(day)), 0);
-
-  const stats = [
-    { label: "Backups", value: backupTotal },
-    { label: "Completados", value: totals.completed },
-    { label: "Con fallos", value: totals.failed },
-    { label: "Días activos", value: totals.activeDays },
-  ];
 
   return (
     <div>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="font-sans text-sm font-medium text-crema/75">Actividad de backups</p>
-          <p className="mt-1 font-mono text-[10px] text-crema/30">Cada cuadro representa un día · {successRate}% de éxito</p>
+          <h2 className="text-[15px] font-semibold text-crema">Actividad de backups</h2>
+          <p className="mt-1 text-sm text-crema/60">
+            <span className="tabular-nums text-crema/85">{backupTotal}</span> backups
+            {" · "}
+            <span className="tabular-nums text-crema/85">{totals.failed}</span> con fallos
+            {" · "}
+            <span className="tabular-nums text-crema/85">{totals.activeDays}</span> días activos
+            {successRate !== null ? (
+              <>
+                {" · "}
+                <span className="tabular-nums text-crema/85">{successRate}%</span> de éxito
+              </>
+            ) : null}
+          </p>
         </div>
-        <div className="flex w-fit rounded-[0.55rem] border border-musgo/25 bg-carbon/40 p-1" aria-label="Periodo del calendario">
+        <div className="flex w-fit rounded-[0.6rem] border border-crema/[0.08] p-0.5" role="group" aria-label="Periodo del calendario">
           {([
-            [84, "Todo"],
-            [30, "30 d"],
-            [7, "7 d"],
+            [30, "30 días"],
+            [7, "7 días"],
           ] as const).map(([value, label]) => (
             <button
               key={value}
@@ -113,10 +112,10 @@ function BackupHeatmap({ days }: { days: ChartDay[] }) {
               }}
               aria-pressed={range === value}
               className={cn(
-                "rounded-[0.4rem] px-3 py-1.5 font-mono text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-arcilla/70",
+                "rounded-[0.45rem] px-2.5 py-1 text-xs transition-colors duration-150",
                 range === value
-                  ? "bg-crema/10 text-crema/90"
-                  : "text-crema/35 hover:text-crema/65",
+                  ? "bg-crema/[0.09] font-medium text-crema"
+                  : "text-crema/55 hover:text-crema",
               )}
             >
               {label}
@@ -125,31 +124,25 @@ function BackupHeatmap({ days }: { days: ChartDay[] }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-        {stats.map((stat) => (
-          <div key={stat.label} className="rounded-[0.55rem] border border-musgo/15 bg-crema/[0.035] px-3 py-2.5">
-            <p className="font-sans text-[11px] text-crema/35">{stat.label}</p>
-            <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-crema/85">{stat.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 overflow-x-auto pb-2">
-        <div className="flex min-w-max items-start gap-2">
-          <div className="grid grid-rows-7 gap-1.5 pt-px" aria-hidden="true">
-            {["L", "M", "M", "J", "V", "S", "D"].map((label, index) => (
-              <span key={`${label}-${index}`} className="flex h-6 w-3 items-center justify-center font-mono text-[8px] text-crema/20 xl:h-7">
-                {label}
-              </span>
-            ))}
-          </div>
-          <div className="grid grid-flow-col grid-rows-7 gap-1.5">
-            {Array.from({ length: leadingEmpty }).map((_, index) => (
-              <span key={`empty-${index}`} className="h-6 w-6 xl:h-7 xl:w-7" aria-hidden="true" />
-            ))}
+      <div className="flex gap-2">
+        {/* Escala: máximo y cero */}
+        <div className="flex h-36 w-6 shrink-0 flex-col justify-between text-right text-[11px] tabular-nums text-crema/45" aria-hidden="true">
+          <span className="-mt-1.5">{maxTotal > 0 ? maxTotal : ""}</span>
+          <span className="-mb-1.5">0</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div
+            className={cn(
+              "relative flex h-36 items-end border-b border-crema/15",
+              range === 30 ? "gap-[2px] sm:gap-1" : "justify-around gap-2 sm:gap-3",
+            )}
+          >
+            <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-crema/[0.08]" />
+            <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-crema/[0.08]" />
             {visibleDays.map((day) => {
               const total = dayTotal(day);
               const isSelected = selected?.date === day.date;
+              const dimmed = selected !== null && !isSelected;
               const description = `${shortDate(day.date)}: ${total} backups; ${day.completed} completados, ${day.failed} fallidos y ${day.running} en ejecución`;
               return (
                 <button
@@ -159,85 +152,133 @@ function BackupHeatmap({ days }: { days: ChartDay[] }) {
                   aria-label={description}
                   aria-pressed={isSelected}
                   onClick={() => setSelectedDate(isSelected ? null : day.date)}
-                  className={cn(
-                    "h-6 w-6 rounded-[0.24rem] border border-crema/[0.035] transition duration-150 hover:scale-110 hover:border-crema/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-arcilla xl:h-7 xl:w-7",
-                    isSelected && "scale-110 border-arcilla/80 ring-1 ring-arcilla/70",
+                  className={cn("group relative flex h-full min-w-0 flex-1 flex-col-reverse rounded-t-[3px] outline-offset-2", range === 7 && "max-w-14")}
+                >
+                  {/* zona de clic completa; el fondo marca el día al pasar o seleccionar */}
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute inset-0 rounded-t-[3px] transition-colors duration-150",
+                      isSelected ? "bg-arcilla/[0.12]" : "group-hover:bg-crema/[0.05]",
+                    )}
+                  />
+                  {total === 0 ? (
+                    <span aria-hidden="true" className="relative h-[3px] w-full rounded-[2px] bg-crema/[0.12]" />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "relative flex w-full flex-col-reverse gap-px overflow-hidden rounded-t-[3px] transition-opacity duration-150",
+                        dimmed && "opacity-40",
+                      )}
+                      style={{ height: `${(total / Math.max(maxTotal, 1)) * 100}%` }}
+                    >
+                      {SEGMENTS.map(({ key, color }) =>
+                        day[key] > 0 ? (
+                          <span key={key} className={cn("w-full min-h-[2px]", color)} style={{ flexGrow: day[key] }} />
+                        ) : null,
+                      )}
+                    </span>
                   )}
-                  style={{ backgroundColor: heatColor(day, maxTotal) }}
-                />
+                </button>
               );
             })}
+          </div>
+          <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-crema/50" aria-hidden="true">
+            <span>{visibleDays[0] ? shortDate(visibleDays[0].date) : ""}</span>
+            {visibleDays.length > 2 ? <span>{shortDate(visibleDays[Math.floor(visibleDays.length / 2)].date)}</span> : null}
+            <span>Hoy</span>
           </div>
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-musgo/15 pt-3">
-        {selected ? (
-          <p className="font-mono text-[10px] text-crema/55" role="status">
-            <span className="text-crema/80">{shortDate(selected.date)}</span>
-            {` · ${selected.completed} completados · ${selected.failed} fallidos · ${selected.running} en ejecución`}
-          </p>
-        ) : (
-          <p className="font-mono text-[10px] text-crema/25">Selecciona un día para ver el detalle</p>
-        )}
-        <div className="flex items-center gap-3 font-mono text-[9px] text-crema/30" aria-label="Leyenda de estados">
-          <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-[0.15rem] bg-green-400/70" />Correcto</span>
-          <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-[0.15rem] bg-red-400/70" />Con fallos</span>
-          <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-[0.15rem] bg-amber-400/70" />En curso</span>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-crema/[0.06] pt-3">
+        <p className="text-sm text-crema/60" role="status">
+          {selected ? (
+            <>
+              <span className="font-medium text-crema">{shortDate(selected.date)}</span>
+              {` · ${selected.completed} completados · ${selected.failed} fallidos · ${selected.running} en ejecución`}
+            </>
+          ) : (
+            "Selecciona un día para ver el detalle"
+          )}
+        </p>
+        <div className="flex items-center gap-3 text-xs text-crema/55" aria-label="Leyenda de estados">
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[0.2rem] bg-green-400/85" />Correctos</span>
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[0.2rem] bg-red-400/90" />Con fallos</span>
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[0.2rem] bg-amber-400/90" />En curso</span>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Metric card ───────────────────────────────────────────────────────────────
-function MetricCard({ label, value, sub, icon: Icon, color, bg, href }: {
-  label: string; value: number | string; sub: string;
-  icon: React.ElementType; color: string; bg: string; href: string;
+// ── Franja de métricas ───────────────────────────────────────────────────────
+type Tone = "neutral" | "danger" | "warning";
+
+function Metric({ label, value, context, href, tone }: {
+  label: string; value: number; context: string; href: string; tone: Tone;
 }) {
+  const alert = value > 0 && tone !== "neutral";
   return (
     <Link
       href={href}
-      aria-label={`${label}: ${value}. Ver detalle`}
-      className="group block rounded-[1.25rem] bg-musgo/10 border border-musgo/20 p-5 hover:border-arcilla/40 focus-visible:border-arcilla/50 focus-visible:outline-none transition-colors"
+      aria-label={`${label}: ${value}. ${context}. Ver detalle`}
+      className="group relative flex flex-col gap-1 bg-carbon px-4 py-4 transition-colors duration-150 hover:bg-musgo/25 sm:px-5"
     >
-      <div className={cn("w-9 h-9 rounded-[0.75rem] flex items-center justify-center mb-4", bg)}>
-        <Icon size={17} className={color} />
-      </div>
-      <p className="mb-0.5 text-4xl font-semibold tabular-nums text-crema/90">{value}</p>
-      <p className="font-sans text-sm text-crema/60 group-hover:text-crema/80 transition-colors">{label}</p>
-      <p className="font-mono text-[10px] text-crema/25 mt-2">{sub}</p>
+      <span className="flex items-center justify-between gap-2 text-sm text-crema/65">
+        {label}
+        <ArrowUpRight
+          size={14}
+          aria-hidden="true"
+          className="text-crema/0 transition-colors duration-150 group-hover:text-crema/50"
+        />
+      </span>
+      <span
+        className={cn(
+          "text-[1.75rem] font-semibold leading-none tracking-[-0.02em] tabular-nums",
+          alert ? (tone === "danger" ? "text-red-300" : "text-amber-300") : "text-crema",
+        )}
+      >
+        {value}
+      </span>
+      <span className="text-xs text-crema/50">{context}</span>
     </Link>
   );
 }
 
-// ── Activity feed ─────────────────────────────────────────────────────────────
+// ── Actividad reciente ───────────────────────────────────────────────────────
 function ActivityFeed({ events }: { events: ActivityEvent[] }) {
   function icon(ev: ActivityEvent) {
     if (ev.kind === "backup") {
-      if (ev.status === "completed") return <CheckCircle2 size={12} className="text-green-400/70" />;
-      if (ev.status === "failed")    return <XCircle      size={12} className="text-red-400/70"   />;
-      return <Clock size={12} className="text-arcilla/60" />;
+      if (ev.status === "completed") return <CheckCircle2 size={15} className="text-green-400/80" />;
+      if (ev.status === "failed")    return <XCircle      size={15} className="text-red-400/80"   />;
+      return <Clock size={15} className="text-arcilla/80" />;
     }
-    if (ev.status === "alert") return <ShieldAlert size={12} className="text-orange-400/70" />;
-    if (ev.status === "active") return <Wifi size={12} className="text-green-400/70" />;
-    return <Monitor size={12} className="text-crema/30" />;
+    if (ev.status === "alert") return <ShieldAlert size={15} className="text-amber-400/80" />;
+    if (ev.status === "active") return <Wifi size={15} className="text-green-400/80" />;
+    return <Monitor size={15} className="text-crema/45" />;
   }
 
   if (!events.length) {
-    return <p className="font-mono text-xs text-crema/20 py-4 text-center">Sin actividad reciente</p>;
+    return (
+      <div className="py-6 text-center">
+        <p className="text-sm text-crema/65">Sin actividad reciente</p>
+        <p className="mt-1 text-xs text-crema/45">Aquí aparecerán los backups y los accesos remotos.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-1">
+    <ul className="divide-y divide-crema/[0.05]">
       {events.map((ev) => (
-        <div key={ev.id} className="flex items-center gap-3 px-1 py-2 rounded-[0.5rem] hover:bg-musgo/10 transition-colors">
-          <div className="shrink-0">{icon(ev)}</div>
-          <span className="flex-1 font-mono text-xs text-crema/60 truncate">{ev.label}</span>
-          <span className="font-mono text-[10px] text-crema/25 shrink-0">{shortTime(ev.ts)}</span>
-        </div>
+        <li key={ev.id} className="flex items-center gap-3 py-2.5">
+          <span className="shrink-0">{icon(ev)}</span>
+          <span className="min-w-0 flex-1 truncate text-sm text-crema/80">{ev.label}</span>
+          <time dateTime={ev.ts} className="shrink-0 text-xs tabular-nums text-crema/50">{shortTime(ev.ts)}</time>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -247,21 +288,27 @@ export default function DashboardPage() {
   const [chart,    setChart]    = useState<ChartDay[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [loading,  setLoading]  = useState(true);
+  const [failed,   setFailed]   = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [s, c, a] = await Promise.all([
         api.get("/api/v1/dashboard/summary").then((r) => r.data),
-        api.get("/api/v1/dashboard/backup-chart", { params: { days: 84 } }).then((r) => r.data),
+        api.get("/api/v1/dashboard/backup-chart", { params: { days: 30 } }).then((r) => r.data),
         api.get("/api/v1/dashboard/activity").then((r) => r.data),
       ]);
       setSummary(s);
       setChart(c.chart);
       setActivity(a.activity);
       setLastSync(new Date());
-    } catch {}
-    finally { setLoading(false); }
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -270,98 +317,77 @@ export default function DashboardPage() {
     return () => clearInterval(id);
   }, [load]);
 
-  const cards = summary ? [
-    {
-      label: "Backups hoy",
-      value: summary.backups_today,
-      sub:   "completados hoy",
-      icon:  Database,
-      color: "text-green-400",
-      bg:    "bg-green-900/20",
-      href:  "/dashboard/backups",
-    },
-    {
-      label: "Sesiones activas",
-      value: summary.active_sessions,
-      sub:   "accesos abiertos ahora",
-      icon:  Monitor,
-      color: "text-blue-400",
-      bg:    "bg-blue-900/20",
-      href:  "/dashboard/access",
-    },
-    {
-      label: "Backups fallidos",
-      value: summary.failed_backups,
-      sub:   "en total",
-      icon:  XCircle,
-      color: "text-red-400",
-      bg:    "bg-red-900/20",
-      href:  "/dashboard/backups",
-    },
-    {
-      label: "Alertas críticas",
-      value: summary.critical_alerts,
-      sub:   "fallos + accesos sospechosos",
-      icon:  AlertTriangle,
-      color: "text-orange-400",
-      bg:    "bg-orange-900/20",
-      href:  "/dashboard/alerts",
-    },
+  const metrics = summary ? [
+    { label: "Backups hoy",      value: summary.backups_today,   context: "Completados hoy",                href: "/dashboard/backups", tone: "neutral" as const },
+    { label: "Backups fallidos", value: summary.failed_backups,  context: "Histórico total",                href: "/dashboard/backups", tone: "danger"  as const },
+    { label: "Alertas críticas", value: summary.critical_alerts, context: "Fallos y accesos sospechosos",   href: "/dashboard/alerts",  tone: "warning" as const },
+    { label: "Sesiones activas", value: summary.active_sessions, context: "Accesos remotos abiertos ahora", href: "/dashboard/access",  tone: "neutral" as const },
   ] : [];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Panel principal</p>
-          <h1 className="font-title text-4xl font-semibold text-crema">
-            Resumen general<span className="text-arcilla">.</span>
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {lastSync && (
-            <span className="font-mono text-[10px] text-crema/25">
-              Actualizado {lastSync.toLocaleTimeString("es", { timeStyle: "short" })}
-            </span>
-          )}
-          <button onClick={load}
-            className="w-7 h-7 flex items-center justify-center rounded-[0.5rem] border border-musgo/25 text-crema/30 hover:text-crema/70 transition-colors">
-            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-          </button>
-        </div>
-      </div>
-
-      {/* Metric cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {loading
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-36 rounded-[1.25rem] bg-musgo/10 border border-musgo/15 animate-pulse" />
-            ))
-          : cards.map((c) => <MetricCard key={c.label} {...c} />)
+    <div className="mx-auto max-w-[1400px] space-y-6">
+      <PageHeader
+        title="Resumen general"
+        description={
+          failed
+            ? "No se pudo actualizar el resumen. Se reintentará en 30 segundos."
+            : lastSync
+              ? `Actualizado a las ${lastSync.toLocaleTimeString("es", { timeStyle: "short" })} · se refresca cada 30 segundos`
+              : "Cargando el estado de la plataforma…"
         }
-      </div>
+        actions={
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="inline-flex h-9 items-center gap-2 rounded-[0.6rem] border border-crema/10 px-3 text-sm text-crema/75 transition-colors duration-150 hover:border-crema/20 hover:text-crema disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            Actualizar
+          </button>
+        }
+      />
 
-      {/* Chart + Activity */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        {/* Backup activity calendar */}
-        <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 p-5">
+      {/* Métricas: una franja, no cuatro tarjetas */}
+      <section aria-label="Indicadores principales" className="overflow-hidden rounded-[0.9rem] border border-crema/[0.07]">
+        <div className="grid grid-cols-2 gap-px bg-crema/[0.07] lg:grid-cols-4">
+          {summary
+            ? metrics.map((m) => <Metric key={m.label} {...m} />)
+            : Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-2 bg-carbon px-5 py-4" aria-hidden="true">
+                  <div className="h-4 w-24 animate-pulse rounded bg-crema/[0.06]" />
+                  <div className="h-7 w-10 animate-pulse rounded bg-crema/[0.08]" />
+                  <div className="h-3 w-32 animate-pulse rounded bg-crema/[0.05]" />
+                </div>
+              ))}
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section className={cn(SURFACE, "p-5")}>
           {chart.length === 0 ? (
-            <div className="h-48 flex items-center justify-center">
-              <p className="font-mono text-xs text-crema/20">Sin datos de backups aún</p>
+            <div className="py-12 text-center">
+              <h2 className="text-[15px] font-semibold text-crema">Actividad de backups</h2>
+              <p className="mt-1 text-sm text-crema/60">
+                {loading ? "Cargando actividad…" : "Todavía no hay backups registrados."}
+              </p>
             </div>
           ) : (
-            <BackupHeatmap days={chart} />
+            <BackupActivityChart days={chart} />
           )}
-        </div>
+        </section>
 
-        {/* Activity feed */}
-        <div className="max-h-[420px] overflow-hidden rounded-[1.25rem] bg-musgo/10 border border-musgo/20 p-5">
-          <p className="font-sans text-sm font-medium text-crema/70 mb-4">Actividad reciente</p>
-          <div className="max-h-[350px] overflow-y-auto pr-1">
+        <section className={cn(SURFACE, "flex max-h-[460px] flex-col p-5")}>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-[15px] font-semibold text-crema">Actividad reciente</h2>
+            <Link href="/dashboard/alerts" className="text-xs text-arcilla hover:underline hover:underline-offset-4">
+              Ver todo
+            </Link>
+          </div>
+          <div className="-mr-2 overflow-y-auto pr-2">
             <ActivityFeed events={activity} />
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

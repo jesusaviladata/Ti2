@@ -1,47 +1,40 @@
 "use client";
 
 import { useState } from "react";
-import { Database, CheckCircle2, XCircle, Clock, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader, SURFACE } from "@/components/ui/page-header";
 import { BackupList } from "@/components/backups/backup-list";
 import { AgentTriggerBackupModal } from "@/components/backups/agent-trigger-backup-modal";
 import { AgentSelector } from "@/components/agents/agent-selector";
 import { useBackupList } from "@/hooks/useBackups";
 import { BackupAutomationList, BackupAutomationModal } from "@/components/backups/backup-automation";
 import { useAgents, useSelectedAgentId } from "@/hooks/useAgents";
+import { cn, isAgentModuleDisabled } from "@/lib/utils";
 
 function BackupStats() {
   const { data } = useBackupList(0, 100);
 
-  const stats = {
-    total:     data?.total ?? 0,
-    completed: data?.items.filter((b) => b.status === "completed").length ?? 0,
-    running:   data?.items.filter((b) => b.status === "running" || b.status === "pending").length ?? 0,
-    failed:    data?.items.filter((b) => b.status === "failed").length ?? 0,
-  };
-
-  const cards = [
-    { label: "Total backups", value: stats.total,     icon: Database,      color: "text-crema/60",  bg: "bg-musgo/30" },
-    { label: "Completados",   value: stats.completed, icon: CheckCircle2,  color: "text-green-400", bg: "bg-green-900/20" },
-    { label: "En ejecución",  value: stats.running,   icon: Clock,         color: "text-arcilla",   bg: "bg-arcilla/10" },
-    { label: "Fallidos",      value: stats.failed,    icon: XCircle,       color: "text-red-400",   bg: "bg-red-900/20" },
+  const stats = [
+    { label: "Total",        value: data?.total ?? 0,                                                                   tone: "text-crema" },
+    { label: "Completados",  value: data?.items.filter((b) => b.status === "completed").length ?? 0,                     tone: "text-crema" },
+    { label: "En ejecución", value: data?.items.filter((b) => b.status === "running" || b.status === "pending").length ?? 0, tone: "text-arcilla" },
+    { label: "Fallidos",     value: data?.items.filter((b) => b.status === "failed").length ?? 0,                        tone: "text-red-300" },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {cards.map(({ label, value, icon: Icon, color, bg }) => (
-        <div
-          key={label}
-          className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 p-4 hover:border-musgo/30 transition-colors"
-        >
-          <div className={`w-8 h-8 rounded-[0.65rem] ${bg} flex items-center justify-center mb-3`}>
-            <Icon size={15} className={color} />
+    <section aria-label="Resumen de backups" className="overflow-hidden rounded-[0.9rem] border border-crema/[0.07]">
+      <dl className="grid grid-cols-2 gap-px bg-crema/[0.07] lg:grid-cols-4">
+        {stats.map(({ label, value, tone }) => (
+          <div key={label} className="flex flex-col gap-1 bg-carbon px-4 py-3.5 sm:px-5">
+            <dt className="text-sm text-crema/65">{label}</dt>
+            <dd className={cn("text-2xl font-semibold leading-none tracking-[-0.02em] tabular-nums", value > 0 ? tone : "text-crema")}>
+              {value}
+            </dd>
           </div>
-          <p className="text-3xl font-semibold tabular-nums text-crema/90">{value}</p>
-          <p className="font-mono text-[11px] text-crema/35 mt-0.5">{label}</p>
-        </div>
-      ))}
-    </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
@@ -51,40 +44,45 @@ export default function BackupsPage() {
   const agentsQuery = useAgents();
   const agents = agentsQuery.data?.items ?? [];
   const [agentId, setAgentId] = useSelectedAgentId(agents);
+  const agentModuleOff = isAgentModuleDisabled(agentsQuery.error);
 
   return (
-    <div className="space-y-7">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Módulo</p>
-          <h1 className="font-title text-4xl font-semibold text-crema">
-            Backups<span className="text-arcilla">.</span>
-          </h1>
-        </div>
+    <div className="mx-auto max-w-[1400px] space-y-6">
+      <PageHeader
+        title="Backups"
+        description="Respaldos de SQL Server ejecutados por los agentes Windows: historial, planes automáticos y ejecución manual."
+        actions={
+          <>
+            {!agentModuleOff ? <AgentSelector agents={agents} value={agentId} onChange={setAgentId} /> : null}
+            <Button
+              onClick={() => setBackupModalOpen(true)}
+              disabled={!agentId}
+              title={agentModuleOff ? "Requiere el módulo de agentes" : !agentId ? "Selecciona un agente conectado" : undefined}
+              className="gap-2"
+            >
+              <Plus size={15} />
+              Nuevo backup
+            </Button>
+          </>
+        }
+      />
 
-        <div className="flex items-center gap-2 mt-1 flex-wrap justify-end">
-          <AgentSelector agents={agents} value={agentId} onChange={setAgentId} />
+      {agentModuleOff ? (
+        <p className="rounded-[0.8rem] border border-arcilla/25 bg-arcilla/[0.06] px-4 py-3 text-sm text-crema/80">
+          <span className="font-medium text-crema">Módulo de agentes desactivado.</span>{" "}
+          Puedes consultar el historial, pero para lanzar o programar backups un administrador debe activar
+          el agente Windows en el servidor.
+        </p>
+      ) : null}
 
-          {/* Trigger backup */}
-          <Button onClick={() => setBackupModalOpen(true)} disabled={!agentId} className="gap-2">
-            <Plus size={14} />
-            Nuevo Backup
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats */}
       <BackupStats />
 
       <BackupAutomationList onNew={() => setAutomationModalOpen(true)} />
 
-      {/* Historial */}
-      <div className="rounded-[1.25rem] bg-musgo/10 border border-musgo/20 overflow-hidden">
+      <section className={cn(SURFACE, "overflow-hidden")}>
         <BackupList />
-      </div>
+      </section>
 
-      {/* Modals */}
       <AgentTriggerBackupModal open={backupModalOpen} onClose={() => setBackupModalOpen(false)} agentId={agentId} />
       <BackupAutomationModal open={automationModalOpen} onClose={() => setAutomationModalOpen(false)} />
     </div>

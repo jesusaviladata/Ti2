@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Check, Database, Power, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SURFACE } from "@/components/ui/page-header";
+import { cn, isAgentModuleDisabled } from "@/lib/utils";
 import {
   useAgentBackupPlans,
   useAgentDatabases,
@@ -31,38 +33,48 @@ function displayDate(value?: string | null) {
 }
 
 export function BackupAutomationList({ onNew }: { onNew: () => void }) {
-  const { data, isLoading } = useAgentBackupPlans();
+  const { data, isLoading, error } = useAgentBackupPlans();
+  const moduleOff = isAgentModuleDisabled(error);
   const update = useUpdateAgentBackupPlan();
   const remove = useDeleteAgentBackupPlan();
   const plans = data?.items ?? [];
 
   return (
-    <section className="rounded-[1.25rem] border border-musgo/20 bg-musgo/10 p-5 space-y-4">
-      <div className="flex items-center justify-between gap-3">
+    <section className={cn(SURFACE, "space-y-4 p-5")}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-arcilla">Automatización</p>
-          <h2 className="mt-1 text-lg font-semibold text-crema">Full L/M/V · Diferencial M/J</h2>
-          <p className="mt-1 text-xs text-crema/40">Cada agente procesa sus bases en lotes de hasta 100.</p>
+          <h2 className="text-[15px] font-semibold text-crema">Planes automáticos</h2>
+          <p className="mt-1 text-sm text-crema/60">Full lunes, miércoles y viernes · diferencial martes y jueves. Cada agente procesa sus bases en lotes de hasta 100.</p>
         </div>
-        <Button onClick={onNew} variant="outline" className="gap-2 shrink-0">
+        <Button onClick={onNew} variant="outline" size="sm" className="shrink-0 gap-2 self-start" disabled={moduleOff}>
           <CalendarClock size={14} /> Programar
         </Button>
       </div>
 
-      {isLoading && <p className="font-mono text-xs text-crema/35">Cargando planes…</p>}
-      {!isLoading && plans.length === 0 && (
-        <div className="rounded-xl border border-dashed border-musgo/25 px-4 py-5 text-center text-xs text-crema/35">
+      {isLoading && <p className="text-sm text-crema/55" role="status">Cargando planes…</p>}
+      {moduleOff && (
+        <p className="rounded-[0.7rem] border border-crema/[0.08] px-4 py-3 text-sm text-crema/65">
+          Los planes automáticos usan el agente Windows, y ese módulo está desactivado en este servidor.
+        </p>
+      )}
+      {!isLoading && !moduleOff && error && (
+        <p className="rounded-[0.7rem] border border-red-400/25 px-4 py-3 text-sm text-red-300" role="alert">
+          No se pudieron cargar los planes. Vuelve a intentarlo en unos segundos.
+        </p>
+      )}
+      {!isLoading && !error && plans.length === 0 && (
+        <div className="rounded-[0.7rem] border border-dashed border-crema/[0.1] px-4 py-5 text-center text-sm text-crema/55">
           Todavía no hay planes automáticos.
         </div>
       )}
       {plans.map((plan) => (
-        <div key={plan.id} className="flex flex-col gap-3 rounded-xl border border-musgo/20 bg-carbon p-4 lg:flex-row lg:items-center">
+        <div key={plan.id} className="flex flex-col gap-3 rounded-[0.7rem] border border-crema/[0.08] p-4 lg:flex-row lg:items-center">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${plan.enabled ? "bg-green-400" : "bg-crema/25"}`} />
               <p className="truncate text-sm font-medium text-crema">{plan.name}</p>
             </div>
-            <p className="mt-1 font-mono text-[10px] text-crema/35">
+            <p className="mt-1 text-xs tabular-nums text-crema/55">
               {scheduleSummary(plan.fullDays, plan.differentialDays)} · {plan.databaseNames.length} bases · {plan.localTime} CDMX · Próximo: {displayDate(plan.nextRunAt)}
             </p>
           </div>
