@@ -24,10 +24,20 @@ class Settings(BaseSettings):
     LOGIN_MAX_FAILS: int = 5
     LOGIN_FAIL_WINDOW_SEC: int = 300
 
-    # Windows Agent. Se activa solo despues de configurar la firma en Railway.
+    # Windows Agent.
+    # Por defecto el modulo se activa y desactiva desde el panel (Configuracion > Agentes)
+    # y el backend genera y custodia su propia llave de firma de comandos.
+    # AGENT_MODULE_SELF_SERVICE=false impide que se active desde el panel.
+    # AGENT_MODULE_ENABLED=true lo fuerza encendido con la llave de las variables de
+    # entorno (modo gestionado por el servidor); el panel ya no puede apagarlo.
+    AGENT_MODULE_SELF_SERVICE: bool = True
     AGENT_MODULE_ENABLED: bool = False
     AGENT_COMMAND_SIGNING_PRIVATE_KEY: str = ""
     AGENT_COMMAND_SIGNING_KEY_ID: str = ""
+    # URL publica que usan los agentes. Vacia: se usa APP_ORIGIN, que reenvia /agent/v1.
+    AGENT_CONTROL_PLANE_URL: str = ""
+    AGENT_PACKAGE_VERSION: str = "0.5.0"
+    AGENT_MODULE_REFRESH_SEC: int = Field(15, ge=5, le=300)
     AGENT_ENROLLMENT_TTL_SEC: int = Field(600, ge=60, le=3600)
     AGENT_COMMAND_TTL_SEC: int = Field(120, ge=30, le=600)
     AGENT_MAX_CLOCK_SKEW_SEC: int = Field(120, ge=30, le=300)
@@ -87,9 +97,33 @@ class Settings(BaseSettings):
                 raise ValueError("Produccion requiere APP_ORIGIN HTTPS y COOKIE_SECURE=true")
         return self
 
+    @property
+    def agent_signing_key_from_environment(self) -> bool:
+        return bool(self.AGENT_COMMAND_SIGNING_PRIVATE_KEY or self.AGENT_COMMAND_SIGNING_KEY_ID)
+
+    @property
+    def agent_control_plane_url(self) -> str:
+        return (self.AGENT_CONTROL_PLANE_URL or self.APP_ORIGIN).rstrip("/")
+
+    @model_validator(mode="after")
+    def _validate_agent_control_plane(self):
+        from urllib.parse import urlsplit
+
+        parts = urlsplit(self.agent_control_plane_url)
+        if parts.scheme not in {"http", "https"} or not parts.netloc:
+            raise ValueError("AGENT_CONTROL_PLANE_URL debe ser una URL http(s) valida")
+        if parts.path not in {"", "/"} or parts.query or parts.fragment:
+            raise ValueError("AGENT_CONTROL_PLANE_URL no debe llevar ruta ni parametros")
+        if self.APP_ENV == "production" and parts.scheme != "https":
+            raise ValueError("En produccion AGENT_CONTROL_PLANE_URL debe ser HTTPS")
+        return self
+
     @model_validator(mode="after")
     def _validate_agent_signing(self):
-        if not self.AGENT_MODULE_ENABLED:
+        # La llave de entorno se valida siempre que se configure, aunque el modulo se
+        # active desde el panel: una llave mal pegada debe fallar al arrancar, no al
+        # firmar el primer comando.
+        if not self.AGENT_MODULE_ENABLED and not self.agent_signing_key_from_environment:
             return self
         key_id = self.AGENT_COMMAND_SIGNING_KEY_ID
         valid_key_id = (

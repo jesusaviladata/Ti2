@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent_protocol import load_private_key, sign_command
+from app.agent_protocol import sign_command
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.errors import DomainError
@@ -24,16 +24,14 @@ from app.schemas.agent import (
 from app.services.agent_command_service import AgentCommandService, canonical_json
 from app.services.agent_enrollment_service import AgentEnrollmentService
 from app.services.agent_health_service import AgentHealthService
+from app.services import agent_module
 
 
 router = APIRouter()
 
 
 def _require_enabled() -> None:
-    if not settings.AGENT_MODULE_ENABLED:
-        raise DomainError(
-            "AGENT_MODULE_DISABLED", "El módulo de agentes no está habilitado", 503
-        )
+    agent_module.require_enabled()
 
 
 def _isoformat(value: datetime) -> str:
@@ -54,10 +52,8 @@ def _command_response(command: AgentCommand) -> Response:
             "idempotencyKey": command.idempotency_key,
         }
     )
-    key_id = settings.AGENT_COMMAND_SIGNING_KEY_ID
-    signature = sign_command(
-        load_private_key(settings.AGENT_COMMAND_SIGNING_PRIVATE_KEY), key_id, body
-    )
+    key_id, private_key = agent_module.signing_material()
+    signature = sign_command(private_key, key_id, body)
     return Response(
         body,
         media_type="application/json",
@@ -92,7 +88,7 @@ async def enroll_agent(
     return {
         "agentId": str(agent.id),
         "tenantId": str(agent.tenant_id),
-        "commandSigningKeyId": settings.AGENT_COMMAND_SIGNING_KEY_ID,
+        "commandSigningKeyId": agent_module.active_key_id(),
         "minimumAgentVersion": settings.AGENT_MIN_VERSION,
         "pollIntervalSeconds": 25,
     }

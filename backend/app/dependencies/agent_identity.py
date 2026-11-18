@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.errors import DomainError
 from app.models.operations import RemoteAgent
+from app.services import agent_module
 from app.services.agent_auth_service import AgentAuthService
 
 
@@ -28,10 +29,7 @@ async def require_agent_identity(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> RemoteAgent:
-    if not settings.AGENT_MODULE_ENABLED:
-        raise DomainError(
-            "AGENT_MODULE_DISABLED", "El módulo de agentes no está habilitado", 503
-        )
+    agent_module.require_enabled()
     body = await request.body()
     if len(body) > settings.AGENT_MAX_BODY_BYTES:
         raise DomainError(

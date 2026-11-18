@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.capabilities import Capability, require_capabilities
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.errors import DomainError
 from app.models.operations import RemoteAgent
 from app.models.user import User
 from app.repositories.agent_admin_repository import AgentAdminRepository
@@ -17,6 +16,7 @@ from app.services.agent_admin_service import (
     AgentAdminService,
     server_payload,
 )
+from app.services import agent_module
 from app.services.agent_enrollment_service import AgentEnrollmentService
 from app.services.agent_operation_service import AgentOperationService, _is_online
 from app.services.agent_replacement_service import AgentReplacementService
@@ -88,10 +88,7 @@ class QuarantineActionRequest(BaseModel):
 
 
 def _require_enabled() -> None:
-    if not settings.AGENT_MODULE_ENABLED:
-        raise DomainError(
-            "AGENT_MODULE_DISABLED", "El módulo de agentes no está habilitado", 503
-        )
+    agent_module.require_enabled()
 
 
 def _serialize(agent: RemoteAgent, configuration: dict | None = None) -> dict:

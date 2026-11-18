@@ -16,8 +16,7 @@ from app.services.agent_admin_service import AgentAdminService
 from app.services.agent_backup_service import AgentBackupService
 from app.services.agent_backup_scheduler import AgentBackupPlanService
 from app.services.agent_operation_service import AgentOperationService
-from app.core.config import settings
-from app.core.errors import DomainError
+from app.services import agent_module
 
 
 router = APIRouter()
@@ -95,10 +94,7 @@ class AgentBackupPlanUpdateBody(BaseModel):
 
 
 def _require_agent_module() -> None:
-    if not settings.AGENT_MODULE_ENABLED:
-        raise DomainError(
-            "AGENT_MODULE_DISABLED", "El modulo de agentes no esta habilitado", 503
-        )
+    agent_module.require_enabled()
 
 
 class RetentionBody(BaseModel):

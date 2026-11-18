@@ -1,21 +1,25 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.database import AsyncSessionLocal
 from app.core.csrf import CSRFMiddleware
 from app.core.scheduler import scheduler
 from app.core.errors import DomainError, domain_error_handler
 from app.middleware.audit import AuditMiddleware
 from app.api import agent as agent_api, health
+from app.api.v1 import agent_module as agent_module_api
 from app.api.v1 import agent_profiles, agent_storage, agents, auth, file_backups, users
 from app.api.v1 import cleanup_runtime, remote_cleanup, file_manager
 from app.api.v1 import access_runtime, backups_runtime, connections, insights
 from app.services.backup_runtime_service import load_backup_schedules
 from app.services.cleanup_scheduler import load_cleanup_schedules
 from app.services.agent_backup_scheduler import load_agent_backup_plans
+from app.services import agent_module
 
 
 logger = logging.getLogger(__name__)
@@ -25,12 +29,23 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     scheduler.start()
     try:
+        async with AsyncSessionLocal() as db:
+            await agent_module.reload(db)
+    except Exception:
+        logger.exception("No se pudo cargar el estado del modulo de agentes")
+    refresher = asyncio.create_task(
+        agent_module.refresh_forever(AsyncSessionLocal, settings.AGENT_MODULE_REFRESH_SEC)
+    )
+    try:
         await load_backup_schedules()
         await load_agent_backup_plans()
         await load_cleanup_schedules()
     except Exception:
         logger.exception("No se pudieron rehidratar las programaciones")
     yield
+    refresher.cancel()
+    with suppress(asyncio.CancelledError):
+        await refresher
     scheduler.shutdown(wait=False)
 
 
@@ -56,6 +71,7 @@ app.add_middleware(CSRFMiddleware)
 
 app.include_router(health.router)
 app.include_router(agent_api.router, prefix="/agent/v1", tags=["agent"] )
+app.include_router(agent_module_api.router, prefix="/api/v1/agent-module", tags=["agent-module"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"] )
 app.include_router(agent_storage.router, prefix="/api/v1/agent-storage", tags=["agent-storage"])
 app.include_router(agent_profiles.router, prefix="/api/v1/agents", tags=["agent-profiles"])
