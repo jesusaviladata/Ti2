@@ -23,4 +23,10 @@ Describe "package.ps1" {
         $hash | Should BeGreaterThan $quick
         $hash | Should BeGreaterThan $specs
     }
+
+    It "acepta el bootstrap.json descargado del panel en lugar de los parametros sueltos" {
+        $source | Should Match '\[string\]\$BootstrapFile'
+        $source | Should Match 'Use -BootstrapFile o los parametros'
+        $source | Should Not Match 'Mandatory = \$true\)\]\[string\]\$CommandSigningPublicKey'
+    }
 }

@@ -2,9 +2,12 @@
 param(
     [Parameter(Mandatory = $true)][string]$WinSWPath,
     [string]$Version = "0.5.0",
-    [Parameter(Mandatory = $true)][ValidatePattern('^https://')][string]$ControlPlaneUrl,
-    [Parameter(Mandatory = $true)][string]$CommandSigningPublicKey,
-    [Parameter(Mandatory = $true)][string]$CommandSigningKeyId,
+    [ValidatePattern('^https://')][string]$ControlPlaneUrl = "",
+    [string]$CommandSigningPublicKey = "",
+    [string]$CommandSigningKeyId = "",
+    # bootstrap.json descargado del panel (Configuracion > Agentes). Sustituye a los
+    # tres parametros anteriores: trae la URL del panel y la llave publica de firma.
+    [string]$BootstrapFile = "",
     [switch]$ReplaceExisting
 )
 
@@ -19,6 +22,27 @@ $installerTarget = Join-Path $packageRoot "installer"
 $releaseNotesSource = Join-Path $agentRoot "CAMBIOS-AGENTE-$Version.md"
 $quickInstallerSource = Join-Path $agentRoot "Instalar-DataExpressAgent.cmd"
 $specsSource = Join-Path $repoRoot "docs\superpowers\specs"
+
+if ($BootstrapFile) {
+    if ($ControlPlaneUrl -or $CommandSigningPublicKey -or $CommandSigningKeyId) {
+        throw "Use -BootstrapFile o los parametros ControlPlaneUrl y CommandSigning*, no ambos."
+    }
+    if (-not (Test-Path -LiteralPath $BootstrapFile -PathType Leaf)) {
+        throw "No se encontro el bootstrap.json indicado."
+    }
+    $downloaded = Get-Content -LiteralPath $BootstrapFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    $activeId = [string]$downloaded.commandTrust.activeKeyId
+    $activeKey = @($downloaded.commandTrust.keys | Where-Object { [string]$_.keyId -eq $activeId })
+    if ([int]$downloaded.schemaVersion -ne 1 -or $activeKey.Count -ne 1 -or -not [string]$activeKey[0].publicKey) {
+        throw "bootstrap.json no es valido; descarguelo de nuevo desde Configuracion > Agentes."
+    }
+    $ControlPlaneUrl = [string]$downloaded.controlPlaneUrl
+    $CommandSigningKeyId = $activeId
+    $CommandSigningPublicKey = [string]$activeKey[0].publicKey
+}
+if ($ControlPlaneUrl -notmatch '^https://' -or -not $CommandSigningPublicKey -or -not $CommandSigningKeyId) {
+    throw "Indique -BootstrapFile o los parametros ControlPlaneUrl, CommandSigningPublicKey y CommandSigningKeyId."
+}
 
 if (-not (Test-Path (Join-Path $bundleSource "DataExpressAgent.exe"))) {
     throw "Primero ejecute build.ps1 para generar el agente."
