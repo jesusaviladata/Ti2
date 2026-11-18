@@ -7,6 +7,7 @@ import { AgentRootWizard } from "@/components/agents/agent-root-wizard";
 import type { AgentRecord } from "@/types/agent";
 import { ManagedProfilesPanel } from "@/components/agents/managed-profiles-panel";
 import { AgentReplacementDialog } from "@/components/agents/agent-replacement-dialog";
+import { isAgentModuleDisabled } from "@/lib/utils";
 
 export function AgentsAdmin() {
   const agentsQuery = useAgents();
@@ -15,24 +16,57 @@ export function AgentsAdmin() {
   const [connections, setConnections] = useState<AgentRecord | null>(null);
   const [replacing, setReplacing] = useState<AgentRecord | null>(null);
 
+  const moduleOff = isAgentModuleDisabled(agentsQuery.error) || isAgentModuleDisabled(pairing.error);
+  const agents = agentsQuery.data?.items ?? [];
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-sm leading-relaxed text-crema/45">Los agentes ejecutan backups y limpieza localmente. Las credenciales y rutas sensibles nunca pasan por el navegador.</p>
-        <button type="button" onClick={() => pairing.mutate()} className="flex h-9 items-center gap-2 rounded-[0.625rem] border border-arcilla/35 bg-arcilla/10 px-4 text-xs text-arcilla hover:bg-arcilla/15"><Link2 size={13} /> Vincular agente</button>
+        <button
+          type="button"
+          onClick={() => pairing.mutate()}
+          disabled={pairing.isPending || moduleOff}
+          title={moduleOff ? "El módulo de agentes está desactivado en este servidor" : undefined}
+          className="flex h-9 items-center gap-2 rounded-[0.625rem] border border-arcilla/35 bg-arcilla/10 px-4 text-xs text-arcilla hover:bg-arcilla/15 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-arcilla/10"
+        >
+          <Link2 size={13} /> {pairing.isPending ? "Generando código…" : "Vincular agente"}
+        </button>
       </div>
+
+      {moduleOff && (
+        <p className="rounded-[0.7rem] border border-crema/[0.08] px-4 py-3 text-sm text-crema/65">
+          La vinculación de agentes usa el módulo del agente Windows, y ese módulo está desactivado en este servidor.
+        </p>
+      )}
+
+      {!moduleOff && pairing.isError && (
+        <p className="rounded-[0.7rem] border border-red-400/25 px-4 py-3 text-sm text-red-300" role="alert">
+          No se pudo generar el código de vinculación. Vuelve a intentarlo en unos segundos.
+        </p>
+      )}
 
       {pairing.data ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[0.875rem] border border-arcilla/25 bg-arcilla/[0.06] px-4 py-3">
-          <div><p className="text-xs text-crema/45">Código de vinculación</p><p className="mt-1 font-mono text-sm tracking-wider text-crema">{pairing.data.code}</p></div>
+          <div>
+            <p className="text-xs text-crema/45">Código de vinculación</p>
+            <p className="mt-1 font-mono text-sm tracking-wider text-crema">{pairing.data.code}</p>
+            <p className="mt-1 font-mono text-[10px] text-crema/35">Vence a las {new Date(pairing.data.expiresAt).toLocaleTimeString("es", { timeStyle: "short" })}</p>
+          </div>
           <button type="button" onClick={() => navigator.clipboard.writeText(pairing.data!.code)} className="flex items-center gap-2 text-xs text-arcilla"><Copy size={13} /> Copiar</button>
         </div>
       ) : null}
 
       <div className="overflow-hidden rounded-[1rem] border border-musgo/20 bg-musgo/[0.05]">
-        {!agentsQuery.data?.items.length ? (
+        {agentsQuery.isLoading ? (
+          <div className="p-10 text-center"><p className="text-sm text-crema/55" role="status">Cargando agentes…</p></div>
+        ) : moduleOff ? (
+          <div className="p-10 text-center"><WifiOff size={22} className="mx-auto mb-3 text-crema/20" /><p className="text-sm text-crema/50">Módulo de agentes desactivado</p><p className="mt-1 font-mono text-[10px] text-crema/25">Habilítalo en el servidor para vincular y administrar agentes.</p></div>
+        ) : agentsQuery.isError ? (
+          <div className="p-10 text-center" role="alert"><p className="text-sm text-red-300">No se pudieron cargar los agentes</p><p className="mt-1 font-mono text-[10px] text-crema/25">Vuelve a intentarlo en unos segundos.</p></div>
+        ) : !agents.length ? (
           <div className="p-10 text-center"><WifiOff size={22} className="mx-auto mb-3 text-crema/20" /><p className="text-sm text-crema/50">No hay agentes vinculados</p><p className="mt-1 font-mono text-[10px] text-crema/25">Genera un código e instálalo en el servidor Windows.</p></div>
-        ) : agentsQuery.data.items.map((agent) => (
+        ) : agents.map((agent) => (
           <div key={agent.id} className="grid gap-3 border-b border-musgo/15 p-4 last:border-b-0 md:grid-cols-[1fr_auto] md:items-center">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2"><ServerCog size={14} className="text-arcilla/70" /><span className="text-sm font-medium text-crema/80">{agent.configuration?.name ?? agent.hostname}</span><span className={agent.online ? "font-mono text-[10px] text-green-400" : "font-mono text-[10px] text-red-400"}>● {agent.online ? "Conectado" : "Desconectado"}</span></div>
