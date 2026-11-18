@@ -1,4 +1,5 @@
 "use client";
+import { isAgentModuleDisabled } from "@/lib/utils";
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +14,11 @@ export const AGENT_KEYS = {
 };
 
 export function useAgents() {
-  return useQuery({ queryKey: AGENT_KEYS.all, queryFn: agentsService.list, refetchInterval: 30_000 });
+  return useQuery({
+    queryKey: AGENT_KEYS.all,
+    queryFn: agentsService.list,
+    refetchInterval: (query) => (isAgentModuleDisabled(query.state.error) ? false : 30_000),
+  });
 }
 
 export function useAgentProfiles(agentId: string | null) {

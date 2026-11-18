@@ -474,9 +474,8 @@ export default function AccessPage() {
       {/* Header */}
       <div className="flex items-end justify-between shrink-0">
         <div>
-          <p className="font-mono text-xs text-arcilla uppercase tracking-[0.18em] mb-1">Módulo</p>
-          <h1 className="font-title text-4xl font-semibold text-crema">
-            Acceso Remoto<span className="text-arcilla">.</span>
+          <h1 className="page-title">
+            Acceso Remoto
           </h1>
         </div>
         <div className="flex items-center gap-2">

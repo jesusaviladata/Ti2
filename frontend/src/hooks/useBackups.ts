@@ -1,4 +1,5 @@
 "use client";
+import { isAgentModuleDisabled } from "@/lib/utils";
 
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { backupsService } from "@/services/backups.service";
@@ -119,7 +120,7 @@ export function useAgentBackupPlans() {
   return useQuery({
     queryKey: BACKUP_KEYS.agentPlans,
     queryFn: () => backupsService.listAgentPlans(),
-    refetchInterval: 30_000,
+    refetchInterval: (query) => (isAgentModuleDisabled(query.state.error) ? false : 30_000),
   });
 }
 

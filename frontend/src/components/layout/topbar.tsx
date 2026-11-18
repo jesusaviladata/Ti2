@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Search, Bell, Sun, Moon, X,
   LogOut, User, Database, Monitor, ShieldAlert,
-  AlertTriangle, CheckCircle2, Trash2,
+  AlertTriangle, CheckCircle2, Trash2, Menu,
 } from "lucide-react";
 import type { User as AuthUser } from "@/types";
 import { useAuthStore } from "@/store/auth.store";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavStore } from "@/store/nav.store";
 import { useTheme } from "@/components/providers/theme-provider";
 import { StorageHealthIndicator } from "@/components/layout/storage-health-indicator";
 import api from "@/lib/api";
@@ -80,12 +82,12 @@ function SearchPanel({
   return (
     <div
       id="global-search-results"
-      className="absolute left-0 top-full mt-2 w-full min-w-[420px] z-[60] rounded-[1rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden"
+      className="absolute left-0 top-full mt-2 w-[min(420px,calc(100vw-2rem))] z-[60] rounded-[0.9rem] bg-carbon border border-crema/10 shadow-[0_12px_32px_rgba(0,0,0,0.35)] overflow-hidden"
     >
       {/* Loading / empty */}
       {status === "loading" && (
         <div className="px-4 py-5 text-center">
-          <p role="status" className="font-mono text-xs text-crema/40">Buscando…</p>
+          <p role="status" className="text-sm text-crema/55">Buscando…</p>
         </div>
       )}
       {status === "error" && (
@@ -97,7 +99,7 @@ function SearchPanel({
       )}
       {status === "success" && !hasAny && (
         <div className="px-4 py-5 text-center">
-          <p className="font-mono text-xs text-crema/25">Sin resultados para &ldquo;{query}&rdquo;</p>
+          <p className="text-sm text-crema/50">Sin resultados para &ldquo;{query}&rdquo;</p>
         </div>
       )}
 
@@ -106,7 +108,7 @@ function SearchPanel({
         <div>
           <div className="flex items-center gap-2 px-4 pt-3 pb-1.5">
             <Database size={10} className="text-crema/30" />
-            <span className="font-mono text-[9px] text-crema/30 uppercase tracking-widest">Backups</span>
+            <span className="text-xs font-medium text-crema/55">Backups</span>
           </div>
           {backups.map((item) => (
             <button
@@ -129,7 +131,7 @@ function SearchPanel({
         <div className={hasBackups ? "border-t border-musgo/15" : ""}>
           <div className="flex items-center gap-2 px-4 pt-3 pb-1.5">
             <Monitor size={10} className="text-crema/30" />
-            <span className="font-mono text-[9px] text-crema/30 uppercase tracking-widest">Acceso Remoto</span>
+            <span className="text-xs font-medium text-crema/55">Acceso Remoto</span>
           </div>
           {access.map((item) => (
             <button
@@ -141,7 +143,7 @@ function SearchPanel({
               <div className="flex-1 min-w-0">
                 <p className="font-sans text-sm text-crema/80 truncate">{item.title}</p>
                 {item.subtitle && (
-                  <p className="font-mono text-[10px] text-crema/35 truncate">{item.subtitle}</p>
+                  <p className="text-xs text-crema/55 truncate">{item.subtitle}</p>
                 )}
               </div>
             </button>
@@ -151,7 +153,7 @@ function SearchPanel({
 
       {/* Footer */}
       <div className="border-t border-musgo/15 px-4 py-2 flex items-center justify-between">
-        <span className="font-mono text-[9px] text-crema/20">Esc para cerrar</span>
+        <span className="text-xs text-crema/45">Esc para cerrar</span>
         <button
           onClick={onClose}
           className="text-crema/25 hover:text-crema/60 transition-colors"
@@ -173,7 +175,7 @@ function NotificationsPanel({
   clearing: boolean;
 }) {
   return (
-    <div className="absolute right-0 top-full mt-2 w-[300px] z-[60] rounded-[1rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden">
+    <div className="absolute right-0 top-full mt-2 w-[min(320px,calc(100vw-2rem))] z-[60] origin-top-right rounded-[0.9rem] bg-carbon border border-crema/10 shadow-[0_12px_32px_rgba(0,0,0,0.35)] overflow-hidden">
       <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-musgo/15">
         <span className="font-sans text-sm font-medium text-crema/70">Notificaciones</span>
         <div className="flex items-center gap-2">
@@ -182,7 +184,7 @@ function NotificationsPanel({
               type="button"
               onClick={onClear}
               disabled={clearing}
-              className="flex items-center gap-1 font-mono text-[9px] text-crema/30 transition-colors hover:text-red-300 disabled:opacity-40"
+              className="flex items-center gap-1 text-xs text-crema/55 transition-colors hover:text-red-300 disabled:opacity-40"
             >
               <Trash2 size={11} /> {clearing ? "Limpiando…" : "Limpiar"}
             </button>
@@ -196,7 +198,7 @@ function NotificationsPanel({
       {notifications.length === 0 ? (
         <div className="px-4 py-8 text-center space-y-2">
           <CheckCircle2 size={20} className="text-crema/15 mx-auto" />
-          <p className="font-mono text-xs text-crema/25">Sin notificaciones</p>
+          <p className="text-sm text-crema/50">Sin notificaciones</p>
         </div>
       ) : (
         <div className="max-h-[320px] overflow-y-auto">
@@ -212,9 +214,9 @@ function NotificationsPanel({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-sans text-xs font-medium text-crema/80">{n.title}</p>
-                <p className="font-mono text-[10px] text-crema/40 mt-0.5 truncate">{n.body}</p>
+                <p className="text-xs text-crema/55 mt-0.5 truncate">{n.body}</p>
               </div>
-              <span className="font-mono text-[9px] text-crema/25 shrink-0 mt-0.5">
+              <span className="text-xs tabular-nums text-crema/45 shrink-0 mt-0.5">
                 {timeAgo(n.ts)}
               </span>
             </div>
@@ -238,17 +240,17 @@ function ProfileDropdown({
     : "??";
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-[210px] z-[60] rounded-[1rem] bg-carbon border border-musgo/30 shadow-2xl overflow-hidden">
+    <div role="menu" className="absolute right-0 top-full mt-2 w-[240px] z-[60] origin-top-right rounded-[0.9rem] bg-carbon border border-crema/10 shadow-[0_12px_32px_rgba(0,0,0,0.35)] overflow-hidden">
       <div className="px-4 py-4 border-b border-musgo/15">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-musgo border border-musgo/60 flex items-center justify-center shrink-0">
-            <span className="font-mono text-sm text-crema/70">{initials}</span>
+          <div className="w-9 h-9 rounded-full bg-arcilla/15 flex items-center justify-center shrink-0">
+            <span className="text-sm font-semibold text-arcilla">{initials}</span>
           </div>
           <div className="min-w-0">
             <p className="font-sans text-sm font-medium text-crema/90 truncate">
               {user?.fullName ?? "Usuario"}
             </p>
-            <p className="font-mono text-[10px] text-crema/40 truncate">
+            <p className="text-xs text-crema/55 truncate">
               {user?.email ?? ""}
             </p>
           </div>
@@ -256,15 +258,21 @@ function ProfileDropdown({
       </div>
 
       <div className="p-2">
-        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-[0.5rem] text-crema/55 hover:bg-musgo/15 hover:text-crema/90 transition-colors text-sm font-sans">
-          <User size={14} />
-          Mi perfil
-        </button>
-        <button
-          onClick={() => { onClose(); onLogout(); }}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-[0.5rem] text-red-400/70 hover:bg-red-900/15 hover:text-red-400 transition-colors text-sm font-sans mt-0.5"
+        <Link
+          href="/dashboard/settings"
+          role="menuitem"
+          onClick={onClose}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-[0.55rem] text-crema/75 hover:bg-crema/[0.05] hover:text-crema transition-colors text-sm"
         >
-          <LogOut size={14} />
+          <User size={15} />
+          Configuración de la cuenta
+        </Link>
+        <button
+          role="menuitem"
+          onClick={() => { onClose(); onLogout(); }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-[0.55rem] text-red-300 hover:bg-red-500/10 transition-colors text-sm mt-0.5"
+        >
+          <LogOut size={15} />
           Cerrar sesión
         </button>
       </div>
@@ -278,6 +286,8 @@ export function Topbar() {
   const { theme, toggle: toggleTheme } = useTheme();
   const user = useAuthStore((s) => s.user);
   const { logout } = useAuth();
+  const mobileNavOpen = useNavStore((s) => s.mobileOpen);
+  const setMobileNavOpen = useNavStore((s) => s.setMobileOpen);
 
   // Search
   const [query,       setQuery]       = useState("");
@@ -418,20 +428,30 @@ export function Topbar() {
     : "??";
 
   return (
-    <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b border-musgo/20 px-6">
+    <header className="relative z-40 flex h-16 shrink-0 items-center gap-2 border-b border-crema/[0.06] px-3 sm:gap-3 sm:px-4 lg:px-6">
+      <button
+        type="button"
+        onClick={() => setMobileNavOpen(true)}
+        aria-label="Abrir menú"
+        aria-controls="menu-movil"
+        aria-expanded={mobileNavOpen}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.6rem] text-crema/70 transition-colors hover:bg-crema/[0.05] hover:text-crema lg:hidden"
+      >
+        <Menu size={18} />
+      </button>
       {/* ── Search ─────────────────────────────────────────────────────────── */}
       <div ref={searchRef} className="relative flex min-w-0 w-full max-w-sm items-center">
-        <Search size={14} className="absolute left-3 text-crema/30 z-10 pointer-events-none" />
+        <Search size={15} className="absolute left-3 text-crema/50 z-10 pointer-events-none" />
         <input
           type="text"
-          placeholder="Buscar..."
+          placeholder="Buscar"
           aria-label="Buscar backups y sesiones de acceso"
           aria-controls="global-search-results"
           aria-expanded={searchOpen && query.trim().length >= 2}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
           onFocus={() => setSearchOpen(true)}
-          className="w-full h-9 bg-musgo/10 border border-musgo/20 rounded-pill pl-9 pr-10 text-sm text-crema placeholder:text-crema/25 focus:outline-none focus:border-musgo/50 transition-colors"
+          className="w-full h-9 bg-crema/[0.04] border border-crema/10 rounded-[0.6rem] pl-9 pr-10 text-sm text-crema placeholder:text-crema/45 focus:outline-none focus-visible:outline-none focus:border-arcilla/60 transition-colors"
         />
         {query ? (
           <button
@@ -442,8 +462,8 @@ export function Topbar() {
             <X size={13} />
           </button>
         ) : (
-          <kbd className="absolute right-3 font-mono text-[10px] text-crema/20 border border-musgo/20 rounded px-1 pointer-events-none">
-            ⌘K
+          <kbd className="absolute right-3 hidden rounded border border-crema/10 px-1.5 text-[11px] text-crema/45 pointer-events-none sm:block">
+            Ctrl K
           </kbd>
         )}
 
@@ -468,7 +488,7 @@ export function Topbar() {
           onClick={toggleTheme}
           title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
           aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-          className="w-9 h-9 rounded-[0.75rem] flex items-center justify-center text-crema/40 hover:bg-musgo/20 hover:text-crema/80 transition-all"
+          className="w-9 h-9 rounded-[0.6rem] flex items-center justify-center text-crema/60 hover:bg-crema/[0.05] hover:text-crema transition-colors"
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
@@ -484,12 +504,12 @@ export function Topbar() {
             aria-label={`Notificaciones${unread > 0 ? ` (${unread} sin leer)` : ""}`}
             aria-haspopup="menu"
             aria-expanded={notifOpen}
-            className="relative w-9 h-9 rounded-[0.75rem] flex items-center justify-center text-crema/40 hover:bg-musgo/20 hover:text-crema/80 transition-all"
+            className="relative w-9 h-9 rounded-[0.6rem] flex items-center justify-center text-crema/60 hover:bg-crema/[0.05] hover:text-crema transition-colors"
           >
             <Bell size={16} />
             {unread > 0 && (
               <span className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] bg-arcilla rounded-full flex items-center justify-center px-0.5">
-                <span className="font-mono text-[8px] text-crema leading-none">
+                <span className="text-[9px] font-semibold text-tinta leading-none tabular-nums">
                   {unread > 9 ? "9+" : unread}
                 </span>
               </span>
@@ -512,9 +532,9 @@ export function Topbar() {
             aria-label="Menú de perfil"
             aria-haspopup="menu"
             aria-expanded={profileOpen}
-            className="w-8 h-8 rounded-full bg-musgo border border-musgo/60 flex items-center justify-center cursor-pointer hover:border-arcilla/50 transition-colors"
+            className="w-8 h-8 rounded-full bg-arcilla/15 flex items-center justify-center cursor-pointer ring-1 ring-transparent hover:ring-arcilla/50 transition-shadow"
           >
-            <span className="font-mono text-xs text-crema/60">{initials}</span>
+            <span className="text-xs font-semibold text-arcilla">{initials}</span>
           </button>
           {profileOpen && (
             <ProfileDropdown

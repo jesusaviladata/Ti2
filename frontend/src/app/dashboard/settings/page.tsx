@@ -63,9 +63,8 @@ export default function SettingsPage() {
   return (
     <div className="max-w-6xl space-y-6">
       <div>
-        <p className="mb-1 font-mono text-xs uppercase tracking-[0.18em] text-arcilla">Cuenta</p>
-        <h1 className="font-title text-4xl font-semibold text-crema">
-          Configuración<span className="text-arcilla">.</span>
+        <h1 className="page-title">
+          Configuración
         </h1>
       </div>
 

@@ -6,7 +6,7 @@
   /* Paleta Data Express — azules corporativos. Los nombres de token se conservan
      (musgo/arcilla/crema/carbon) para no tocar cada componente; solo cambian los
      valores. Rol de cada uno: carbon = fondo, musgo = superficies/bordes (slate azul),
-     arcilla = acento (azul Data Express), crema = texto. */
+     arcilla = acento (azul Data Express), crema = texto, tinta = texto sobre acento. */
 
   /* Dark theme (default) — RGB tuples for Tailwind opacity modifier support */
   :root {
@@ -14,6 +14,8 @@
     --color-arcilla: 54 169 224;  /* #36A9E0 — azul claro institucional */
     --color-crema:   233 240 247; /* #E9F0F7 — texto blanco frío */
     --color-carbon:  7 24 39;     /* #071827 — fondo azul noche */
+    --color-tinta:   6 18 31;     /* #06121F — texto sobre el acento */
+    color-scheme: dark;
   }
 
   /* Light theme */
@@ -21,25 +23,65 @@
     --color-carbon:  237 242 248; /* #EDF2F8 — fondo claro frío */
     --color-crema:   15 27 45;    /* #0F1B2D — texto azul oscuro */
     --color-musgo:   12 51 80;
-    --color-arcilla: 54 169 224;
+    --color-arcilla: 23 126 181;  /* #177EB5 — acento oscurecido para contraste en claro */
+    --color-tinta:   255 255 255;
+    color-scheme: light;
   }
 
   html {
-    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
     @apply bg-carbon text-crema font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  ::selection {
+    background: rgb(var(--color-arcilla) / 0.35);
+    color: rgb(var(--color-crema));
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--color-arcilla));
+    outline-offset: 2px;
+  }
+
+  input,
+  textarea {
+    caret-color: rgb(var(--color-arcilla));
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--color-crema) / 0.16) transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Título de página: lo lleva el peso y el tamaño, sin etiqueta encima ni punto final. */
+  .page-title {
+    @apply text-2xl font-semibold tracking-[-0.02em] text-crema text-balance sm:text-[1.75rem];
+  }
+
+  .page-subtitle {
+    @apply mt-1.5 max-w-2xl text-sm leading-relaxed text-crema/60;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
-  }
-
-  /* Magnetic button scale — from design system */
-  .btn-magnetic {
-    @apply transition-transform duration-200 ease-power3-out hover:scale-[1.03];
   }
 }

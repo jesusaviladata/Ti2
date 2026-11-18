@@ -32,9 +32,9 @@ export function BackupList() {
 
   if (isLoading) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-2 p-4" aria-busy="true">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-14 rounded-[0.75rem] bg-musgo/10 animate-pulse" />
+          <div key={i} className="h-12 rounded-[0.6rem] bg-crema/[0.05] animate-pulse" />
         ))}
       </div>
     );
@@ -43,11 +43,9 @@ export function BackupList() {
   if (!data?.items.length) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-12 h-12 rounded-[0.75rem] bg-musgo/20 flex items-center justify-center mb-3">
-          <ShieldCheck size={22} className="text-crema/20" />
-        </div>
-        <p className="font-sans text-sm text-crema/40">Sin backups registrados</p>
-        <p className="font-mono text-xs text-crema/20 mt-1">Crea el primero con el botón "Nuevo Backup"</p>
+        <ShieldCheck size={22} className="mb-3 text-crema/40" aria-hidden="true" />
+        <p className="text-sm font-medium text-crema/80">Sin backups registrados</p>
+        <p className="mt-1 text-sm text-crema/55">El historial aparecerá aquí cuando un agente ejecute el primer respaldo.</p>
       </div>
     );
   }
@@ -55,7 +53,7 @@ export function BackupList() {
   return (
     <div className="overflow-x-auto">
       {/* Table header */}
-      <div className="grid min-w-[1020px] grid-cols-[minmax(180px,1fr)_minmax(150px,0.8fr)_85px_110px_125px_80px_110px_70px] gap-3 px-4 py-2 text-[10px] font-mono text-crema/30 uppercase tracking-wider border-b border-musgo/15">
+      <div className="grid min-w-[1020px] grid-cols-[minmax(180px,1fr)_minmax(150px,0.8fr)_85px_110px_125px_80px_110px_70px] gap-3 px-4 py-2.5 text-xs font-medium text-crema/55 border-b border-crema/[0.07]">
         <span>Base de datos</span>
         <span>Origen</span>
         <span>Tipo</span>
@@ -106,18 +104,18 @@ export function BackupList() {
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-musgo/15">
-        <span className="font-mono text-xs text-crema/25">
+      <div className="flex items-center justify-between px-4 py-3 border-t border-crema/[0.07]">
+        <span className="text-xs tabular-nums text-crema/55">
           {data.total} backup{data.total !== 1 ? "s" : ""} en total
           {isFetching && <RefreshCw size={10} className="inline ml-2 animate-spin" />}
         </span>
         <div className="flex gap-2">
           <button disabled={page === 0} onClick={() => setPage((p) => p - 1)}
-            className="font-mono text-xs text-crema/30 hover:text-crema disabled:opacity-20 transition-colors px-2">
+            className="rounded-[0.5rem] px-2.5 py-1 text-xs text-crema/70 transition-colors hover:bg-crema/[0.05] hover:text-crema disabled:pointer-events-none disabled:opacity-35">
             ← Anterior
           </button>
           <button disabled={(page + 1) * limit >= data.total} onClick={() => setPage((p) => p + 1)}
-            className="font-mono text-xs text-crema/30 hover:text-crema disabled:opacity-20 transition-colors px-2">
+            className="rounded-[0.5rem] px-2.5 py-1 text-xs text-crema/70 transition-colors hover:bg-crema/[0.05] hover:text-crema disabled:pointer-events-none disabled:opacity-35">
             Siguiente →
           </button>
         </div>
