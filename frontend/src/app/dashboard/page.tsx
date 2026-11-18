@@ -50,25 +50,19 @@ function dayTotal(day: ChartDay) {
   return day.completed + day.failed + day.running;
 }
 
-function heatColor(day: ChartDay, maxTotal: number) {
-  const total = dayTotal(day);
-  if (total === 0) return "rgb(var(--color-crema) / 0.06)";
-  const intensity = 0.3 + (total / Math.max(maxTotal, 1)) * 0.6;
-  if (day.failed > 0) return `rgba(248, 113, 113, ${intensity})`;
-  if (day.running > 0) return `rgba(251, 191, 36, ${intensity})`;
-  return `rgba(74, 222, 128, ${intensity})`;
-}
+const SEGMENTS = [
+  { key: "completed", label: "completados", color: "bg-green-400/85" },
+  { key: "failed",    label: "fallidos",    color: "bg-red-400/90" },
+  { key: "running",   label: "en ejecución", color: "bg-amber-400/90" },
+] as const;
 
-// ── Calendario de actividad ──────────────────────────────────────────────────
-function BackupHeatmap({ days }: { days: ChartDay[] }) {
-  const [range, setRange] = useState<HeatmapRange>(84);
+// ── Barras diarias apiladas ──────────────────────────────────────────────────
+function BackupActivityChart({ days }: { days: ChartDay[] }) {
+  const [range, setRange] = useState<HeatmapRange>(30);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const visibleDays = useMemo(() => days.slice(-range), [days, range]);
   const selected = visibleDays.find((day) => day.date === selectedDate) ?? null;
-  const leadingEmpty = visibleDays.length
-    ? (new Date(`${visibleDays[0].date}T00:00:00`).getDay() + 6) % 7
-    : 0;
 
   const totals = useMemo(() => visibleDays.reduce(
     (acc, day) => {
@@ -131,22 +125,25 @@ function BackupHeatmap({ days }: { days: ChartDay[] }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto pb-2">
-        <div className="flex min-w-max items-start gap-2">
-          <div className="grid grid-rows-7 gap-1.5" aria-hidden="true">
-            {["L", "M", "X", "J", "V", "S", "D"].map((label) => (
-              <span key={label} className="flex h-6 w-3 items-center justify-center text-[10px] text-crema/45 xl:h-7">
-                {label}
-              </span>
-            ))}
-          </div>
-          <div className="grid grid-flow-col grid-rows-7 gap-1.5">
-            {Array.from({ length: leadingEmpty }).map((_, index) => (
-              <span key={`empty-${index}`} className="h-6 w-6 xl:h-7 xl:w-7" aria-hidden="true" />
-            ))}
+      <div className="flex gap-2">
+        {/* Escala: máximo y cero */}
+        <div className="flex h-36 w-6 shrink-0 flex-col justify-between text-right text-[11px] tabular-nums text-crema/45" aria-hidden="true">
+          <span className="-mt-1.5">{maxTotal > 0 ? maxTotal : ""}</span>
+          <span className="-mb-1.5">0</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div
+            className={cn(
+              "relative flex h-36 items-end border-b border-crema/15",
+              range === 84 ? "gap-px sm:gap-[2px]" : range === 30 ? "gap-[2px] sm:gap-1" : "justify-around gap-2 sm:gap-3",
+            )}
+          >
+            <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-crema/[0.08]" />
+            <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-crema/[0.08]" />
             {visibleDays.map((day) => {
               const total = dayTotal(day);
               const isSelected = selected?.date === day.date;
+              const dimmed = selected !== null && !isSelected;
               const description = `${shortDate(day.date)}: ${total} backups; ${day.completed} completados, ${day.failed} fallidos y ${day.running} en ejecución`;
               return (
                 <button
@@ -156,14 +153,42 @@ function BackupHeatmap({ days }: { days: ChartDay[] }) {
                   aria-label={description}
                   aria-pressed={isSelected}
                   onClick={() => setSelectedDate(isSelected ? null : day.date)}
-                  className={cn(
-                    "h-6 w-6 rounded-[0.3rem] outline-offset-1 ring-inset transition-shadow duration-150 hover:ring-1 hover:ring-crema/40 xl:h-7 xl:w-7",
-                    isSelected && "ring-2 ring-arcilla hover:ring-2 hover:ring-arcilla",
+                  className={cn("group relative flex h-full min-w-0 flex-1 flex-col-reverse rounded-t-[3px] outline-offset-2", range === 7 && "max-w-14")}
+                >
+                  {/* zona de clic completa; el fondo marca el día al pasar o seleccionar */}
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute inset-0 rounded-t-[3px] transition-colors duration-150",
+                      isSelected ? "bg-arcilla/[0.12]" : "group-hover:bg-crema/[0.05]",
+                    )}
+                  />
+                  {total === 0 ? (
+                    <span aria-hidden="true" className="relative h-[3px] w-full rounded-[2px] bg-crema/[0.12]" />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "relative flex w-full flex-col-reverse gap-px overflow-hidden rounded-t-[3px] transition-opacity duration-150",
+                        dimmed && "opacity-40",
+                      )}
+                      style={{ height: `${(total / Math.max(maxTotal, 1)) * 100}%` }}
+                    >
+                      {SEGMENTS.map(({ key, color }) =>
+                        day[key] > 0 ? (
+                          <span key={key} className={cn("w-full min-h-[2px]", color)} style={{ flexGrow: day[key] }} />
+                        ) : null,
+                      )}
+                    </span>
                   )}
-                  style={{ backgroundColor: heatColor(day, maxTotal) }}
-                />
+                </button>
               );
             })}
+          </div>
+          <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-crema/50" aria-hidden="true">
+            <span>{visibleDays[0] ? shortDate(visibleDays[0].date) : ""}</span>
+            {visibleDays.length > 2 ? <span>{shortDate(visibleDays[Math.floor(visibleDays.length / 2)].date)}</span> : null}
+            <span>Hoy</span>
           </div>
         </div>
       </div>
@@ -180,9 +205,9 @@ function BackupHeatmap({ days }: { days: ChartDay[] }) {
           )}
         </p>
         <div className="flex items-center gap-3 text-xs text-crema/55" aria-label="Leyenda de estados">
-          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[0.2rem] bg-green-400/80" />Correcto</span>
-          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[0.2rem] bg-red-400/80" />Con fallos</span>
-          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[0.2rem] bg-amber-400/80" />En curso</span>
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[0.2rem] bg-green-400/85" />Correctos</span>
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[0.2rem] bg-red-400/90" />Con fallos</span>
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[0.2rem] bg-amber-400/90" />En curso</span>
         </div>
       </div>
     </div>
@@ -349,7 +374,7 @@ export default function DashboardPage() {
               </p>
             </div>
           ) : (
-            <BackupHeatmap days={chart} />
+            <BackupActivityChart days={chart} />
           )}
         </section>
 
