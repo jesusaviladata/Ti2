@@ -54,7 +54,7 @@ export function BackupAutomationList({ onNew }: { onNew: () => void }) {
       {isLoading && <p className="text-sm text-crema/55" role="status">Cargando planes…</p>}
       {moduleOff && (
         <p className="rounded-[0.7rem] border border-crema/[0.08] px-4 py-3 text-sm text-crema/65">
-          Los planes automáticos usan el agente Windows, y ese módulo está desactivado en este servidor.
+          Los planes automáticos usan el agente Windows, y ese módulo está desactivado. Un administrador puede activarlo en Configuración → Agentes.
         </p>
       )}
       {!isLoading && !moduleOff && error && (

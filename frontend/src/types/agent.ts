@@ -113,3 +113,16 @@ export interface CleanupExecutionResult {
   errors: Array<{ relativePath: string; code: string }>;
   root: string;
 }
+
+export interface AgentModuleStatus {
+  enabled: boolean;
+  /** panel: lo gobierna un administrador; server: lo fijan las variables de entorno; locked: el servidor prohíbe activarlo. */
+  managedBy: "panel" | "server" | "locked";
+  canManage: boolean;
+  keyStatus: "missing" | "ok" | "unreadable";
+  keySource: "environment" | "database" | null;
+  keyId: string | null;
+  publicKey: string | null;
+  controlPlaneUrl: string;
+  packageVersion: string;
+}

@@ -70,8 +70,8 @@ export default function BackupsPage() {
       {agentModuleOff ? (
         <p className="rounded-[0.8rem] border border-arcilla/25 bg-arcilla/[0.06] px-4 py-3 text-sm text-crema/80">
           <span className="font-medium text-crema">Módulo de agentes desactivado.</span>{" "}
-          Puedes consultar el historial, pero para lanzar o programar backups un administrador debe activar
-          el agente Windows en el servidor.
+          Puedes consultar el historial, pero para lanzar o programar backups un administrador debe activarlo
+          en Configuración → Agentes.
         </p>
       ) : null}
 
