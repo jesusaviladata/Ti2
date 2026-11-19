@@ -31,6 +31,9 @@ export default function CleanupPage() {
   const result = simulation.data?.status === "completed" ? simulation.data.result : null;
   const completed = execution.data?.status === "completed";
   const phase = executionJobId ? 3 : result ? (confirmed ? 2 : 1) : 0;
+  const batchOnly = Boolean(result?.batchLimited) && !result?.discoveryTruncated;
+  const blocked = Boolean(result?.truncated) && !batchOnly;
+  const summary = (result?.propertySummary ?? []) as { path: string; files: number; bytes: number }[];
   const error = simulation.data?.status === "failed" ? simulation.data.error : execution.data?.status === "failed" ? execution.data.error : null;
 
   async function startSimulation() {
@@ -60,19 +63,44 @@ export default function CleanupPage() {
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <section className="rounded-[1.1rem] border border-musgo/20 bg-musgo/[0.06] p-5">
             <div className="flex items-start gap-3"><FolderLock size={18} className="mt-0.5 text-arcilla" /><div><p className="text-sm font-medium text-crema/75">Raíz autorizada e inmutable para esta operación</p><p className="mt-1 font-mono text-xs text-crema/45">{selected.configuration.root}</p></div></div>
-            <div className="mt-5 rounded-[0.875rem] border border-musgo/20 bg-carbon/40 p-4"><p className="text-xs text-crema/45">Por cada carpeta de propiedad:</p><p className="mt-2 font-mono text-sm text-crema/75">Propiedad\core\</p><div className="mt-3 flex flex-wrap gap-2">{TARGETS.map((target) => <span key={target} className="rounded-[0.5rem] border border-musgo/25 bg-musgo/10 px-2.5 py-1 text-[10px] text-crema/50">{target}</span>)}</div><p className="mt-3 text-[11px] leading-relaxed text-crema/35">Se eliminan todos los archivos internos elegibles. No se elimina ninguna carpeta, no se siguen enlaces y no se aceptan rutas manuales.</p></div>
+            <div className="mt-5 rounded-[0.875rem] border border-musgo/20 bg-carbon/40 p-4"><p className="text-xs text-crema/55">Por cada propiedad encontrada bajo la raíz (hasta 8 niveles):</p><p className="mt-2 font-mono text-sm text-crema/75">…\Propiedad\core\</p><div className="mt-3 flex flex-wrap gap-2">{TARGETS.map((target) => <span key={target} className="rounded-[0.5rem] border border-musgo/25 bg-musgo/10 px-2.5 py-1 text-[10px] text-crema/50">{target}</span>)}</div><p className="mt-3 text-[11px] leading-relaxed text-crema/35">Se eliminan todos los archivos internos elegibles. No se elimina ninguna carpeta, no se siguen enlaces y no se aceptan rutas manuales.</p></div>
 
             {!simulationJobId ? <button type="button" onClick={startSimulation} disabled={simulate.isPending} className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-[0.625rem] bg-arcilla text-xs font-medium text-carbon disabled:opacity-40">{simulate.isPending ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Simular limpieza completa</button> : simulation.isLoading || !result ? <ProgressCard label={simulation.data?.phase ?? "Escaneando propiedades"} current={simulation.data?.processedUnits ?? 0} total={simulation.data?.totalUnits ?? 0} /> : (
               <div className="mt-5 space-y-4">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Stat label="Propiedades" value={Number(result.propertiesAffected ?? 0)} /><Stat label="Archivos" value={Number(result.eligibleCount ?? 0)} accent /><Stat label="Espacio" value={formatBytes(Number(result.bytesEligible ?? 0))} accent /><Stat label="Protegidos" value={Number(result.protectedCount ?? 0)} /></div>
-                {result.truncated ? <p className="flex items-center gap-2 text-xs text-amber-300"><AlertTriangle size={13} /> La simulación alcanzó su límite de seguridad; no confirme hasta revisarlo.</p> : null}
+                {batchOnly ? (
+                  <p className="flex items-start gap-2 rounded-[0.7rem] border border-amber-400/25 bg-amber-400/[0.05] px-3 py-2 text-xs leading-relaxed text-amber-200">
+                    <AlertTriangle size={13} className="mt-px shrink-0" />
+                    <span>Lote parcial: hay más archivos que el límite de seguridad ({Number(result.safetyLimit ?? 0).toLocaleString("es")} por lote). Esta ejecución borra exactamente los {Number(result.eligibleCount ?? 0).toLocaleString("es")} archivos listados; al terminar, simule de nuevo para el siguiente lote.</span>
+                  </p>
+                ) : null}
+                {blocked ? <p className="flex items-center gap-2 text-xs text-amber-300"><AlertTriangle size={13} /> La búsqueda de propiedades no terminó (límite de tiempo o de carpetas). Use una raíz más concreta antes de confirmar.</p> : null}
+                {summary.length ? (
+                  <details className="group rounded-[0.8rem] border border-crema/[0.08]" open={summary.length <= 8}>
+                    <summary className="cursor-pointer select-none px-3 py-2 text-xs text-crema/70 hover:text-crema">Desglose por propiedad ({summary.length}{Number(result.propertiesAffected ?? 0) > summary.length ? ` de ${result.propertiesAffected}` : ""})</summary>
+                    <div className="max-h-64 overflow-y-auto border-t border-crema/[0.06]">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-carbon text-left text-crema/50"><tr><th className="px-3 py-1.5 font-medium">Propiedad</th><th className="px-3 py-1.5 text-right font-medium">Archivos</th><th className="px-3 py-1.5 text-right font-medium">Espacio</th></tr></thead>
+                        <tbody className="divide-y divide-crema/[0.05]">
+                          {summary.map((item) => (
+                            <tr key={item.path}>
+                              <td className="max-w-0 truncate px-3 py-1.5 font-mono text-crema/80" title={item.path}>{item.path}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums text-crema/70">{item.files.toLocaleString("es")}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums text-crema/70">{formatBytes(item.bytes)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                ) : null}
                 {!executionJobId ? <label className="flex cursor-pointer items-start gap-3 rounded-[0.875rem] border border-red-500/25 bg-red-500/[0.04] p-4"><input type="checkbox" className="mt-0.5" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span><span className="block text-sm text-red-300">Confirmo la eliminación definitiva</span><span className="mt-1 block text-xs leading-relaxed text-crema/40">Se usarán exactamente el manifiesto y hash de esta simulación. Si algo cambió, el agente rechazará la ejecución.</span></span></label> : null}
-                {!executionJobId ? <div className="flex gap-3"><button type="button" onClick={() => setSimulationJobId(null)} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-[0.625rem] border border-musgo/25 text-xs text-crema/45"><RotateCcw size={13} /> Simular de nuevo</button><button type="button" onClick={startExecution} disabled={!confirmed || execute.isPending || Boolean(result.truncated)} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-[0.625rem] bg-red-500 text-xs font-medium text-white disabled:opacity-30"><Trash2 size={13} /> Vaciar archivos</button></div> : completed ? <div className="rounded-[0.875rem] border border-green-500/25 bg-green-500/[0.05] p-4"><p className="flex items-center gap-2 text-sm text-green-300"><CheckCircle2 size={15} /> Limpieza terminada</p><p className="mt-2 text-xs text-crema/40">{Number(execution.data?.result?.deletedCount ?? 0)} archivos eliminados · {formatBytes(Number(execution.data?.result?.bytesDeleted ?? 0))} liberados · {Number(execution.data?.result?.failedCount ?? 0)} errores.</p></div> : <ProgressCard label={execution.data?.phase ?? "Eliminando archivos autorizados"} current={execution.data?.processedUnits ?? 0} total={execution.data?.totalUnits ?? 0} />}
+                {!executionJobId ? <div className="flex gap-3"><button type="button" onClick={() => setSimulationJobId(null)} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-[0.625rem] border border-musgo/25 text-xs text-crema/45"><RotateCcw size={13} /> Simular de nuevo</button><button type="button" onClick={startExecution} disabled={!confirmed || execute.isPending || blocked} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-[0.625rem] bg-red-500 text-xs font-medium text-white disabled:opacity-30"><Trash2 size={13} /> {batchOnly ? "Vaciar este lote" : "Vaciar archivos"}</button></div> : completed ? <div className="rounded-[0.875rem] border border-green-500/25 bg-green-500/[0.05] p-4"><p className="flex items-center gap-2 text-sm text-green-300"><CheckCircle2 size={15} /> Limpieza terminada</p><p className="mt-2 text-xs text-crema/40">{Number(execution.data?.result?.deletedCount ?? 0)} archivos eliminados · {formatBytes(Number(execution.data?.result?.bytesDeleted ?? 0))} liberados · {Number(execution.data?.result?.failedCount ?? 0)} errores.</p></div> : <ProgressCard label={execution.data?.phase ?? "Eliminando archivos autorizados"} current={execution.data?.processedUnits ?? 0} total={execution.data?.totalUnits ?? 0} />}
               </div>
             )}
             {error ? <p className="mt-4 rounded-[0.625rem] border border-red-500/25 bg-red-500/[0.05] px-3 py-2 text-xs text-red-400">{error}</p> : null}
           </section>
-          <aside className="rounded-[1.1rem] border border-musgo/20 bg-musgo/[0.05] p-5"><div className="flex items-center gap-2"><Server size={15} className="text-arcilla" /><p className="text-sm font-medium text-crema/70">Cómo funciona</p></div><ol className="mt-4 space-y-4 text-xs leading-relaxed text-crema/40"><li><span className="mr-2 text-arcilla">1.</span>El backend toma la raíz validada; el navegador no envía otra ruta.</li><li><span className="mr-2 text-arcilla">2.</span>El agente recorre sólo Propiedad\core y crea un manifiesto con hash.</li><li><span className="mr-2 text-arcilla">3.</span>Usted revisa conteos y espacio antes de confirmar.</li><li><span className="mr-2 text-arcilla">4.</span>El agente revalida cada archivo y elimina únicamente lo aprobado.</li></ol></aside>
+          <aside className="rounded-[1.1rem] border border-musgo/20 bg-musgo/[0.05] p-5"><div className="flex items-center gap-2"><Server size={15} className="text-arcilla" /><p className="text-sm font-medium text-crema/70">Cómo funciona</p></div><ol className="mt-4 space-y-4 text-xs leading-relaxed text-crema/40"><li><span className="mr-2 text-arcilla">1.</span>El backend toma la raíz validada; el navegador no envía otra ruta.</li><li><span className="mr-2 text-arcilla">2.</span>El agente busca las propiedades bajo la raíz (solo las que tienen la firma de Ipsofactu en core) y crea un manifiesto con hash.</li><li><span className="mr-2 text-arcilla">3.</span>Usted revisa conteos y espacio antes de confirmar.</li><li><span className="mr-2 text-arcilla">4.</span>El agente revalida cada archivo y elimina únicamente lo aprobado.</li><li><span className="mr-2 text-arcilla">5.</span>Si hay más archivos que el límite por lote, se limpia por lotes: simular, vaciar y repetir.</li></ol></aside>
         </div>
       )}
     </div>
