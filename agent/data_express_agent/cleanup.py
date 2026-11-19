@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from .property_discovery import discover_properties, is_system_drive_root
 from .explorer import _is_reparse_point, _safe_directory, _safe_target_name
 
 
@@ -78,8 +79,8 @@ class StructuralCleanupExecutor:
         progress: ProgressCallback | None = None,
     ) -> dict[str, Any]:
         root = _safe_directory(str(payload["root"]))
-        if root.parent == root:
-            raise CleanupError("ROOT_TOO_BROAD", "No se permite limpiar la raiz del sistema")
+        if is_system_drive_root(root):
+            raise CleanupError("ROOT_TOO_BROAD", "No se permite limpiar la unidad del sistema")
         container = _safe_container(str(payload.get("containerFolder") or "Core"))
         target_folders = [_safe_target_name(str(item)) for item in payload.get("targetFolders", [])]
         target_files = [_safe_target_name(str(item)) for item in payload.get("targetFiles", [])]
@@ -90,29 +91,48 @@ class StructuralCleanupExecutor:
         max_bytes = max(0, int(payload.get("maxBytes") or 0))
         candidates: list[dict[str, Any]] = []
         protected: list[dict[str, str]] = []
-        properties = []
-        with os.scandir(root) as entries:
-            for entry in entries:
-                path = Path(entry.path)
-                if entry.name.casefold() == ".dataexpress-quarantine":
-                    continue
-                if entry.is_dir(follow_symlinks=False) and not _is_reparse_point(path):
-                    properties.append(path)
-        properties.sort(key=lambda value: value.name.casefold())
+        discovery = discover_properties(
+            root,
+            container=container,
+            target_folders=target_folders,
+            target_files=target_files,
+            progress=(
+                (lambda scanned, total: progress(
+                    {"phase": "discovering_properties", "processedUnits": scanned, "totalUnits": total, "foundCount": 0}
+                ))
+                if progress
+                else None
+            ),
+        )
+        properties = discovery.properties
         if max_properties:
             properties = properties[:max_properties]
+        summary: dict[str, dict[str, Any]] = {}
 
-        for index, property_path in enumerate(properties, start=1):
-            core = property_path / container
-            if core.is_dir() and not _is_reparse_point(core):
+        for index, item in enumerate(properties, start=1):
+            property_path = item.path
+            before = len(candidates)
+            core = self._container_path(property_path, container)
+            if core is not None:
                 for folder_name in target_folders:
                     folder = core / folder_name
                     if folder.is_dir() and not _is_reparse_point(folder):
                         self._collect_files(folder, root, candidates, protected)
                 for file_name in target_files:
                     file_path = core / file_name
-                    if file_path.is_file() and not file_path.is_symlink():
+                    if (
+                        len(candidates) < self.max_candidates
+                        and file_path.is_file()
+                        and not file_path.is_symlink()
+                    ):
                         self._append_candidate(file_path, root, candidates, protected)
+            added = candidates[before:]
+            if added:
+                summary[item.relative] = {
+                    "path": item.relative,
+                    "files": len(added),
+                    "bytes": sum(int(entry["sizeBytes"]) for entry in added),
+                }
             if progress and (index == len(properties) or index % 25 == 0):
                 progress(
                     {
@@ -125,6 +145,7 @@ class StructuralCleanupExecutor:
             if len(candidates) >= self.max_candidates:
                 break
 
+        safety_limit = len(candidates) >= self.max_candidates
         limited = False
         if max_files and len(candidates) > max_files:
             candidates = candidates[:max_files]
@@ -164,10 +185,25 @@ class StructuralCleanupExecutor:
         temporary = path.with_suffix(".json.tmp")
         temporary.write_bytes(_canonical(document))
         os.replace(temporary, path)
+        # Desglose final por propiedad, ya aplicado el corte del lote.
         by_property: dict[str, int] = {}
-        for item in candidates:
-            property_name = Path(str(item["relativePath"])).parts[0]
-            by_property[property_name] = by_property.get(property_name, 0) + 1
+        bytes_by_property: dict[str, int] = {}
+        ordered = sorted(summary, key=len, reverse=True)
+        for entry in candidates:
+            relative = str(entry["relativePath"])
+            owner = next(
+                (name for name in ordered if relative == name or relative.startswith(name + os.sep)),
+                Path(relative).parts[0],
+            )
+            by_property[owner] = by_property.get(owner, 0) + 1
+            bytes_by_property[owner] = bytes_by_property.get(owner, 0) + int(entry["sizeBytes"])
+        property_summary = sorted(
+            (
+                {"path": name, "files": count, "bytes": bytes_by_property.get(name, 0)}
+                for name, count in by_property.items()
+            ),
+            key=lambda value: (-value["bytes"], value["path"].casefold()),
+        )
         return {
             "simulationId": simulation_id,
             "manifestHash": manifest_hash,
@@ -176,12 +212,18 @@ class StructuralCleanupExecutor:
             "propertiesProcessed": len(properties),
             "propertiesAffected": len(by_property),
             "byProperty": by_property,
+            "propertySummary": property_summary[:300],  # el cuerpo del agente está limitado a 256 KB
+            "propertiesDiscovered": len(discovery.properties),
+            "discoveryTruncated": discovery.truncated,
+            "scannedFolders": discovery.scanned_folders,
+            "batchLimited": safety_limit or limited,
+            "safetyLimit": self.max_candidates,
             "eligibleCount": len(candidates),
             "bytesEligible": sum(int(item["sizeBytes"]) for item in candidates),
             "protectedCount": len(protected),
             "samples": candidates[:100],
             "protected": protected[:100],
-            "truncated": len(candidates) >= self.max_candidates or limited,
+            "truncated": safety_limit or limited or discovery.truncated,
         }
 
     def execute_direct(
@@ -334,6 +376,22 @@ class StructuralCleanupExecutor:
         shutil.rmtree(quarantine_root)
         return {"executionId": execution_id, "purged": True}
 
+    @staticmethod
+    def _container_path(property_path: Path, container: str) -> Path | None:
+        """Devuelve la carpeta contenedora sin importar mayúsculas (core / Core)."""
+        direct = property_path / container
+        if direct.is_dir() and not _is_reparse_point(direct):
+            return direct
+        try:
+            with os.scandir(property_path) as iterator:
+                for entry in iterator:
+                    if entry.name.casefold() == container.casefold() and entry.is_dir(follow_symlinks=False):
+                        path = Path(entry.path)
+                        return None if _is_reparse_point(path) else path
+        except OSError:
+            return None
+        return None
+
     def _collect_files(
         self,
         folder: Path,
@@ -349,9 +407,9 @@ class StructuralCleanupExecutor:
                 if not _is_reparse_point(current_path / name)
             ]
             for file_name in sorted(file_names, key=str.casefold):
-                self._append_candidate(current_path / file_name, root, candidates, protected)
                 if len(candidates) >= self.max_candidates:
                     return
+                self._append_candidate(current_path / file_name, root, candidates, protected)
 
     @staticmethod
     def _append_candidate(

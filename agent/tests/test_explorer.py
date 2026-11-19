@@ -30,10 +30,11 @@ def test_validation_treats_direct_children_as_properties_and_only_reads_core(tmp
     )
 
     assert result["valid"] is True
-    assert result["propertiesDetected"] == 3
+    # Solo cuentan como propiedad las carpetas con core; "Hotel Sin Core" ya no se cuenta.
+    assert result["propertiesDetected"] == 2
     assert result["propertiesWithCore"] == 2
-    assert result["propertiesWithoutCore"] == 1
-    assert result["propertiesWithWeb"] == 2
+    assert result["propertiesWithoutCore"] == 0
+    assert result["propertiesWithWeb"] == 1  # entre las propiedades detectadas
     assert result["targetFolders"] == {"Logs": 1}
     assert result["targetFiles"] == {"BD_log.txt": 1}
 

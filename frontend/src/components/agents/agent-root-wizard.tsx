@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, X } from "lucide-react";
 import { useAgentJob, useSaveAgentConfiguration, useValidateAgentRoot } from "@/hooks/useAgents";
 import type { AgentRecord } from "@/types/agent";
 
@@ -12,7 +12,17 @@ export function AgentRootWizard({ agent, onClose }: { agent: AgentRecord; onClos
   const [localError, setLocalError] = useState<string | null>(null);
   const validate = useValidateAgentRoot();
   const save = useSaveAgentConfiguration();
-  const validation = useAgentJob<{ valid?: boolean; propertiesDetected?: number }>(validationJobId);
+  const validation = useAgentJob<{
+    valid?: boolean;
+    propertiesDetected?: number;
+    properties?: { path: string; depth: number; targetsFound: number }[];
+    propertiesListTruncated?: boolean;
+    scannedFolders?: number;
+    maxDepth?: number;
+    truncated?: boolean;
+    errorCount?: number;
+  }>(validationJobId);
+  const report = validation.data?.status === "completed" ? validation.data.result : null;
   const validated = validation.data?.status === "completed" && validation.data.result?.valid === true;
 
   useEffect(() => {
@@ -72,14 +82,40 @@ export function AgentRootWizard({ agent, onClose }: { agent: AgentRecord; onClos
           </label>
 
           <div className="rounded-[0.75rem] border border-musgo/20 bg-musgo/[0.06] p-3">
-            <div className="flex items-center gap-2 text-sm text-crema/65"><ShieldCheck size={14} className="text-arcilla" /> Alcance fijo de Ipsofactu</div>
-            <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-crema/35">Propiedad\core\Log · LogSec · LogsRadian · Respuesta · BD_log.txt</p>
+            <div className="flex items-center gap-2 text-sm text-crema/75"><ShieldCheck size={14} className="text-arcilla" /> Alcance fijo de Ipsofactu</div>
+            <p className="mt-1.5 text-xs leading-relaxed text-crema/55">
+              La raíz puede ser una unidad completa (por ejemplo <span className="font-mono">D:\</span>). El agente busca hasta 8 niveles hacia abajo
+              y solo toma como propiedad una carpeta cuyo <span className="font-mono">core</span> tenga la firma de Ipsofactu
+              (al menos dos de: Log, LogSec, LogsRadian, Respuesta, BD_log.txt).
+            </p>
           </div>
 
           {localError ? <p className="text-xs text-red-400">{localError}</p> : null}
           {validation.data?.status === "failed" ? <p className="text-xs text-red-400">{validation.data.error ?? "La raíz no superó la validación."}</p> : null}
-          {validated ? (
-            <p className="flex items-center gap-2 text-xs text-green-400"><CheckCircle2 size={14} /> Raíz validada · {validation.data?.result?.propertiesDetected ?? 0} propiedades detectadas</p>
+          {report && !report.valid ? (
+            <p className="flex items-start gap-2 text-xs text-amber-300"><AlertTriangle size={14} className="mt-px shrink-0" /> No se encontró ninguna propiedad con la firma de Ipsofactu bajo esta raíz ({report.scannedFolders ?? 0} carpetas revisadas).</p>
+          ) : null}
+          {validated && report ? (
+            <div className="space-y-2">
+              <p className="flex items-center gap-2 text-xs text-green-400">
+                <CheckCircle2 size={14} /> Raíz validada · {report.propertiesDetected ?? 0} propiedades · {report.scannedFolders ?? 0} carpetas revisadas · hasta {report.maxDepth ?? 0} niveles
+              </p>
+              {report.truncated ? (
+                <p className="flex items-start gap-2 text-xs text-amber-300"><AlertTriangle size={14} className="mt-px shrink-0" /> La búsqueda llegó a su límite de tiempo o de carpetas; puede haber propiedades sin listar. Considere una raíz más concreta.</p>
+              ) : null}
+              {report.errorCount ? <p className="text-xs text-amber-300">{report.errorCount} carpetas sin acceso para el agente (revise permisos de NETWORK SERVICE).</p> : null}
+              <div className="max-h-48 overflow-y-auto rounded-[0.6rem] border border-crema/[0.08]">
+                <ul className="divide-y divide-crema/[0.05] text-xs">
+                  {(report.properties ?? []).map((item) => (
+                    <li key={item.path} className="flex items-center justify-between gap-3 px-3 py-1.5">
+                      <span className="min-w-0 truncate font-mono text-crema/80" title={item.path}>{item.path}</span>
+                      <span className="shrink-0 tabular-nums text-crema/50">{item.targetsFound} objetivos</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {report.propertiesListTruncated ? <p className="text-xs text-crema/50">Se muestran las primeras {report.properties?.length ?? 0}.</p> : null}
+            </div>
           ) : null}
 
           <div className="flex justify-end gap-2 pt-1">

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$WinSWPath,
-    [string]$Version = "0.5.0",
+    [string]$Version = "0.5.1",
     [Parameter(Mandatory = $true)][ValidatePattern('^https://')][string]$ControlPlaneUrl,
     [Parameter(Mandatory = $true)][string]$CommandSigningPublicKey,
     [Parameter(Mandatory = $true)][string]$CommandSigningKeyId,

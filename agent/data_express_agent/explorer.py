@@ -118,54 +118,50 @@ class WindowsExplorer:
         target_files: list[str],
         progress: Callable[[int, int], None] | None = None,
     ) -> dict[str, Any]:
+        from .property_discovery import discover_properties, is_system_drive_root
+
         started = time.monotonic()
         root = _safe_directory(root_value)
+        if is_system_drive_root(root):
+            raise ExplorerError("ROOT_TOO_BROAD", "No se permite usar la unidad del sistema como raíz")
         folders = [_safe_target_name(value) for value in target_folders]
         files = [_safe_target_name(value) for value in target_files]
         folder_counts = {name: 0 for name in folders}
         file_counts = {name: 0 for name in files}
-        errors: list[dict[str, str]] = []
-        properties: list[Path] = []
-        truncated = False
         try:
-            with os.scandir(root) as iterator:
-                for entry in iterator:
-                    if len(properties) >= self.max_entries:
-                        truncated = True
-                        break
-                    if entry.name.casefold() in {".dataexpress-quarantine"}:
-                        continue
-                    try:
-                        path = Path(entry.path)
-                        if entry.is_dir(follow_symlinks=False) and not _is_reparse_point(path):
-                            properties.append(path)
-                    except OSError:
-                        errors.append({"property": entry.name, "code": "PROPERTY_INACCESSIBLE"})
+            discovery = discover_properties(
+                root,
+                container="core",
+                target_folders=folders,
+                target_files=files,
+                max_seconds=self.max_validation_seconds,
+            )
         except PermissionError as exc:
             raise ExplorerError("ROOT_ACCESS_DENIED", "No hay acceso a la raíz") from exc
+        errors: list[dict[str, str]] = list(discovery.errors)
+        truncated = discovery.truncated
+        properties = discovery.properties[: self.max_entries]
+        if len(discovery.properties) > self.max_entries:
+            truncated = True
 
-        properties.sort(key=lambda path: path.name.casefold())
-        with_core = 0
-        without_core = 0
         with_web = 0
         processed = 0
-        for property_path in properties:
+        listed: list[dict[str, Any]] = []
+        for item in properties:
             if time.monotonic() - started > self.max_validation_seconds:
                 truncated = True
                 break
+            property_files = 0
             try:
                 children = {
                     entry.name.casefold(): entry
-                    for entry in os.scandir(property_path)
+                    for entry in os.scandir(item.path)
                     if entry.is_dir(follow_symlinks=False) and not entry.is_symlink()
                 }
                 if "web" in children:
                     with_web += 1
                 core_entry = children.get("core")
-                if core_entry is None or _is_reparse_point(Path(core_entry.path)):
-                    without_core += 1
-                else:
-                    with_core += 1
+                if core_entry is not None:
                     core_children = {
                         entry.name.casefold(): entry
                         for entry in os.scandir(core_entry.path)
@@ -175,15 +171,19 @@ class WindowsExplorer:
                         entry = core_children.get(name.casefold())
                         if entry is not None and entry.is_dir(follow_symlinks=False):
                             folder_counts[name] += 1
+                            property_files += 1
                     for name in files:
                         entry = core_children.get(name.casefold())
                         if entry is not None and entry.is_file(follow_symlinks=False):
                             file_counts[name] += 1
+                            property_files += 1
             except PermissionError:
-                errors.append({"property": property_path.name, "code": "PROPERTY_ACCESS_DENIED"})
+                errors.append({"property": item.relative, "code": "PROPERTY_ACCESS_DENIED"})
             except OSError:
-                errors.append({"property": property_path.name, "code": "PROPERTY_READ_FAILED"})
+                errors.append({"property": item.relative, "code": "PROPERTY_READ_FAILED"})
             processed += 1
+            if len(listed) < 300:  # el cuerpo del agente está limitado a 256 KB
+                listed.append({"path": item.relative, "depth": item.depth, "targetsFound": property_files})
             if progress:
                 progress(processed, len(properties))
 
@@ -191,11 +191,15 @@ class WindowsExplorer:
         return {
             "valid": bool(properties) and processed > 0,
             "root": str(root),
-            "propertiesDetected": len(properties),
+            "propertiesDetected": len(discovery.properties),
             "propertiesProcessed": processed,
-            "propertiesWithCore": with_core,
-            "propertiesWithoutCore": without_core,
+            "propertiesWithCore": len(discovery.properties),
+            "propertiesWithoutCore": 0,
             "propertiesWithWeb": with_web,
+            "properties": listed,
+            "propertiesListTruncated": len(discovery.properties) > len(listed),
+            "scannedFolders": discovery.scanned_folders,
+            "maxDepth": max((item.depth for item in discovery.properties), default=0),
             "targetFolders": folder_counts,
             "targetFiles": file_counts,
             "errors": errors[:100],
