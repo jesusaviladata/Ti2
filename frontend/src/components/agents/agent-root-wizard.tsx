@@ -93,7 +93,9 @@ export function AgentRootWizard({ agent, onClose }: { agent: AgentRecord; onClos
           {localError ? <p className="text-xs text-red-400">{localError}</p> : null}
           {validation.data?.status === "failed" ? <p className="text-xs text-red-400">{validation.data.error ?? "La raíz no superó la validación."}</p> : null}
           {report && !report.valid ? (
-            <p className="flex items-start gap-2 text-xs text-amber-300"><AlertTriangle size={14} className="mt-px shrink-0" /> No se encontró ninguna propiedad con la firma de Ipsofactu bajo esta raíz ({report.scannedFolders ?? 0} carpetas revisadas).</p>
+            <p className="flex items-start gap-2 text-xs text-amber-300"><AlertTriangle size={14} className="mt-px shrink-0" /> {report.truncated
+              ? `La búsqueda llegó a su límite de tiempo tras revisar ${report.scannedFolders ?? 0} carpetas sin encontrar propiedades. Use una raíz más concreta (por ejemplo una carpeta de grupo).`
+              : `No se encontró ninguna propiedad con la firma de Ipsofactu bajo esta raíz (${report.scannedFolders ?? 0} carpetas revisadas).`}</p>
           ) : null}
           {validated && report ? (
             <div className="space-y-2">

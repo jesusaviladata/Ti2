@@ -1,4 +1,4 @@
-DATA EXPRESS AGENT 0.5.1 - INSTALACION
+DATA EXPRESS AGENT 0.5.2 - INSTALACION
 ========================================
 
 NO abra DataExpressAgent.exe con doble clic.

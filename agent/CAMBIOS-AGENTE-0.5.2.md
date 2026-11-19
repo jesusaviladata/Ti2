@@ -1,7 +1,7 @@
-# Data Express Agent 0.5.1
+# Data Express Agent 0.5.2
 
 - Fecha de preparación: 19 de noviembre de 2026
-- Base: 0.5.0
+- Base: 0.5.0 (0.5.1 fue una versión de prueba que no llegó a main)
 - Tipo: mejora de Limpieza. No cambia el protocolo, la vinculación ni los backups.
 
 ## Qué cambia
@@ -39,9 +39,15 @@ La validación devuelve la lista de propiedades encontradas, con su ruta relativ
 - **Lotes:** cuando hay más archivos que el límite de seguridad (200 000), la simulación devuelve un lote exacto de ese tamaño y lo marca con `batchLimited`. El lote se puede ejecutar; al terminar se vuelve a simular para el siguiente. Antes, el panel bloqueaba la ejecución y no había forma de limpiar volúmenes grandes.
 - Se corrige que el límite de seguridad se superara en uno (200 001).
 
+### Correcciones respecto a 0.5.1 (versión de prueba)
+
+- **La validación de `D:\` decía "ninguna propiedad" aunque sí las encontraba.** La búsqueda podía agotar los 120 s de validación y luego el conteo de objetivos, que miraba el mismo reloj, se cortaba antes de procesar ninguna propiedad. Ahora el tiempo es solo para la búsqueda, el conteo siempre termina y la raíz es válida si se encontró al menos una propiedad.
+- El tiempo de búsqueda de la validación sube de 120 s a 300 s, para llegar a propiedades profundas en unidades con muchas carpetas.
+- La validación informa del progreso durante la búsqueda.
+
 ## Actualización
 
-Desde 0.5.0, en PowerShell como administrador dentro de `installer`:
+Desde 0.5.0 o 0.5.1, en PowerShell como administrador dentro de `installer`:
 
 ```powershell
 .\Update-DataExpressAgent.ps1
@@ -51,5 +57,5 @@ Se conservan la identidad y la vinculación. Después hay que volver a validar l
 
 ## Pruebas
 
-- 12 pruebas nuevas en `agent/tests/test_discovery_properties.py`: rutas reales a distinta profundidad, aplicación ajena con `core\Log`, carpetas de sistema, límite de profundidad y de carpetas, cuarentena y restauración anidadas, lote exacto y reejecución.
+- 13 pruebas nuevas en `agent/tests/test_discovery_properties.py`: rutas reales a distinta profundidad, aplicación ajena con `core\Log`, carpetas de sistema, límite de profundidad y de carpetas, cuarentena y restauración anidadas, lote exacto, reejecución y la regresión de tiempo de 0.5.1.
 - Se ajustó `test_explorer.py` al nuevo significado de `propertiesDetected`.

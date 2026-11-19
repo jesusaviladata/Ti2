@@ -74,7 +74,7 @@ class WindowsExplorer:
         *,
         drive_provider: Callable[[], Iterable[str]] | None = None,
         max_entries: int = 5000,
-        max_validation_seconds: int = 120,
+        max_validation_seconds: int = 300,  # una unidad completa (D:\) puede tener miles de carpetas
     ):
         self.drive_provider = drive_provider or _windows_drives
         self.max_entries = max_entries
@@ -135,6 +135,7 @@ class WindowsExplorer:
                 target_folders=folders,
                 target_files=files,
                 max_seconds=self.max_validation_seconds,
+                progress=progress,
             )
         except PermissionError as exc:
             raise ExplorerError("ROOT_ACCESS_DENIED", "No hay acceso a la raíz") from exc
@@ -147,10 +148,9 @@ class WindowsExplorer:
         with_web = 0
         processed = 0
         listed: list[dict[str, Any]] = []
+        # El presupuesto de tiempo es para la búsqueda; contar objetivos de las
+        # propiedades ya encontradas es acotado (max_entries) y siempre se completa.
         for item in properties:
-            if time.monotonic() - started > self.max_validation_seconds:
-                truncated = True
-                break
             property_files = 0
             try:
                 children = {
@@ -189,9 +189,10 @@ class WindowsExplorer:
 
         duration_ms = int((time.monotonic() - started) * 1000)
         return {
-            "valid": bool(properties) and processed > 0,
+            "valid": bool(discovery.properties),
             "root": str(root),
             "propertiesDetected": len(discovery.properties),
+            "discoveryTruncated": discovery.truncated,
             "propertiesProcessed": processed,
             "propertiesWithCore": len(discovery.properties),
             "propertiesWithoutCore": 0,

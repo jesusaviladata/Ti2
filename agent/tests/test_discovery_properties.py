@@ -185,3 +185,28 @@ def test_simulation_rejects_system_drive_root(tmp_path, monkeypatch):
             {"root": str(tmp_path), "targetFolders": ["Log"], "targetFiles": []}
         )
     assert rejected.value.code == "ROOT_TOO_BROAD"
+
+
+def test_validation_stays_valid_when_discovery_uses_the_whole_time_budget(tmp_path, monkeypatch):
+    """Regresión 0.5.1: si la búsqueda agotaba el tiempo, no se contaba ninguna propiedad."""
+    import time
+
+    _layout(tmp_path)
+    original = discovery_module.discover_properties
+
+    def slow_discovery(root, **kwargs):
+        kwargs["max_seconds"] = None
+        result = original(root, **kwargs)
+        time.sleep(0.05)  # agota el presupuesto de 0.01 s del explorador
+        return result
+
+    monkeypatch.setattr(discovery_module, "discover_properties", slow_discovery)
+
+    result = WindowsExplorer(max_validation_seconds=0.01).validate_structure(
+        str(tmp_path), target_folders=FOLDERS, target_files=FILES
+    )
+
+    assert result["valid"] is True
+    assert result["propertiesDetected"] == 3
+    assert result["propertiesProcessed"] == 3
+    assert result["targetFiles"]["BD_log.txt"] == 3
