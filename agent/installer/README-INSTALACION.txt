@@ -51,7 +51,35 @@ a sobrescribir una identidad o configuracion existente.
 
 IMPORTANTE: este paquete no contiene contrasenas de Windows, RDP, SFTP ni base de datos.
 
-PERMISOS
+PERMISOS AUTOMATICOS (doble clic)
+
+En el servidor de SQL Server donde esta el agente, ejecute:
+
+  Configurar-Permisos-SQL.cmd
+
+- Pide permisos de administrador y debe usarlo un usuario de Windows que sea
+  sysadmin en SQL Server.
+- Detecta la instancia (si hay varias, pregunta cual) y pide la carpeta donde
+  SQL Server guardara los .bak.
+- En SQL Server: crea el login de NETWORK SERVICE, le concede CREATE ANY DATABASE
+  (necesario para RESTORE VERIFYONLY y para calcular el espacio) y VIEW ANY DATABASE,
+  y lo agrega a db_backupoperator en cada base de usuario en linea.
+- En la carpeta: concede Modificar a NETWORK SERVICE y a la cuenta del servicio de
+  SQL Server.
+- No concede sysadmin ni db_owner. Se puede repetir sin riesgo; vuelva a ejecutarlo
+  cuando agregue bases nuevas.
+- Para ver lo que haria sin cambiar nada:
+    .\installer\Grant-BackupPermissions.ps1 -DryRun
+
+Si el destino es una carpeta compartida (SMB), ejecute en el servidor de ARCHIVOS:
+
+  Configurar-Permisos-CarpetaRed.cmd
+
+- Pide la ruta local de la carpeta compartida y las cuentas de equipo de los
+  servidores con el agente (DOMINIO\SERVIDOR$).
+- Concede Modificar (NTFS) y Cambiar en cada recurso compartido de esa carpeta.
+
+PERMISOS (detalle)
 El servicio se ejecuta como NT AUTHORITY\NetworkService. El perfil SQL usa autenticacion
 integrada de Windows. Esta cuenta debe tener
 permiso BACKUP DATABASE en cada base seleccionable y lectura de la raiz configurada.
