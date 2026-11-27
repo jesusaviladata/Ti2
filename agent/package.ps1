@@ -18,6 +18,10 @@ $packageRoot = Join-Path $releaseRoot $packageName
 $installerTarget = Join-Path $packageRoot "installer"
 $releaseNotesSource = Join-Path $agentRoot "CAMBIOS-AGENTE-$Version.md"
 $quickInstallerSource = Join-Path $agentRoot "Instalar-DataExpressAgent.cmd"
+$permissionLaunchers = @(
+    (Join-Path $agentRoot "Configurar-Permisos-SQL.cmd"),
+    (Join-Path $agentRoot "Configurar-Permisos-CarpetaRed.cmd")
+)
 $specsSource = Join-Path $repoRoot "docs\superpowers\specs"
 
 if (-not (Test-Path (Join-Path $bundleSource "DataExpressAgent.exe"))) {
@@ -31,6 +35,11 @@ if (-not (Test-Path -LiteralPath $releaseNotesSource -PathType Leaf)) {
 }
 if (-not (Test-Path -LiteralPath $quickInstallerSource -PathType Leaf)) {
     throw "Falta Instalar-DataExpressAgent.cmd en la fuente del agente."
+}
+foreach ($launcher in $permissionLaunchers) {
+    if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
+        throw "Falta $(Split-Path -Leaf $launcher) en la fuente del agente."
+    }
 }
 if (-not (Test-Path -LiteralPath $specsSource -PathType Container)) {
     throw "Falta la carpeta versionada de especificaciones."
@@ -55,6 +64,9 @@ Copy-Item -Force -LiteralPath $WinSWPath (Join-Path $packageRoot "DataExpressAge
 Copy-Item -Force (Join-Path $agentRoot "installer\*") $installerTarget
 Copy-Item -Force -LiteralPath $releaseNotesSource (Join-Path $packageRoot "CAMBIOS-AGENTE-$Version.md")
 Copy-Item -Force -LiteralPath $quickInstallerSource (Join-Path $packageRoot "Instalar-DataExpressAgent.cmd")
+foreach ($launcher in $permissionLaunchers) {
+    Copy-Item -Force -LiteralPath $launcher (Join-Path $packageRoot (Split-Path -Leaf $launcher))
+}
 Copy-Item -Recurse -Force -LiteralPath $specsSource (Join-Path $packageRoot "specs")
 Set-Content -Encoding ASCII (Join-Path $packageRoot "VERSION.txt") $Version
 
